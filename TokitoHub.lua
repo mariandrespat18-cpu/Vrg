@@ -2401,9 +2401,12 @@ local function createDropBrainrotButton()
 	close.Parent = btn
 
 	close.MouseButton1Click:Connect(function()
-		gui:Destroy()
-		dropBrainrotGui = nil
-	end)
+	Config["Drop Brainrot Btn"] = false
+	saveConfig()
+
+	gui:Destroy()
+	dropBrainrotGui = nil
+end)
 
 	btn.MouseButton1Click:Connect(function()
 		runDropBrainrot()
@@ -2477,15 +2480,26 @@ end
 createButton("Drop Brainrot Btn", function()
 
 	if dropBrainrotGui then
+		Config["Drop Brainrot Btn"] = false
+		saveConfig()
+
 		dropBrainrotGui:Destroy()
 		dropBrainrotGui = nil
 		return
 	end
 
-	dropBrainrotGui =
-		createDropBrainrotButton()
+	Config["Drop Brainrot Btn"] = true
+	saveConfig()
+
+	dropBrainrotGui = createDropBrainrotButton()
 
 end)
+
+if Config["Drop Brainrot Btn"] then
+	task.defer(function()
+		dropBrainrotGui = createDropBrainrotButton()
+	end)
+end
 
 -- ================= END =================
 -- ================= SERVER HOPPER =================
