@@ -2637,20 +2637,95 @@ end)
 
 end
 
-task.delay(5, function()
-if splash and splash.Parent then
-local t1 = TweenService:Create(splash, TweenInfo.new(0.35), {BackgroundTransparency = 1})
-local t2 = TweenService:Create(splashStroke, TweenInfo.new(0.35), {Transparency = 1})
-local t3 = TweenService:Create(splashText, TweenInfo.new(0.35), {TextTransparency = 1})
-local t4 = TweenService:Create(splashSub, TweenInfo.new(0.35), {TextTransparency = 1})
-t1:Play()
-t2:Play()
-t3:Play()
-t4:Play()
-t1.Completed:Wait()
-if splash then splash:Destroy() end
+if splash then
+	splash:Destroy()
 end
 
-createMenu()
+local CoreGui = game:GetService("CoreGui")
 
+pcall(function()
+	if CoreGui:FindFirstChild("SofkaNotification") then
+		CoreGui.SofkaNotification:Destroy()
+	end
+end)
+
+local notifGui = Instance.new("ScreenGui")
+notifGui.Name = "SofkaNotification"
+notifGui.ResetOnSpawn = false
+notifGui.Parent = CoreGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 95)
+frame.Position = UDim2.new(0.5, -160, 0.05, 0)
+frame.BackgroundColor3 = Color3.fromRGB(12, 16, 35)
+frame.BackgroundTransparency = 0.15
+frame.BorderSizePixel = 0
+frame.Parent = notifGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Parent = frame
+
+local strokeGradient = Instance.new("UIGradient")
+strokeGradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 30, 80)),
+	ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 120, 255)),
+	ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+	ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 120, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 30, 80))
+}
+strokeGradient.Parent = stroke
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 0, 30)
+title.Position = UDim2.new(0, 10, 0, 8)
+title.BackgroundTransparency = 1
+title.Text = "TokitoHub"
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 24
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Parent = frame
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 255)),
+	ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 120, 255))
+}
+titleGradient.Parent = title
+
+local message = Instance.new("TextLabel")
+message.Size = UDim2.new(1, -20, 0, 40)
+message.Position = UDim2.new(0, 10, 0, 42)
+message.BackgroundTransparency = 1
+message.TextWrapped = true
+message.Text = "⚡ Script creado por Tokito ⚡\nTokitoHub"
+message.Font = Enum.Font.GothamBold
+message.TextSize = 12
+message.TextColor3 = Color3.new(1, 1, 1)
+message.Parent = frame
+
+local messageGradient = Instance.new("UIGradient")
+messageGradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 255)),
+	ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 120, 255))
+}
+messageGradient.Parent = message
+
+task.delay(6, function()
+	local info = TweenInfo.new(0.5)
+
+	TweenService:Create(frame, info, {BackgroundTransparency = 1}):Play()
+	TweenService:Create(title, info, {TextTransparency = 1}):Play()
+	TweenService:Create(message, info, {TextTransparency = 1}):Play()
+	TweenService:Create(stroke, info, {Transparency = 1}):Play()
+
+	task.wait(0.6)
+	notifGui:Destroy()
+	createMenu()
 end)
