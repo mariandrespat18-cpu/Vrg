@@ -2187,40 +2187,76 @@ local function enablePerformance()
 	performanceEnabled = true
 
 	local frameCount = 0
-	local lastFpsTime = tick()
+	local lastFpsTime = os.clock()
 
 	performanceGui = Instance.new("ScreenGui")
 	performanceGui.Name = "StatsGui"
 	performanceGui.ResetOnSpawn = false
 	performanceGui.Parent = game:GetService("CoreGui")
 
+	local container = Instance.new("Frame")
+	container.Parent = performanceGui
+	container.Size = UDim2.new(0, 220, 0, 50)
+	container.Position = UDim2.new(0.5, 0, 0, 15)
+	container.AnchorPoint = Vector2.new(0.5, 0)
+	container.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+	container.BackgroundTransparency = 0.15
+	container.BorderSizePixel = 0
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = container
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(0, 170, 255)
+	stroke.Thickness = 1.5
+	stroke.Transparency = 0.2
+	stroke.Parent = container
+
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(25,25,25)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(45,45,45))
+	}
+	gradient.Rotation = 45
+	gradient.Parent = container
+
 	local statsLabel = Instance.new("TextLabel")
-	statsLabel.Parent = performanceGui
-	statsLabel.Size = UDim2.new(0, 180, 0, 40)
-	statsLabel.Position = UDim2.new(0.5, 0, 0, 10)
-	statsLabel.AnchorPoint = Vector2.new(0.5, 0)
-	statsLabel.BackgroundTransparency = 0.3
-	statsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	statsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	statsLabel.Parent = container
+	statsLabel.BackgroundTransparency = 1
+	statsLabel.Size = UDim2.new(1, -10, 1, 0)
+	statsLabel.Position = UDim2.new(0, 5, 0, 0)
+	statsLabel.Font = Enum.Font.GothamBold
+	statsLabel.TextColor3 = Color3.fromRGB(255,255,255)
 	statsLabel.TextScaled = true
-	statsLabel.Font = Enum.Font.SourceSansBold
 	statsLabel.Text = "FPS: 0 | PING: 0ms"
 
 	performanceConn = RunService.RenderStepped:Connect(function()
 		frameCount += 1
-		local now = tick()
 
-		if now - lastFpsTime >= 0.5 then
-			local fps = math.floor(frameCount / (now - lastFpsTime))
+		local now = os.clock()
+		local elapsed = now - lastFpsTime
+
+		if elapsed >= 0.5 then
+			local fps = math.floor(frameCount / elapsed)
+
 			frameCount = 0
 			lastFpsTime = now
 
 			local ping = 0
 			pcall(function()
-				ping = math.floor((player:GetNetworkPing() or 0) * 1000)
+				ping = math.floor(player:GetNetworkPing() * 1000)
 			end)
 
-			statsLabel.Text = "FPS: " .. fps .. " | PING: " .. ping .. "ms"
+			if fps >= 60 then
+				stroke.Color = Color3.fromRGB(0,255,140)
+			elseif fps >= 30 then
+				stroke.Color = Color3.fromRGB(255,200,0)
+			else
+				stroke.Color = Color3.fromRGB(255,80,80)
+			end
+
+			statsLabel.Text = string.format("FPS: %d | PING: %dms", fps, ping)
 		end
 	end)
 end
@@ -2247,12 +2283,14 @@ createToggle("Ver rendimiento", function(state)
 	end
 end)
 
--- ================= END =================
+-- Activar automáticamente al ejecutar el script
+enablePerformance()
 -- ================= DROP BRAINROT BUTTON =================
 
 local dropBrainrotGui = nil
 local dropBrainrotConn = nil
 local dropBrainrotActive = false
+local dropBrainrotAnimConn = nil
 
 local DROP_ASCEND_DURATION = 0.2
 local DROP_ASCEND_SPEED = 150
@@ -2267,11 +2305,9 @@ local function runDropBrainrot()
 	if not root then return end
 
 	dropBrainrotActive = true
-
 	local startTick = tick()
 
 	dropBrainrotConn = RunService.Heartbeat:Connect(function()
-
 		local r = char and char:FindFirstChild("HumanoidRootPart")
 
 		if not r then
@@ -2285,29 +2321,24 @@ local function runDropBrainrot()
 		end
 
 		if tick() - startTick >= DROP_ASCEND_DURATION then
-
 			if dropBrainrotConn then
 				dropBrainrotConn:Disconnect()
 				dropBrainrotConn = nil
 			end
 
 			local rp = RaycastParams.new()
-			rp.FilterDescendantsInstances = {char}
+			rp.FilterDescendantsInstances = { char }
 			rp.FilterType = Enum.RaycastFilterType.Exclude
 
 			local ray = workspace:Raycast(
 				r.Position,
-				Vector3.new(0,-2000,0),
+				Vector3.new(0, -2000, 0),
 				rp
 			)
 
 			if ray then
 				local hum = char:FindFirstChildOfClass("Humanoid")
-
-				local offset =
-					((hum and hum.HipHeight) or 2)
-					+
-					(r.Size.Y / 2)
+				local offset = ((hum and hum.HipHeight) or 2) + (r.Size.Y / 2)
 
 				r.CFrame = CFrame.new(
 					r.Position.X,
@@ -2315,8 +2346,7 @@ local function runDropBrainrot()
 					r.Position.Z
 				)
 
-				r.AssemblyLinearVelocity =
-					Vector3.new(0,0,0)
+				r.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 			end
 
 			dropBrainrotActive = false
@@ -2331,112 +2361,332 @@ local function runDropBrainrot()
 	end)
 end
 
+local function destroyDropBrainrotGui()
+	if dropBrainrotAnimConn then
+		dropBrainrotAnimConn:Disconnect()
+		dropBrainrotAnimConn = nil
+	end
+
+	if dropBrainrotConn then
+		dropBrainrotConn:Disconnect()
+		dropBrainrotConn = nil
+	end
+
+	dropBrainrotActive = false
+
+	if dropBrainrotGui then
+		dropBrainrotGui:Destroy()
+		dropBrainrotGui = nil
+	end
+end
+
 local function createDropBrainrotButton()
+	if dropBrainrotGui then
+		destroyDropBrainrotGui()
+	end
 
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "DropBrainrotGui"
 	gui.ResetOnSpawn = false
-	gui.Parent = player.PlayerGui
+	gui.IgnoreGuiInset = true
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent = player:WaitForChild("PlayerGui")
+	dropBrainrotGui = gui
+
+	local shadow = Instance.new("ImageLabel")
+	shadow.Name = "Shadow"
+	shadow.Parent = gui
+	shadow.BackgroundTransparency = 1
+	shadow.Size = UDim2.new(0, 92, 0, 92)
+	shadow.Position = UDim2.new(0, 13, 0, 13)
+	shadow.Image = "rbxassetid://6014261993"
+	shadow.ImageTransparency = 0.78
+	shadow.ScaleType = Enum.ScaleType.Slice
+	shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+	shadow.ZIndex = 1
 
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0,65,0,65)
-
-	-- IZQUIERDA ARRIBA
-	btn.Position = UDim2.new(0,10,0,10)
-
-	btn.BackgroundColor3 =
-		Color3.fromRGB(12,22,38)
-
-	btn.Text = "DROP"
-	btn.TextScaled = true
-	btn.TextColor3 =
-		Color3.fromRGB(255,255,255)
-
-	btn.Font = Enum.Font.GothamBold
+	btn.Name = "DropButton"
+	btn.Size = UDim2.new(0, 72, 0, 72)
+	btn.Position = UDim2.new(0, 10, 0, 10)
+	btn.BackgroundColor3 = Color3.fromRGB(14, 18, 30)
+	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = false
+	btn.Text = ""
 	btn.Parent = gui
+	btn.ZIndex = 3
 	btn.Active = true
 
-	Instance.new(
-		"UICorner",
-		btn
-	).CornerRadius = UDim.new(1,0)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = btn
+
+	local uiScale = Instance.new("UIScale")
+	uiScale.Scale = 0.95
+	uiScale.Parent = btn
 
 	local stroke = Instance.new("UIStroke")
 	stroke.Parent = btn
 	stroke.Thickness = 2
-	stroke.Color =
-		Color3.fromRGB(0,170,255)
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Color3.fromRGB(0, 170, 255)
+	stroke.Transparency = 0.15
 
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(
-			0,
-			Color3.fromRGB(0,90,255)
-		),
-
-		ColorSequenceKeypoint.new(
-			1,
-			Color3.fromRGB(120,220,255)
-		)
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 255)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(55, 95, 255)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 180))
 	})
+	grad.Rotation = 135
+	grad.Parent = btn
 
-	grad.Parent = stroke
+	local inner = Instance.new("Frame")
+	inner.Name = "Inner"
+	inner.Parent = btn
+	inner.BackgroundColor3 = Color3.fromRGB(18, 24, 40)
+	inner.BackgroundTransparency = 0.22
+	inner.BorderSizePixel = 0
+	inner.Size = UDim2.new(1, -8, 1, -8)
+	inner.Position = UDim2.new(0, 4, 0, 4)
+	inner.ZIndex = 2
+
+	local innerCorner = Instance.new("UICorner")
+	innerCorner.CornerRadius = UDim.new(1, 0)
+	innerCorner.Parent = inner
+
+	local innerGrad = Instance.new("UIGradient")
+	innerGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 30, 50)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 16, 28))
+	})
+	innerGrad.Rotation = 90
+	innerGrad.Parent = inner
+
+	local glow = Instance.new("Frame")
+	glow.Name = "Glow"
+	glow.Parent = btn
+	glow.BackgroundTransparency = 1
+	glow.BorderSizePixel = 0
+	glow.Size = UDim2.new(1, 6, 1, 6)
+	glow.Position = UDim2.new(0, -3, 0, -3)
+	glow.ZIndex = 1
+
+	local glowCorner = Instance.new("UICorner")
+	glowCorner.CornerRadius = UDim.new(1, 0)
+	glowCorner.Parent = glow
+
+	local glowStroke = Instance.new("UIStroke")
+	glowStroke.Parent = glow
+	glowStroke.Thickness = 1
+	glowStroke.Color = Color3.fromRGB(0, 170, 255)
+	glowStroke.Transparency = 0.72
+
+	local icon = Instance.new("TextLabel")
+	icon.Name = "Icon"
+	icon.Parent = btn
+	icon.BackgroundTransparency = 1
+	icon.Size = UDim2.new(1, 0, 0.34, 0)
+	icon.Position = UDim2.new(0, 0, 0.10, 0)
+	icon.Text = "⚡"
+	icon.TextScaled = true
+	icon.Font = Enum.Font.GothamBlack
+	icon.TextColor3 = Color3.fromRGB(255, 255, 255)
+	icon.ZIndex = 4
+
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Parent = btn
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.new(1, -8, 0.20, 0)
+	title.Position = UDim2.new(0, 4, 0.55, 0)
+	title.Text = "DROP"
+	title.TextScaled = true
+	title.Font = Enum.Font.GothamBlack
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.ZIndex = 4
+
+	local subtitle = Instance.new("TextLabel")
+	subtitle.Name = "Subtitle"
+	subtitle.Parent = btn
+	subtitle.BackgroundTransparency = 1
+	subtitle.Size = UDim2.new(1, -8, 0.12, 0)
+	subtitle.Position = UDim2.new(0, 4, 0.76, 0)
+	subtitle.Text = "Brainrot"
+	subtitle.TextScaled = true
+	subtitle.Font = Enum.Font.GothamMedium
+	subtitle.TextColor3 = Color3.fromRGB(210, 220, 255)
+	subtitle.TextTransparency = 0.08
+	subtitle.ZIndex = 4
 
 	local close = Instance.new("TextButton")
-	close.Size = UDim2.new(0,18,0,18)
-
-	close.Position =
-		UDim2.new(1,-18,0,0)
-
-	close.Text = "X"
-
-	close.TextScaled = true
-
-	close.BackgroundColor3 =
-		Color3.fromRGB(255,40,40)
-
-	close.TextColor3 =
-		Color3.fromRGB(255,255,255)
-
+	close.Name = "Close"
 	close.Parent = btn
+	close.Size = UDim2.new(0, 18, 0, 18)
+	close.Position = UDim2.new(1, -9, 0, -9)
+	close.AnchorPoint = Vector2.new(0.5, 0.5)
+	close.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+	close.BorderSizePixel = 0
+	close.AutoButtonColor = false
+	close.Text = "×"
+	close.TextScaled = true
+	close.Font = Enum.Font.GothamBold
+	close.TextColor3 = Color3.fromRGB(255, 255, 255)
+	close.ZIndex = 5
+
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(1, 0)
+	closeCorner.Parent = close
+
+	local closeStroke = Instance.new("UIStroke")
+	closeStroke.Parent = close
+	closeStroke.Thickness = 1
+	closeStroke.Color = Color3.fromRGB(255, 255, 255)
+	closeStroke.Transparency = 0.45
+
+	dropBrainrotAnimConn = RunService.RenderStepped:Connect(function()
+		if not gui.Parent then return end
+		grad.Rotation = (grad.Rotation + 0.5) % 360
+	end)
+
+	task.defer(function()
+		btn.Size = UDim2.new(0, 0, 0, 0)
+		shadow.Size = UDim2.new(0, 0, 0, 0)
+
+		TweenService:Create(
+			btn,
+			TweenInfo.new(0.30, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Size = UDim2.new(0, 72, 0, 72) }
+		):Play()
+
+		TweenService:Create(
+			shadow,
+			TweenInfo.new(0.30, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Size = UDim2.new(0, 92, 0, 92) }
+		):Play()
+
+		TweenService:Create(
+			uiScale,
+			TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Scale = 0.95 }
+		):Play()
+	end)
+
+	local function setPremiumHover(on)
+		if on then
+			TweenService:Create(
+				btn,
+				TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{ BackgroundColor3 = Color3.fromRGB(18, 22, 38) }
+			):Play()
+
+			TweenService:Create(
+				uiScale,
+				TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{ Scale = 1 }
+			):Play()
+
+			stroke.Transparency = 0.02
+			glowStroke.Transparency = 0.62
+		else
+			TweenService:Create(
+				btn,
+				TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{ BackgroundColor3 = Color3.fromRGB(14, 18, 30) }
+			):Play()
+
+			TweenService:Create(
+				uiScale,
+				TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{ Scale = 0.95 }
+			):Play()
+
+			stroke.Transparency = 0.15
+			glowStroke.Transparency = 0.72
+		end
+	end
+
+	btn.MouseEnter:Connect(function()
+		setPremiumHover(true)
+	end)
+
+	btn.MouseLeave:Connect(function()
+		setPremiumHover(false)
+	end)
+
+	btn.MouseButton1Down:Connect(function()
+		TweenService:Create(
+			uiScale,
+			TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ Scale = 0.90 }
+		):Play()
+	end)
+
+	btn.MouseButton1Up:Connect(function()
+		TweenService:Create(
+			uiScale,
+			TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Scale = 1 }
+		):Play()
+	end)
+
+	close.MouseEnter:Connect(function()
+		TweenService:Create(
+			close,
+			TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ BackgroundColor3 = Color3.fromRGB(255, 95, 95) }
+		):Play()
+	end)
+
+	close.MouseLeave:Connect(function()
+		TweenService:Create(
+			close,
+			TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ BackgroundColor3 = Color3.fromRGB(255, 70, 70) }
+		):Play()
+	end)
 
 	close.MouseButton1Click:Connect(function()
-	Config["Drop Brainrot Btn"] = false
-	saveConfig()
-
-	gui:Destroy()
-	dropBrainrotGui = nil
-end)
+		Config["Drop Brainrot Btn"] = false
+		saveConfig()
+		destroyDropBrainrotGui()
+	end)
 
 	btn.MouseButton1Click:Connect(function()
 		runDropBrainrot()
 	end)
 
-	-- MOVIBLE
 	local dragging = false
 	local dragStart
 	local startPos
 	local dragInput
 
+	local function updateDrag(input)
+		local delta = input.Position - dragStart
+
+		btn.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+
+		shadow.Position = UDim2.new(
+			btn.Position.X.Scale,
+			btn.Position.X.Offset + 3,
+			btn.Position.Y.Scale,
+			btn.Position.Y.Offset + 3
+		)
+	end
+
 	btn.InputBegan:Connect(function(input)
-
-		if input.UserInputType ==
-			Enum.UserInputType.Touch
-
-			or
-
-			input.UserInputType ==
-			Enum.UserInputType.MouseButton1 then
-
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = input.Position
 			startPos = btn.Position
 
 			input.Changed:Connect(function()
-
-				if input.UserInputState ==
-					Enum.UserInputState.End then
-
+				if input.UserInputState == Enum.UserInputState.End then
 					dragging = false
 				end
 			end)
@@ -2444,33 +2694,14 @@ end)
 	end)
 
 	btn.InputChanged:Connect(function(input)
-
-		if input.UserInputType ==
-			Enum.UserInputType.Touch
-
-			or
-
-			input.UserInputType ==
-			Enum.UserInputType.MouseMovement then
-
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
 			dragInput = input
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-
 		if dragging and input == dragInput then
-
-			local delta =
-				input.Position - dragStart
-
-			btn.Position = UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset + delta.X,
-
-				startPos.Y.Scale,
-				startPos.Y.Offset + delta.Y
-			)
+			updateDrag(input)
 		end
 	end)
 
@@ -2478,21 +2709,16 @@ end)
 end
 
 createButton("Drop Brainrot Btn", function()
-
 	if dropBrainrotGui then
 		Config["Drop Brainrot Btn"] = false
 		saveConfig()
-
-		dropBrainrotGui:Destroy()
-		dropBrainrotGui = nil
+		destroyDropBrainrotGui()
 		return
 	end
 
 	Config["Drop Brainrot Btn"] = true
 	saveConfig()
-
 	dropBrainrotGui = createDropBrainrotButton()
-
 end)
 
 if Config["Drop Brainrot Btn"] then
