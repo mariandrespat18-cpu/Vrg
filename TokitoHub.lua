@@ -1794,179 +1794,105 @@ createToggle(
 local sentryEnabled = false
 local sentryConn
 
-local function attackSentry(desc)
-	task.spawn(function()
-
-		local lp = game.Players.LocalPlayer
-		local char = lp.Character
-
-		if not char then return end
-
-		local hrp =
-			char:FindFirstChild("HumanoidRootPart")
-
-		local backpack =
-			lp:FindFirstChild("Backpack")
-
-		if not hrp or not backpack then
-			return
-		end
-
-		local batTool =
-			backpack:FindFirstChild("Bat")
-			or char:FindFirstChild("Bat")
-
-		if not batTool then
-			return
-		end
-
-		local humanoid =
-			char:FindFirstChildOfClass(
-				"Humanoid"
-			)
-
-		if batTool.Parent ~= char
-			and humanoid then
-
-			humanoid:EquipTool(
-				batTool
-			)
-		end
-
-		task.wait(0.05)
-
-		local targetPart
-
-		if desc:IsA("Model") then
-
-			targetPart =
-				desc.PrimaryPart
-				or
-				desc:FindFirstChildWhichIsA(
-					"BasePart"
-				)
-
-		else
-			targetPart = desc
-		end
-
-		if not targetPart then
-			return
-		end
-
-		pcall(function()
-
-			targetPart.CFrame =
-				hrp.CFrame
-				+
-				(hrp.CFrame.LookVector * 2)
-				+
-				Vector3.new(0,1,0)
-
-		end)
-
-		for i = 1, 10 do
-
-			if not sentryEnabled
-				or not desc
-				or not desc.Parent then
-
-				break
-			end
-
-			pcall(function()
-				batTool:Activate()
-			end)
-
-			task.wait(0.03)
-		end
-
-		if batTool.Parent == char then
-			batTool.Parent = backpack
-		end
-	end)
-end
-
-local function checkSentry(desc)
-
-	if not sentryEnabled then
-		return
-	end
-
-	if not (
-		desc:IsA("Model")
-		or desc:IsA("BasePart")
-	) then
-		return
-	end
-
-	local name =
-		string.lower(desc.Name)
-
-	if name:find("sentry")
-		or name:find("turret")
-		or name:find("torreta") then
-
-		task.spawn(function()
-
-			task.wait(0.1)
-
-			if sentryEnabled
-				and desc
-				and desc.Parent then
-
-				attackSentry(desc)
-			end
-		end)
-	end
-end
-
 local function startSentryWatch()
+    if sentryConn then
+        sentryConn:Disconnect()
+        sentryConn = nil
+    end
 
-	if sentryConn then
-		sentryConn:Disconnect()
-		sentryConn = nil
-	end
+    local lp = game.Players.LocalPlayer
+    local Players = game:GetService("Players")
 
-	for _, obj in ipairs(
-		workspace:GetDescendants()
-	) do
+    sentryConn = workspace.DescendantAdded:Connect(function(desc)
+        if not sentryEnabled then return end
+        if not desc:IsA("Model") and not desc:IsA("BasePart") then return end
+        if not string.find(desc.Name:lower(), "sentry") then return end
 
-		checkSentry(obj)
-	end
+        local char = lp.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
-	sentryConn =
-		workspace.DescendantAdded:Connect(
-			checkSentry
-		)
+        local hrp = char.HumanoidRootPart
+
+        -- ignorar tus propios sentries
+        for _, playerObj in pairs(Players:GetPlayers()) do
+            if playerObj == lp then continue end
+            if playerObj.Character and desc:IsDescendantOf(playerObj.Character) then
+                return
+            end
+        end
+
+        task.wait(4.1)
+        if not desc.Parent or not sentryEnabled then return end
+
+        local backpack = lp:FindFirstChild("Backpack")
+        local batTool = backpack and backpack:FindFirstChild("Bat") or char:FindFirstChild("Bat")
+
+        -- buscar Bat en workspace si no tienes
+        if not batTool then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Tool") and obj.Name == "Bat" then
+                    obj.Parent = backpack
+                    batTool = obj
+                    break
+                end
+            end
+        end
+
+        if not batTool then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if batTool.Parent == backpack and humanoid then
+            humanoid:EquipTool(batTool)
+            task.wait(0.25)
+        end
+
+        -- colocar frente al jugador
+        local offset = hrp.CFrame.LookVector * 3.5 + Vector3.new(0, 1.2, 0)
+
+        if desc:IsA("Model") and desc.PrimaryPart then
+            desc:SetPrimaryPartCFrame(hrp.CFrame + offset)
+        elseif desc:IsA("BasePart") then
+            desc.CFrame = hrp.CFrame + offset
+        end
+
+        -- atacar
+        if batTool.Parent == char then
+            batTool:Activate()
+        end
+
+        local hits = 0
+        while sentryEnabled and desc.Parent and hits < 5 do
+            task.wait(0.12)
+            batTool:Activate()
+            hits += 1
+        end
+
+        task.wait(0.1)
+
+        if batTool.Parent == char then
+            batTool.Parent = backpack
+        end
+    end)
 end
 
 local function stopSentryWatch()
+    sentryEnabled = false
 
-	sentryEnabled = false
-
-	if sentryConn then
-		sentryConn:Disconnect()
-		sentryConn = nil
-	end
+    if sentryConn then
+        sentryConn:Disconnect()
+        sentryConn = nil
+    end
 end
 
-createToggle(
-	"Anti Torreta (Beta)",
+createToggle("Anti Torreta (Beta)", function(state)
+    sentryEnabled = state
 
-	function(state)
-
-		sentryEnabled = state
-
-		if state then
-			startSentryWatch()
-		else
-			stopSentryWatch()
-		end
-	end
-)
-
--- ================= END =================
+    if state then
+        startSentryWatch()
+    else
+        stopSentryWatch()
+    end
+end)
 -- ================= PLAYER ESP =================
 
 local playerESPEnabled = false
@@ -2108,88 +2034,145 @@ end)
 -- ================= XRAY =================
 
 local xrayEnabled = false
-local originalTransparency = {}
+local xrayConnection = nil
+local originalDecorationsTransparency = {}
 
-local function applyXrayToObj(obj)
+local XRayTransparency = 0.5
 
-	if obj:IsA("ParticleEmitter")
-	or obj:IsA("Trail")
-	or obj:IsA("Beam") then
+local function startXRay()
 
-		pcall(function()
-			obj:Destroy()
-		end)
+	if xrayConnection then
+		xrayConnection:Disconnect()
+		xrayConnection = nil
+	end
 
-	elseif obj:IsA("BasePart") then
+	local plots = workspace:FindFirstChild("Plots")
 
-		obj.Material = Enum.Material.Plastic
+	if plots then
+		for _, plot in ipairs(plots:GetChildren()) do
 
-		local isBase =
-			obj.Anchored and
-			(
-				obj.Name:lower():find("base")
-				or
-				(obj.Parent and obj.Parent.Name:lower():find("base"))
-			)
+			local decorations = plot:FindFirstChild("Decorations")
 
-		if isBase then
+			if plot:IsA("Model") and decorations then
 
-			if originalTransparency[obj] == nil then
-				originalTransparency[obj] =
-					obj.LocalTransparencyModifier
+				for _, part in ipairs(decorations:GetDescendants()) do
+
+					if part:IsA("BasePart") then
+
+						if originalDecorationsTransparency[part] == nil then
+							originalDecorationsTransparency[part] =
+								part.Transparency
+						end
+
+						part.Transparency =
+							XRayTransparency
+					end
+				end
+			end
+		end
+	end
+
+	xrayConnection =
+		RunService.Heartbeat:Connect(function()
+
+			if not xrayEnabled then
+				return
 			end
 
-			obj.LocalTransparencyModifier = 0.5
-		end
-	end
-end
+			local plots =
+				workspace:FindFirstChild("Plots")
 
-local function enableXray()
+			if not plots then
+				return
+			end
+
+			for _, plot in ipairs(
+				plots:GetChildren()
+			) do
+
+				local decorations =
+					plot:FindFirstChild(
+						"Decorations"
+					)
+
+				if plot:IsA("Model")
+					and decorations then
+
+					for _, part in ipairs(
+						decorations:GetDescendants()
+					) do
+
+						if part:IsA(
+							"BasePart"
+						) then
+
+							part.Transparency =
+								XRayTransparency
+						end
+					end
+				end
+			end
+		end)
 
 	xrayEnabled = true
-
-	for _, obj in ipairs(workspace:GetDescendants()) do
-		applyXrayToObj(obj)
-	end
-
-	if not Connections.xrayDescAdded then
-
-		Connections.xrayDescAdded =
-			workspace.DescendantAdded:Connect(function(obj)
-
-				if xrayEnabled then
-					applyXrayToObj(obj)
-				end
-			end)
-	end
 end
 
-local function disableXray()
+local function stopXRay()
 
-	xrayEnabled = false
+	if xrayConnection then
+		xrayConnection:Disconnect()
+		xrayConnection = nil
+	end
 
-	for part, value in pairs(originalTransparency) do
+	local plots = workspace:FindFirstChild("Plots")
 
-		if part and part.Parent then
-			part.LocalTransparencyModifier = value
+	if plots then
+		for _, plot in ipairs(plots:GetChildren()) do
+
+			local decorations =
+				plot:FindFirstChild(
+					"Decorations"
+				)
+
+			if plot:IsA("Model")
+				and decorations then
+
+				for _, part in ipairs(
+					decorations:GetDescendants()
+				) do
+
+					if part:IsA(
+						"BasePart"
+					) then
+
+						local old =
+							originalDecorationsTransparency[
+								part
+							]
+
+						if old ~= nil then
+							part.Transparency =
+								old
+						else
+							part.Transparency = 0
+						end
+					end
+				end
+			end
 		end
 	end
 
-	originalTransparency = {}
-
-	if Connections.xrayDescAdded then
-		Connections.xrayDescAdded:Disconnect()
-		Connections.xrayDescAdded = nil
-	end
+	xrayEnabled = false
 end
 
-createToggle("Xray", function(state)
+createToggle("Xray (Undetectable) ", function(state)
 
 	if state then
-		enableXray()
+		startXRay()
 	else
-		disableXray()
+		stopXRay()
 	end
+
 end)
 
 -- ================= END =================
