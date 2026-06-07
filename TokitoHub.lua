@@ -2543,7 +2543,6 @@ createToggle("Ver rendimiento", function(state)
 end)
 
 -- Activar automáticamente al ejecutar el script
-enablePerformance()
 -- ================= DROP BRAINROT BUTTON =================
 
 local dropBrainrotGui = nil
