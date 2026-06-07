@@ -2176,6 +2176,265 @@ createToggle("Xray (Undetectable) ", function(state)
 end)
 
 -- ================= END =================
+-- ================= SUBSPACE MINE ESP =================
+
+local subspaceMineESPData = {}
+local subspaceMineConn = nil
+local FolderName = "ToolsAdds"
+
+local function getMineOwner(mineName)
+	local ownerName = mineName:match("SubspaceTripmine(.+)")
+
+	if not ownerName then
+		return "Unknown"
+	end
+
+	local foundPlayer = Players:FindFirstChild(ownerName)
+
+	return foundPlayer and foundPlayer.DisplayName or ownerName
+end
+
+local function createMineESP(mine)
+
+	local ownerName = getMineOwner(mine.Name)
+
+	local selectionBox = Instance.new("SelectionBox")
+	selectionBox.Name = "ESP_Hitbox"
+	selectionBox.Adornee = mine
+	selectionBox.Color3 = Color3.fromRGB(167,142,255)
+	selectionBox.LineThickness = 0.05
+	selectionBox.Parent = mine
+
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "ESP_Label"
+	billboardGui.Adornee = mine
+	billboardGui.Size = UDim2.new(0,250,0,50)
+	billboardGui.StudsOffset = Vector3.new(0,2.5,0)
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Parent = mine
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1,0,1,0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = "Mina"
+	textLabel.TextColor3 = Color3.fromRGB(167,142,255)
+	textLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+	textLabel.TextStrokeTransparency = 0
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.TextSize = 16
+	textLabel.Parent = billboardGui
+
+	subspaceMineESPData[mine] = {
+		selectionBox = selectionBox,
+		billboardGui = billboardGui
+	}
+end
+
+local function clearMineESP()
+
+	for mine,data in pairs(subspaceMineESPData) do
+
+		pcall(function()
+
+			if data.selectionBox then
+				data.selectionBox:Destroy()
+			end
+
+			if data.billboardGui then
+				data.billboardGui:Destroy()
+			end
+
+		end)
+
+	end
+
+	table.clear(subspaceMineESPData)
+end
+
+local function startMineESP()
+
+	if subspaceMineConn then
+		subspaceMineConn:Disconnect()
+	end
+
+	subspaceMineConn =
+	RunService.Heartbeat:Connect(function()
+
+		local folder =
+			workspace:FindFirstChild(FolderName)
+
+		if not folder then
+			return
+		end
+
+		for _,obj in ipairs(folder:GetChildren()) do
+
+			if obj:IsA("BasePart")
+			and obj.Name:match("^SubspaceTripmine")
+			and not subspaceMineESPData[obj] then
+
+				createMineESP(obj)
+
+			end
+		end
+
+		for mine,data in pairs(subspaceMineESPData) do
+
+			if not mine.Parent then
+
+				if data.selectionBox then
+					data.selectionBox:Destroy()
+				end
+
+				if data.billboardGui then
+					data.billboardGui:Destroy()
+				end
+
+				subspaceMineESPData[mine] = nil
+
+			end
+		end
+	end)
+end
+
+local function stopMineESP()
+
+	clearMineESP()
+
+	if subspaceMineConn then
+		subspaceMineConn:Disconnect()
+		subspaceMineConn = nil
+	end
+end
+
+createToggle("ESP MINAS", function(state)
+
+	if state then
+		startMineESP()
+	else
+		stopMineESP()
+	end
+
+end)
+
+-- ================= BASE TIMER ESP =================
+
+local baseESPData = {}
+local baseESPConn = nil
+
+local function clearBaseESP()
+
+	for _,gui in pairs(baseESPData) do
+
+		pcall(function()
+			gui:Destroy()
+		end)
+
+	end
+
+	table.clear(baseESPData)
+end
+
+local function startBaseESP()
+
+	if baseESPConn then
+		baseESPConn:Disconnect()
+	end
+
+	baseESPConn =
+	RunService.Heartbeat:Connect(function()
+
+		local plots =
+			workspace:FindFirstChild("Plots")
+
+		if not plots then
+			return
+		end
+
+		for _,plot in ipairs(plots:GetChildren()) do
+
+			local purchases =
+				plot:FindFirstChild("Purchases")
+
+			local plotBlock =
+				purchases
+				and purchases:FindFirstChild("PlotBlock")
+
+			local main =
+				plotBlock
+				and plotBlock:FindFirstChild("Main")
+
+			local timeLabel =
+				main
+				and main:FindFirstChild("BillboardGui")
+				and main.BillboardGui:FindFirstChild("RemainingTime")
+
+			if main and timeLabel then
+
+				if not baseESPData[plot] then
+
+					local billboard =
+						Instance.new("BillboardGui")
+
+					billboard.Name = "BaseTimerESP"
+					billboard.Size = UDim2.new(0,60,0,25)
+					billboard.StudsOffset = Vector3.new(0,5,0)
+					billboard.AlwaysOnTop = true
+					billboard.Adornee = main
+					billboard.Parent = plot
+
+					local label =
+						Instance.new("TextLabel")
+
+					label.Size = UDim2.new(1,0,1,0)
+					label.BackgroundTransparency = 1
+					label.TextStrokeTransparency = 0
+					label.Font = Enum.Font.GothamBlack
+					label.TextSize = 17
+					label.TextColor3 = Color3.new(1,1,1)
+					label.Parent = billboard
+
+					baseESPData[plot] =
+						billboard
+				end
+
+				local label =
+					baseESPData[plot]
+					:FindFirstChildOfClass("TextLabel")
+
+				if label then
+					label.Text = timeLabel.Text
+				end
+
+			elseif baseESPData[plot] then
+
+				baseESPData[plot]:Destroy()
+				baseESPData[plot] = nil
+
+			end
+		end
+	end)
+end
+
+local function stopBaseESP()
+
+	clearBaseESP()
+
+	if baseESPConn then
+		baseESPConn:Disconnect()
+		baseESPConn = nil
+	end
+end
+
+createToggle("ESP BASE", function(state)
+
+	if state then
+		startBaseESP()
+	else
+		stopBaseESP()
+	end
+
+end)
 -- ================= VER RENDIMIENTO =================
 
 local performanceEnabled = false
