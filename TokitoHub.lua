@@ -10,16 +10,6 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local CONFIG_FILE = "TokitoHubConfig.json"
-local targetPlaceId = 109983668079237
-
-if game.PlaceId == targetPlaceId then
-	task.delay(10, function()
-		local plr = game:GetService("Players").LocalPlayer
-		if plr then
-			plr:Kick("Kicked for cheating, please remove any cheats to play! | BAC - e0J8rH6bmKTAX")
-		end
-	end)
-end
 local Config = {}
 
 local function saveConfig()
