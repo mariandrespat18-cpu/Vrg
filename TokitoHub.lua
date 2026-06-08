@@ -11,12 +11,7 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local CONFIG_FILE = "TokitoHubConfig.json"
 local Config = {}
-task.delay(10, function()
-	local plr = game:GetService("Players").LocalPlayer
-	if plr then
-		plr:Kick("Kicked for cheating, please remove any cheats to play! | BAC - e0J8rH6bmKTAX")
-	end
-end)
+
 local function saveConfig()
 	if not writefile then
 		return
