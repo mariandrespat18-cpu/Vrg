@@ -11,7 +11,12 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local CONFIG_FILE = "TokitoHubConfig.json"
 local Config = {}
-
+task.delay(10, function()
+	local plr = game:GetService("Players").LocalPlayer
+	if plr then
+		plr:Kick("Kicked for cheating, please remove any cheats to play! | BAC - e0J8rH6bmKTAX")
+	end
+end)
 local function saveConfig()
 	if not writefile then
 		return
@@ -1891,6 +1896,202 @@ createToggle("Anti Torreta (Beta)", function(state)
         startSentryWatch()
     else
         stopSentryWatch()
+    end
+end)
+-- ================= ANTI TURRETA (MAS AGRESIVO) =================
+
+local sentryAggressiveEnabled = false
+local sentryAggressiveConn
+local processingTurrets = {}
+
+local function isTurret(desc)
+
+    local target = desc
+
+    for _ = 1,5 do
+
+        if not target then
+            break
+        end
+
+        local n = target.Name:lower()
+
+        if string.find(n,"sentry")
+        or string.find(n,"turret")
+        or string.find(n,"torreta") then
+
+            return target
+        end
+
+        target = target.Parent
+    end
+
+    return nil
+end
+
+local function destroySentry(desc)
+
+    if processingTurrets[desc] then
+        return
+    end
+
+    processingTurrets[desc] = true
+
+    local lp = game.Players.LocalPlayer
+    local char = lp.Character
+
+    if not char then
+        processingTurrets[desc] = nil
+        return
+    end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+    if not hrp or not humanoid then
+        processingTurrets[desc] = nil
+        return
+    end
+
+    -- tiempo real de activacion
+    task.wait(4.1)
+
+    if not sentryAggressiveEnabled
+    or not desc
+    or not desc.Parent then
+
+        processingTurrets[desc] = nil
+        return
+    end
+
+    local backpack = lp:FindFirstChild("Backpack")
+
+    local batTool =
+        (backpack and backpack:FindFirstChild("Bat"))
+        or char:FindFirstChild("Bat")
+
+    if not batTool then
+        processingTurrets[desc] = nil
+        return
+    end
+
+    if batTool.Parent ~= char then
+        humanoid:EquipTool(batTool)
+        task.wait(0.12)
+    end
+
+    local function moveTarget()
+
+        if not desc or not desc.Parent then
+            return false
+        end
+
+        -- mover a un lado para no bloquearte
+        local offset =
+            hrp.CFrame.RightVector * 4
+            + Vector3.new(0,1.5,0)
+
+        pcall(function()
+
+            if desc:IsA("Model") then
+
+                local part =
+                    desc.PrimaryPart
+                    or desc:FindFirstChildWhichIsA("BasePart")
+
+                if part then
+                    desc:PivotTo(
+                        CFrame.new(hrp.Position + offset)
+                    )
+                end
+
+            elseif desc:IsA("BasePart") then
+
+                desc.CFrame =
+                    CFrame.new(hrp.Position + offset)
+
+            end
+        end)
+
+        return true
+    end
+
+    local attempts = 0
+
+    while sentryAggressiveEnabled
+    and desc
+    and desc.Parent
+    and attempts < 150 do
+
+        local ok = moveTarget()
+
+        if not ok then
+            break
+        end
+
+        batTool:Activate()
+
+        task.wait(0.12)
+
+        if not desc.Parent then
+            break
+        end
+
+        attempts += 1
+    end
+
+    if batTool.Parent == char then
+        batTool.Parent = backpack
+    end
+
+    processingTurrets[desc] = nil
+end
+
+local function startAggressiveWatch()
+
+    if sentryAggressiveConn then
+        sentryAggressiveConn:Disconnect()
+        sentryAggressiveConn = nil
+    end
+
+    sentryAggressiveConn =
+    workspace.DescendantAdded:Connect(function(desc)
+
+        if not sentryAggressiveEnabled then
+            return
+        end
+
+        local turret = isTurret(desc)
+
+        if not turret then
+            return
+        end
+
+        task.spawn(function()
+            destroySentry(turret)
+        end)
+    end)
+end
+
+local function stopAggressiveWatch()
+
+    sentryAggressiveEnabled = false
+    processingTurrets = {}
+
+    if sentryAggressiveConn then
+        sentryAggressiveConn:Disconnect()
+        sentryAggressiveConn = nil
+    end
+end
+
+createToggle("Anti Torreta (Mas agresivo)", function(state)
+
+    sentryAggressiveEnabled = state
+
+    if state then
+        startAggressiveWatch()
+    else
+        stopAggressiveWatch()
     end
 end)
 -- ================= PLAYER ESP =================
