@@ -1261,6 +1261,100 @@ else
 stopAnimalESP()
 end
 end)
+-- ================= ANTI RAGDOLL V2 =================
+
+local antiRagdollEnabled = false
+local antiRagdollConnection = nil
+
+local function startAntiRagdoll()
+
+    if antiRagdollConnection then
+        antiRagdollConnection:Disconnect()
+        antiRagdollConnection = nil
+    end
+
+    local player = game.Players.LocalPlayer
+
+    antiRagdollConnection = RunService.Heartbeat:Connect(function()
+
+        if not antiRagdollEnabled then
+            return
+        end
+
+        local char = player.Character
+        if not char then
+            return
+        end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+
+        if hum then
+
+            local state = hum:GetState()
+
+            if state == Enum.HumanoidStateType.Physics
+            or state == Enum.HumanoidStateType.Ragdoll
+            or state == Enum.HumanoidStateType.FallingDown then
+
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+
+                workspace.CurrentCamera.CameraSubject = hum
+
+                pcall(function()
+
+                    local PlayerModule =
+                        player.PlayerScripts:FindFirstChild("PlayerModule")
+
+                    if PlayerModule then
+
+                        local Controls =
+                            require(PlayerModule:FindFirstChild("ControlModule"))
+
+                        Controls:Enable()
+                    end
+                end)
+
+                if root then
+                    root.Velocity = Vector3.zero
+                    root.RotVelocity = Vector3.zero
+                end
+            end
+        end
+
+        for _, obj in ipairs(char:GetDescendants()) do
+
+            if obj:IsA("Motor6D")
+            and not obj.Enabled then
+
+                obj.Enabled = true
+            end
+        end
+
+    end)
+
+    antiRagdollEnabled = true
+end
+
+local function stopAntiRagdoll()
+
+    if antiRagdollConnection then
+        antiRagdollConnection:Disconnect()
+        antiRagdollConnection = nil
+    end
+
+    antiRagdollEnabled = false
+end
+
+createToggle("Anti Ragdoll V2", function(state)
+
+    if state then
+        startAntiRagdoll()
+    else
+        stopAntiRagdoll()
+    end
+
+end)
 
 -- INFINITE JUMP
 local infiniteJumpEnabled = false
@@ -1425,94 +1519,236 @@ createToggle("FPS Booster", function(state)
 end)
 
 -- ================= END FPS BOOSTER =================
--- ================= KICK BUTTON TOGGLE =================
+-- ================= PREMIUM KICK PANEL =================
 
 local kickButtonEnabled = false
 local kickGui = nil
+local lastPosition = UDim2.new(1, -180, 0, 20) -- Guarda la posición en memoria entre ejecuciones
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
+-- Variable global interna para limpiar la conexión de arrastre
+local inputChangedConnection = nil
+
 local function createKickButton()
+	-- 1. GUI Principal
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "KickGui"
 	gui.ResetOnSpawn = false
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(0, 60, 0, 60) -- pequeño
-	button.Position = UDim2.new(1, -70, 0, 10) -- arriba derecha
-	button.AnchorPoint = Vector2.new(0,0)
-	button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-	button.Text = "K"
-	button.TextColor3 = Color3.fromRGB(255,255,255)
-	button.TextScaled = true
-	button.Parent = gui
-	button.Active = true
+	-- 2. Marco Principal (Fondo Base)
+	local mainFrame = Instance.new("Frame")
+	mainFrame.Size = UDim2.new(0, 140, 0, 65)
+	mainFrame.Position = lastPosition -- Carga el estado de la última posición utilizada
+	mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Base blanca para no alterar el UIGradient
+	mainFrame.Active = true
+	mainFrame.ClipsDescendants = false
+	mainFrame.Parent = gui
 
-	-- BOTÓN X
-	local close = Instance.new("TextButton")
-	close.Size = UDim2.new(0, 18, 0, 18)
-	close.Position = UDim2.new(1, -18, 0, 0)
-	close.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-	close.Text = "X"
-	close.TextColor3 = Color3.fromRGB(255,255,255)
-	close.TextScaled = true
-	close.Parent = button
+	local frameCorner = Instance.new("UICorner")
+	frameCorner.CornerRadius = UDim.new(0, 10)
+	frameCorner.Parent = mainFrame
 
-	-- cerrar GUI
-	close.MouseButton1Click:Connect(function()
+	-- Fondo Degradado Premium
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 25)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 45, 45))
+	}
+	gradient.Rotation = 90
+	gradient.Parent = mainFrame
+
+	-- UIStroke con Efecto de Brillo Cian
+	local frameStroke = Instance.new("UIStroke")
+	frameStroke.Color = Color3.fromRGB(0, 170, 255)
+	frameStroke.Thickness = 1.5
+	frameStroke.Transparency = 0.2
+	frameStroke.Parent = mainFrame
+
+	-- Sombra Difuminada (Glow) usando ImageLabel
+	local shadow = Instance.new("ImageLabel")
+	shadow.Name = "Shadow"
+	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	shadow.Size = UDim2.new(1, 30, 1, 30)
+	shadow.BackgroundTransparency = 1
+	shadow.Image = "rbxassetid://1316045217" -- Textura estándar de sombra difuminada de Roblox
+	shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	shadow.ImageTransparency = 0.4
+	shadow.ScaleType = Enum.ScaleType.Slice
+	shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+	shadow.ZIndex = mainFrame.ZIndex - 1
+	shadow.Parent = mainFrame
+
+	-- 3. Título con Icono Integrado
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -35, 0, 30)
+	title.Position = UDim2.new(0, 12, 0, 2)
+	title.BackgroundTransparency = 1
+	title.Text = "⚡ KICK BOTON"
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 11
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Parent = mainFrame
+
+	-- 4. Botón X (Cerrar)
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Size = UDim2.new(0, 22, 0, 22)
+	closeBtn.Position = UDim2.new(1, -26, 0, 6)
+	closeBtn.BackgroundTransparency = 1
+	closeBtn.Text = "✕"
+	closeBtn.TextColor3 = Color3.fromRGB(140, 140, 140)
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 13
+	closeBtn.Parent = mainFrame
+
+	-- 5. Botón de Acción (Expulsar)
+	local kickBtn = Instance.new("TextButton")
+	kickBtn.Size = UDim2.new(1, -24, 0, 26)
+	kickBtn.Position = UDim2.new(0, 12, 0, 28)
+	kickBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	kickBtn.Text = "⚡ Kick"
+	kickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	kickBtn.TextStrokeTransparency = 0
+kickBtn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+kickBtn.Font = Enum.Font.GothamBold
+	kickBtn.TextSize = 13
+	kickBtn.Parent = mainFrame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = kickBtn
+
+	local btnGradient = Instance.new("UIGradient")
+	btnGradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 170, 255)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 110, 220))
+	}
+	btnGradient.Rotation = 90
+	btnGradient.Parent = kickBtn
+
+	-- ==========================================
+	-- ANIMACIONES Y EFECTOS VISUALES (TWEEN)
+	-- ==========================================
+	
+	-- Estado inicial para la animación de entrada
+	mainFrame.Size = UDim2.new(0, 0, 0, 0)
+	mainFrame.BackgroundTransparency = 1
+	shadow.ImageTransparency = 1
+	frameStroke.Enabled = false
+	title.TextTransparency = 1
+	closeBtn.TextTransparency = 1
+	kickBtn.BackgroundTransparency = 1
+	kickBtn.TextTransparency = 1
+
+	-- Ejecución del Tween de apertura
+	local openTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	TweenService:Create(mainFrame, openTweenInfo, {Size = UDim2.new(0, 140, 0, 65), BackgroundTransparency = 0}):Play()
+	
+	task.spawn(function()
+		task.wait(0.15)
+		frameStroke.Enabled = true
+		local fadeInInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(shadow, fadeInInfo, {ImageTransparency = 0.4}):Play()
+		TweenService:Create(title, fadeInInfo, {TextTransparency = 0}):Play()
+		TweenService:Create(closeBtn, fadeInInfo, {TextTransparency = 0}):Play()
+		TweenService:Create(kickBtn, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
+	end)
+
+	-- Función de cierre controlada y desconexión segura
+	local function closeGui()
+		if inputChangedConnection then
+			inputChangedConnection:Disconnect()
+			inputChangedConnection = nil
+		end
+		
+		local closeTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		TweenService:Create(mainFrame, closeTweenInfo, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
+		TweenService:Create(shadow, closeTweenInfo, {ImageTransparency = 1}):Play()
+		TweenService:Create(title, closeTweenInfo, {TextTransparency = 1}):Play()
+		TweenService:Create(closeBtn, closeTweenInfo, {TextTransparency = 1}):Play()
+		TweenService:Create(kickBtn, closeTweenInfo, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+		
+		task.wait(0.2)
 		gui:Destroy()
 		kickGui = nil
 		kickButtonEnabled = false
+	end
+
+	closeBtn.MouseButton1Click:Connect(closeGui)
+
+	-- Efectos Hover (PC) con transiciones suaves
+	kickBtn.MouseEnter:Connect(function()
+		TweenService:Create(btnGradient, TweenInfo.new(0.2), {Offset = Vector2.new(0, -0.15)}):Play()
+		TweenService:Create(kickBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 37)}):Play()
+	end)
+	kickBtn.MouseLeave:Connect(function()
+		TweenService:Create(btnGradient, TweenInfo.new(0.2), {Offset = Vector2.new(0, 0)}):Play()
+		TweenService:Create(kickBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, -24, 0, 32), Position = UDim2.new(0, 12, 0, 38)}):Play()
 	end)
 
-	-- DRAG (móvil + PC)
+	closeBtn.MouseEnter:Connect(function()
+		TweenService:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255, 75, 75)}):Play()
+	end)
+	closeBtn.MouseLeave:Connect(function()
+		TweenService:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(140, 140, 140)}):Play()
+	end)
+
+	-- Lógica del Kick
+	kickBtn.MouseButton1Click:Connect(function()
+		player:Kick("Has sido kickeado por el botón de Kick.")
+	end)
+
+	-- ==========================================
+	-- SISTEMA DE ARRASTRE OPTIMIZADO SIN FUGAS
+	-- ==========================================
 	local dragging = false
 	local dragInput
 	local dragStart
 	local startPos
 
-	button.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Touch
-		or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
+	mainFrame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
-			startPos = button.Position
+			startPos = mainFrame.Position
 
 			input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
 					dragging = false
+					lastPosition = mainFrame.Position -- Guarda la posición actual al soltar la interfaz
 				end
 			end)
 		end
 	end)
 
-	button.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Touch
-		or input.UserInputType == Enum.UserInputType.MouseMovement then
+	mainFrame.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			dragInput = input
 		end
 	end)
 
-	UserInputService.InputChanged:Connect(function(input)
+	-- Limpieza preventiva de conexiones previas antes de reasignar
+	if inputChangedConnection then
+		inputChangedConnection:Disconnect()
+	end
+
+	-- Almacenamiento directo de la conexión activa
+	inputChangedConnection = UserInputService.InputChanged:Connect(function(input)
 		if dragging and input == dragInput then
 			local delta = input.Position - dragStart
-
-			button.Position = UDim2.new(
+			mainFrame.Position = UDim2.new(
 				startPos.X.Scale,
 				startPos.X.Offset + delta.X,
 				startPos.Y.Scale,
 				startPos.Y.Offset + delta.Y
 			)
 		end
-	end)
-
-	-- KICK
-	button.MouseButton1Click:Connect(function()
-		player:Kick("Has sido expulsado por el botón Kick")
 	end)
 
 	return gui
@@ -1528,9 +1764,15 @@ local function disableKickButton()
 	if not kickButtonEnabled then return end
 	kickButtonEnabled = false
 
-	if kickGui then
-		kickGui:Destroy()
-		kickGui = nil
+	-- Desconexión manual obligatoria al desactivar mediante la función externa
+	if inputChangedConnection then
+		inputChangedConnection:Disconnect()
+		inputChangedConnection = nil
+	end
+
+	if kickGui then  
+		kickGui:Destroy()  
+		kickGui = nil  
 	end
 end
 
@@ -1544,6 +1786,7 @@ createToggle("Kick Boton", function(state)
 end)
 
 -- ================= END =================
+
 -- ================= ANTI BEE =================
 
 local antiBeeEnabled = false
@@ -2095,6 +2338,7 @@ local playerESPEnabled = false
 local playerHighlights = {}
 local playerNameLabels = {}
 local characterConnections = {}
+local playerAddedConnection = nil
 
 local function addGradient(obj)
 	local gradient = Instance.new("UIGradient")
@@ -2129,12 +2373,16 @@ end
 
 local function removePlayerESP(otherPlayer)
 	if playerHighlights[otherPlayer] then
-		playerHighlights[otherPlayer]:Destroy()
+		pcall(function()
+			playerHighlights[otherPlayer]:Destroy()
+		end)
 		playerHighlights[otherPlayer] = nil
 	end
 
 	if playerNameLabels[otherPlayer] then
-		playerNameLabels[otherPlayer]:Destroy()
+		pcall(function()
+			playerNameLabels[otherPlayer]:Destroy()
+		end)
 		playerNameLabels[otherPlayer] = nil
 	end
 end
@@ -2142,27 +2390,32 @@ end
 local function addESPToPlayer(otherPlayer)
 	if not playerESPEnabled then return end
 	if otherPlayer == player then return end
-	if not otherPlayer.Character then return end
+
+	local character = otherPlayer.Character
+	if not character then return end
 
 	removePlayerESP(otherPlayer)
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "PlayerESP"
-	highlight.Adornee = otherPlayer.Character
+	highlight.Adornee = character
 	highlight.FillColor = Color3.fromRGB(140,100,200)
 	highlight.OutlineColor = Color3.fromRGB(255,255,255)
-	highlight.Parent = otherPlayer.Character
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = character
 
 	playerHighlights[otherPlayer] = highlight
 
-	local hrp = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local hrp = character:WaitForChild("HumanoidRootPart", 5)
 
 	if hrp then
 		local billboard = Instance.new("BillboardGui")
+		billboard.Name = "PlayerESPLabel"
 		billboard.Adornee = hrp
 		billboard.Size = UDim2.new(0,200,0,50)
 		billboard.StudsOffset = Vector3.new(0,3,0)
 		billboard.AlwaysOnTop = true
+		billboard.MaxDistance = math.huge
 		billboard.Parent = hrp
 
 		local label = Instance.new("TextLabel")
@@ -2181,27 +2434,52 @@ local function addESPToPlayer(otherPlayer)
 	end
 end
 
+local function setupPlayer(plr)
+	if plr == player then
+		return
+	end
+
+	if characterConnections[plr] then
+		characterConnections[plr]:Disconnect()
+	end
+
+	characterConnections[plr] = plr.CharacterAdded:Connect(function(character)
+		task.wait(1)
+
+		if playerESPEnabled and character then
+			addESPToPlayer(plr)
+		end
+	end)
+
+	plr.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			removePlayerESP(plr)
+
+			if characterConnections[plr] then
+				characterConnections[plr]:Disconnect()
+				characterConnections[plr] = nil
+			end
+		end
+	end)
+
+	if plr.Character and playerESPEnabled then
+		task.spawn(function()
+			addESPToPlayer(plr)
+		end)
+	end
+end
+
 local function startPlayerESP()
 	playerESPEnabled = true
 
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player then
+	for _, plr in ipairs(Players:GetPlayers()) do
+		setupPlayer(plr)
+	end
 
-			if plr.Character then
-				addESPToPlayer(plr)
-			end
-
-			if not characterConnections[plr] then
-				characterConnections[plr] =
-					plr.CharacterAdded:Connect(function()
-						task.wait(0.5)
-
-						if playerESPEnabled then
-							addESPToPlayer(plr)
-						end
-					end)
-			end
-		end
+	if not playerAddedConnection then
+		playerAddedConnection = Players.PlayerAdded:Connect(function(plr)
+			setupPlayer(plr)
+		end)
 	end
 end
 
@@ -2217,6 +2495,11 @@ local function stopPlayerESP()
 	end
 
 	characterConnections = {}
+
+	if playerAddedConnection then
+		playerAddedConnection:Disconnect()
+		playerAddedConnection = nil
+	end
 end
 
 createToggle("Player ESP", function(state)
