@@ -906,7 +906,25 @@ if state then
 end
 
 end)
--- ESP BEST
+-- ================= ESP BEST + BRAINROT MANAGER =================
+
+local ignoredAnimals = ignoredAnimals or setmetatable({}, { __mode = "k" }) -- [BasePart] = data
+local firstBrainrotMenuOpen = true
+
+local brainrotLauncherGui = nil
+local brainrotMenuGui = nil
+local brainrotMenuFrame = nil
+local brainrotMenuBody = nil
+local brainrotMenuMinBtn = nil
+local brainrotMenuHiddenList = nil
+local brainrotMenuBestName = nil
+local brainrotMenuBestValue = nil
+local brainrotMenuBestGen = nil
+local brainrotMenuHiddenCount = nil
+
+local brainrotMenuMinimized = false
+local brainrotNoticeShown = false
+
 local animalESPEnabled = false
 local espObjects = espObjects or {}
 local animalESPCache = animalESPCache or {}
@@ -915,352 +933,935 @@ local Connections = Connections or {}
 
 local bestAnimalPart = nil
 local bestAnimalValue = 0
+local bestAnimalName = "Unknown"
+local bestAnimalGenerationText = ""
 
 local currentBeam = nil
 local currentAttachments = {}
 
+local toggleBrainrotMenu
+
+local function formatBrainrotValue(value)
+	if not value or value <= 0 then
+		return "$0/s"
+	end
+
+	if value >= 1000000000000 then
+		return string.format("$%.2fT/s", value / 1000000000000)
+	elseif value >= 1000000000 then
+		return string.format("$%.2fB/s", value / 1000000000)
+	elseif value >= 1000000 then
+		return string.format("$%.2fM/s", value / 1000000)
+	elseif value >= 1000 then
+		return string.format("$%.2fK/s", value / 1000)
+	end
+
+	return string.format("$%d/s", math.floor(value))
+end
+
+local function parseAnimalData(part)
+	if not part or not part.Parent then
+		return nil
+	end
+
+	local animalOverhead = part:FindFirstChild("AnimalOverhead")
+	if not animalOverhead or not animalOverhead:IsA("SurfaceGui") then
+		return nil
+	end
+
+	local generationLabel = animalOverhead:FindFirstChild("Generation")
+	local displayNameLabel = animalOverhead:FindFirstChild("DisplayName")
+
+	if not generationLabel or not displayNameLabel then
+		return nil
+	end
+
+	local generationText = generationLabel.Text or ""
+	local animalName = displayNameLabel.Text or "Unknown"
+
+	if generationText == "" or animalName == "" then
+		return nil
+	end
+
+	local firstValue = generationText:match("^%$([^%s]+)/s") or generationText:match("^%$([^/]+)/s")
+	if not firstValue then
+		return nil
+	end
+
+	local cleanText = firstValue:gsub(" ", "")
+	local multiplier = 1
+	local value = cleanText
+
+	if cleanText:find("T") then
+		multiplier = 1000000000000
+		value = cleanText:gsub("T", "")
+	elseif cleanText:find("B") then
+		multiplier = 1000000000
+		value = cleanText:gsub("B", "")
+	elseif cleanText:find("M") then
+		multiplier = 1000000
+		value = cleanText:gsub("M", "")
+	elseif cleanText:find("K") then
+		multiplier = 1000
+		value = cleanText:gsub("K", "")
+	end
+
+	local numValue = tonumber(value)
+	local earningValue = numValue and (numValue * multiplier) or 0
+
+	return earningValue, animalName, generationText
+end
+
 local function clearAllESP()
-for _, obj in ipairs(espObjects) do
-if obj then
-pcall(function()
-obj:Destroy()
-end)
-end
-end
+	for _, obj in ipairs(espObjects) do
+		if obj then
+			pcall(function()
+				obj:Destroy()
+			end)
+		end
+	end
 
-espObjects = {}  
+	espObjects = {}
 
-if currentBeam then  
-	pcall(function()  
-		currentBeam:Destroy()  
-	end)  
+	if currentBeam then
+		pcall(function()
+			currentBeam:Destroy()
+		end)
+		currentBeam = nil
+	end
 
-	currentBeam = nil  
-end  
+	for _, att in pairs(currentAttachments) do
+		pcall(function()
+			att:Destroy()
+		end)
+	end
 
-for _, att in pairs(currentAttachments) do  
-	pcall(function()  
-		att:Destroy()  
-	end)  
-end  
-
-currentAttachments = {}
-
+	currentAttachments = {}
 end
 
 local function createBeam(part)
-if currentBeam then
-pcall(function()
-currentBeam:Destroy()
-end)
+	if currentBeam then
+		pcall(function()
+			currentBeam:Destroy()
+		end)
+		currentBeam = nil
+	end
 
-currentBeam = nil  
-end  
+	for _, att in pairs(currentAttachments) do
+		pcall(function()
+			att:Destroy()
+		end)
+	end
 
-for _, att in pairs(currentAttachments) do  
-	pcall(function()  
-		att:Destroy()  
-	end)  
-end  
+	currentAttachments = {}
 
-currentAttachments = {}  
+	local character = game.Players.LocalPlayer.Character
+	if not character then
+		return
+	end
 
-local character = game.Players.LocalPlayer.Character  
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		return
+	end
 
-if not character then  
-	return  
-end  
+	local attachment0 = Instance.new("Attachment")
+	attachment0.Parent = hrp
 
-local hrp = character:FindFirstChild("HumanoidRootPart")  
+	local attachment1 = Instance.new("Attachment")
+	attachment1.Parent = part
 
-if not hrp then  
-	return  
-end  
+	local beam = Instance.new("Beam")
+	beam.Attachment0 = attachment0
+	beam.Attachment1 = attachment1
+	beam.Width0 = 0.4
+	beam.Width1 = 0.4
+	beam.FaceCamera = true
+	beam.LightEmission = 1
+	beam.Brightness = 5
+	beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 120))
+	beam.Parent = hrp
 
-local attachment0 = Instance.new("Attachment")  
-attachment0.Parent = hrp  
+	currentBeam = beam
+	currentAttachments = { attachment0, attachment1 }
+end
 
-local attachment1 = Instance.new("Attachment")  
-attachment1.Parent = part  
+local function showBrainrotNotice()
+	if brainrotNoticeShown then
+		return
+	end
 
-local beam = Instance.new("Beam")  
-beam.Attachment0 = attachment0  
-beam.Attachment1 = attachment1  
-beam.Width0 = 0.4  
-beam.Width1 = 0.4  
-beam.FaceCamera = true  
-beam.LightEmission = 1  
-beam.Brightness = 5  
-beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 120))  
-beam.Parent = hrp  
+	brainrotNoticeShown = true
 
-currentBeam = beam  
-currentAttachments = {  
-	attachment0,  
-	attachment1  
-}
+	local CoreGui = game:GetService("CoreGui")
+	pcall(function()
+		local old = CoreGui:FindFirstChild("BrainrotNotice")
+		if old then
+			old:Destroy()
+		end
+	end)
 
+	local notifGui = Instance.new("ScreenGui")
+	notifGui.Name = "BrainrotNotice"
+	notifGui.ResetOnSpawn = false
+	notifGui.IgnoreGuiInset = true
+	notifGui.Parent = CoreGui
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 360, 0, 90)
+	frame.Position = UDim2.new(0.5, -180, 0.08, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(12, 16, 35)
+	frame.BackgroundTransparency = 0.1
+	frame.BorderSizePixel = 0
+	frame.Parent = notifGui
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Color = Color3.fromRGB(0, 170, 255)
+	stroke.Transparency = 0.15
+	stroke.Parent = frame
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -16, 0, 24)
+	title.Position = UDim2.new(0, 8, 0, 8)
+	title.BackgroundTransparency = 1
+	title.Text = "TokitoHub"
+	title.Font = Enum.Font.GothamBlack
+	title.TextSize = 20
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.Parent = frame
+
+	local msg = Instance.new("TextLabel")
+	msg.Size = UDim2.new(1, -16, 0, 38)
+	msg.Position = UDim2.new(0, 8, 0, 36)
+	msg.BackgroundTransparency = 1
+	msg.TextWrapped = true
+msg.Text = "Oculta el brainrot más valioso para que no lo marque. Al actualizar reinicia el ESP."
+	msg.Font = Enum.Font.GothamBold
+	msg.TextSize = 13
+	msg.TextColor3 = Color3.fromRGB(230, 240, 255)
+	msg.Parent = frame
+
+	task.delay(7, function()
+		pcall(function()
+			notifGui:Destroy()
+		end)
+	end)
+end
+
+local function updateBrainrotMenu()
+	if not brainrotMenuGui or not brainrotMenuGui.Parent then
+		return
+	end
+
+	if brainrotMenuBestName then
+		if bestAnimalPart and bestAnimalPart.Parent then
+			brainrotMenuBestName.Text = "Actual: " .. tostring(bestAnimalName or "Unknown")
+		else
+			brainrotMenuBestName.Text = "Actual: Ninguno"
+		end
+	end
+
+	if brainrotMenuBestValue then
+		if bestAnimalPart and bestAnimalPart.Parent then
+			brainrotMenuBestValue.Text = "Valor: " .. formatBrainrotValue(bestAnimalValue)
+		else
+			brainrotMenuBestValue.Text = "Valor: $0/s"
+		end
+	end
+
+	if brainrotMenuBestGen then
+		if bestAnimalPart and bestAnimalPart.Parent then
+			brainrotMenuBestGen.Text = tostring(bestAnimalGenerationText or "")
+		else
+			brainrotMenuBestGen.Text = "Sin brainrot detectado"
+		end
+	end
+
+	if brainrotMenuHiddenCount then
+		local count = 0
+		for _ in pairs(ignoredAnimals) do
+			count += 1
+		end
+		brainrotMenuHiddenCount.Text = "Ocultados: " .. count
+	end
+
+	if brainrotMenuHiddenList then
+		for _, child in ipairs(brainrotMenuHiddenList:GetChildren()) do
+			if child:IsA("Frame") and child.Name == "HiddenEntry" then
+				child:Destroy()
+			end
+		end
+
+		local entries = {}
+		for hiddenPart, data in pairs(ignoredAnimals) do
+			if hiddenPart and data then
+				table.insert(entries, {
+					part = hiddenPart,
+					name = data.name or "Unknown",
+					value = data.value or 0,
+					gen = data.generation or ""
+				})
+			end
+		end
+
+		table.sort(entries, function(a, b)
+			return (a.value or 0) > (b.value or 0)
+		end)
+
+		for _, item in ipairs(entries) do
+			local row = Instance.new("Frame")
+			row.Name = "HiddenEntry"
+			row.Size = UDim2.new(1, -4, 0, 34)
+			row.BackgroundColor3 = Color3.fromRGB(20, 30, 48)
+			row.BorderSizePixel = 0
+			row.Parent = brainrotMenuHiddenList
+			Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.new(1, -60, 1, 0)
+			label.Position = UDim2.new(0, 8, 0, 0)
+			label.BackgroundTransparency = 1
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.Text = item.name .. "  |  " .. formatBrainrotValue(item.value)
+			label.TextColor3 = Color3.fromRGB(255, 255, 255)
+			label.Font = Enum.Font.GothamBold
+			label.TextSize = 11
+			label.Parent = row
+
+			local unhide = Instance.new("TextButton")
+			unhide.Size = UDim2.new(0, 44, 0, 22)
+			unhide.Position = UDim2.new(1, -50, 0.5, -11)
+			unhide.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+			unhide.Text = "Ver"
+			unhide.TextColor3 = Color3.fromRGB(255, 255, 255)
+			unhide.Font = Enum.Font.GothamBold
+			unhide.TextSize = 11
+			unhide.BorderSizePixel = 0
+			unhide.Parent = row
+			Instance.new("UICorner", unhide).CornerRadius = UDim.new(0, 6)
+
+			unhide.MouseButton1Click:Connect(function()
+				if item.part then
+					ignoredAnimals[item.part] = nil
+				end
+				local debris = workspace:FindFirstChild("Debris")
+				if debris then
+					rebuildBestAnimal(debris)
+				end
+				updateBrainrotMenu()
+			end)
+		end
+	end
+end
+
+local function hideCurrentBestBrainrot()
+	if not bestAnimalPart or not bestAnimalPart.Parent then
+		return
+	end
+
+	ignoredAnimals[bestAnimalPart] = {
+		name = bestAnimalName or "Unknown",
+		value = bestAnimalValue or 0,
+		generation = bestAnimalGenerationText or ""
+	}
+
+	local debris = workspace:FindFirstChild("Debris")
+	if debris then
+		rebuildBestAnimal(debris)
+	end
+
+	updateBrainrotMenu()
+end
+
+local function showAllBrainrots()
+	table.clear(ignoredAnimals)
+
+	local debris = workspace:FindFirstChild("Debris")
+	if debris then
+		rebuildBestAnimal(debris)
+	end
+
+	updateBrainrotMenu()
+end
+
+local function setBrainrotMenuMinimized(state)
+	brainrotMenuMinimized = state
+
+	if brainrotMenuBody then
+		brainrotMenuBody.Visible = not state
+	end
+
+	if brainrotMenuFrame then
+		brainrotMenuFrame.Size = state and UDim2.new(0, 280, 0, 34) or UDim2.new(0, 280, 0, 250)
+	end
+
+	if brainrotMenuMinBtn then
+		brainrotMenuMinBtn.Text = state and "+" or "—"
+	end
+end
+
+local function createBrainrotLauncher()
+	if brainrotLauncherGui then
+		return
+	end
+
+	brainrotLauncherGui = Instance.new("TextButton")
+	brainrotLauncherGui.Name = "BrainrotLauncher"
+	brainrotLauncherGui.Size = UDim2.new(0, 40, 0, 40)
+	brainrotLauncherGui.Position = UDim2.new(0, 16, 0, 260)
+	brainrotLauncherGui.BackgroundColor3 = Color3.fromRGB(14, 20, 34)
+	brainrotLauncherGui.BorderSizePixel = 0
+	brainrotLauncherGui.Text = "BR"
+	brainrotLauncherGui.TextColor3 = Color3.fromRGB(255, 255, 255)
+	brainrotLauncherGui.Font = Enum.Font.GothamBlack
+	brainrotLauncherGui.TextSize = 14
+	brainrotLauncherGui.Parent = gui
+	brainrotLauncherGui.Active = true
+	Instance.new("UICorner", brainrotLauncherGui).CornerRadius = UDim.new(1, 0)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Transparency = 0.1
+	stroke.Color = Color3.fromRGB(0, 170, 255)
+	stroke.Parent = brainrotLauncherGui
+
+	local scale = Instance.new("UIScale")
+	scale.Scale = 1
+	scale.Parent = brainrotLauncherGui
+
+	brainrotLauncherGui.MouseEnter:Connect(function()
+		TweenService:Create(scale, TweenInfo.new(0.12), { Scale = 1.08 }):Play()
+	end)
+
+	brainrotLauncherGui.MouseLeave:Connect(function()
+		TweenService:Create(scale, TweenInfo.new(0.12), { Scale = 1 }):Play()
+	end)
+
+	brainrotLauncherGui.MouseButton1Click:Connect(function()
+		toggleBrainrotMenu()
+	end)
+
+	local dragging = false
+	local dragStart
+	local startPos
+	local dragInput
+
+	brainrotLauncherGui.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = brainrotLauncherGui.Position
+		end
+	end)
+
+	brainrotLauncherGui.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UIS.InputChanged:Connect(function(input)
+		if dragging and input == dragInput then
+			local delta = input.Position - dragStart
+			brainrotLauncherGui.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+
+	brainrotLauncherGui.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+end
+
+local function createBrainrotMenu()
+	if brainrotMenuGui then
+		brainrotMenuGui.Visible = true
+		updateBrainrotMenu()
+		return
+	end
+
+	brainrotMenuGui = Instance.new("Frame")
+	brainrotMenuGui.Name = "BrainrotMenu"
+	brainrotMenuGui.Size = UDim2.new(0, 280, 0, 250)
+	brainrotMenuGui.Position = UDim2.new(0.5, -140, 0.28, 0)
+	brainrotMenuGui.BackgroundColor3 = Color3.fromRGB(12, 18, 31)
+	brainrotMenuGui.BorderSizePixel = 0
+	brainrotMenuGui.Parent = gui
+	brainrotMenuGui.Active = true
+	Instance.new("UICorner", brainrotMenuGui).CornerRadius = UDim.new(0, 12)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Transparency = 0.1
+	stroke.Color = Color3.fromRGB(0, 170, 255)
+	stroke.Parent = brainrotMenuGui
+
+	local topbar = Instance.new("Frame")
+	topbar.Name = "Topbar"
+	topbar.Size = UDim2.new(1, 0, 0, 30)
+	topbar.BackgroundColor3 = Color3.fromRGB(18, 28, 45)
+	topbar.BorderSizePixel = 0
+	topbar.Parent = brainrotMenuGui
+	Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 12)
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -70, 1, 0)
+	title.Position = UDim2.new(0, 10, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = "Brainrot Manager"
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 13
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Parent = topbar
+
+	brainrotMenuMinBtn = Instance.new("TextButton")
+	brainrotMenuMinBtn.Size = UDim2.new(0, 22, 0, 18)
+	brainrotMenuMinBtn.Position = UDim2.new(1, -46, 0, 6)
+	brainrotMenuMinBtn.BackgroundColor3 = Color3.fromRGB(28, 46, 78)
+	brainrotMenuMinBtn.Text = "—"
+	brainrotMenuMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	brainrotMenuMinBtn.Font = Enum.Font.GothamBold
+	brainrotMenuMinBtn.TextSize = 16
+	brainrotMenuMinBtn.BorderSizePixel = 0
+	brainrotMenuMinBtn.Parent = topbar
+	Instance.new("UICorner", brainrotMenuMinBtn).CornerRadius = UDim.new(0, 6)
+
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Size = UDim2.new(0, 22, 0, 18)
+	closeBtn.Position = UDim2.new(1, -22, 0, 6)
+	closeBtn.BackgroundColor3 = Color3.fromRGB(40, 28, 55)
+	closeBtn.Text = "X"
+	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 12
+	closeBtn.BorderSizePixel = 0
+	closeBtn.Parent = topbar
+	Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+	brainrotMenuBody = Instance.new("Frame")
+	brainrotMenuBody.Name = "Body"
+	brainrotMenuBody.Size = UDim2.new(1, -10, 1, -36)
+	brainrotMenuBody.Position = UDim2.new(0, 5, 0, 33)
+	brainrotMenuBody.BackgroundTransparency = 1
+	brainrotMenuBody.Parent = brainrotMenuGui
+
+	local bestName = Instance.new("TextLabel")
+	brainrotMenuBestName = bestName
+	bestName.Size = UDim2.new(1, 0, 0, 18)
+	bestName.Position = UDim2.new(0, 0, 0, 0)
+	bestName.BackgroundTransparency = 1
+	bestName.TextXAlignment = Enum.TextXAlignment.Left
+	bestName.TextColor3 = Color3.fromRGB(255, 255, 255)
+	bestName.Font = Enum.Font.GothamBold
+	bestName.TextSize = 12
+	bestName.Parent = brainrotMenuBody
+
+	local bestValue = Instance.new("TextLabel")
+	brainrotMenuBestValue = bestValue
+	bestValue.Size = UDim2.new(1, 0, 0, 18)
+	bestValue.Position = UDim2.new(0, 0, 0, 18)
+	bestValue.BackgroundTransparency = 1
+	bestValue.TextXAlignment = Enum.TextXAlignment.Left
+	bestValue.TextColor3 = Color3.fromRGB(0, 255, 120)
+	bestValue.Font = Enum.Font.GothamBold
+	bestValue.TextSize = 12
+	bestValue.Parent = brainrotMenuBody
+
+	local bestGen = Instance.new("TextLabel")
+	brainrotMenuBestGen = bestGen
+	bestGen.Size = UDim2.new(1, 0, 0, 18)
+	bestGen.Position = UDim2.new(0, 0, 0, 36)
+	bestGen.BackgroundTransparency = 1
+	bestGen.TextXAlignment = Enum.TextXAlignment.Left
+	bestGen.TextColor3 = Color3.fromRGB(180, 200, 255)
+	bestGen.Font = Enum.Font.Gotham
+	bestGen.TextSize = 11
+	bestGen.TextWrapped = true
+	bestGen.Parent = brainrotMenuBody
+
+	local hiddenCount = Instance.new("TextLabel")
+	brainrotMenuHiddenCount = hiddenCount
+	hiddenCount.Size = UDim2.new(1, 0, 0, 18)
+	hiddenCount.Position = UDim2.new(0, 0, 0, 56)
+	hiddenCount.BackgroundTransparency = 1
+	hiddenCount.TextXAlignment = Enum.TextXAlignment.Left
+	hiddenCount.TextColor3 = Color3.fromRGB(255, 255, 255)
+	hiddenCount.Font = Enum.Font.GothamBold
+	hiddenCount.TextSize = 11
+	hiddenCount.Parent = brainrotMenuBody
+
+	local hideBtn = Instance.new("TextButton")
+	hideBtn.Size = UDim2.new(0.49, -3, 0, 28)
+	hideBtn.Position = UDim2.new(0, 0, 0, 78)
+	hideBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+	hideBtn.Text = "Ocultar actual"
+	hideBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	hideBtn.Font = Enum.Font.GothamBold
+	hideBtn.TextSize = 11
+	hideBtn.BorderSizePixel = 0
+	hideBtn.Parent = brainrotMenuBody
+	Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(0, 8)
+
+	local showAllBtn = Instance.new("TextButton")
+	showAllBtn.Size = UDim2.new(0.49, -3, 0, 28)
+	showAllBtn.Position = UDim2.new(0.51, 0, 0, 78)
+	showAllBtn.BackgroundColor3 = Color3.fromRGB(26, 40, 66)
+	showAllBtn.Text = "Mostrar todos"
+	showAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	showAllBtn.Font = Enum.Font.GothamBold
+	showAllBtn.TextSize = 11
+	showAllBtn.BorderSizePixel = 0
+	showAllBtn.Parent = brainrotMenuBody
+	Instance.new("UICorner", showAllBtn).CornerRadius = UDim.new(0, 8)
+
+	local refreshBtn = Instance.new("TextButton")
+	refreshBtn.Size = UDim2.new(1, 0, 0, 24)
+	refreshBtn.Position = UDim2.new(0, 0, 0, 110)
+	refreshBtn.BackgroundColor3 = Color3.fromRGB(24, 34, 52)
+	refreshBtn.Text = "Actualizar"
+	refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	refreshBtn.Font = Enum.Font.GothamBold
+	refreshBtn.TextSize = 11
+	refreshBtn.BorderSizePixel = 0
+	refreshBtn.Parent = brainrotMenuBody
+	Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 8)
+
+	brainrotMenuHiddenList = Instance.new("ScrollingFrame")
+	brainrotMenuHiddenList.Name = "HiddenList"
+	brainrotMenuHiddenList.Size = UDim2.new(1, 0, 1, -142)
+	brainrotMenuHiddenList.Position = UDim2.new(0, 0, 0, 138)
+	brainrotMenuHiddenList.BackgroundTransparency = 1
+	brainrotMenuHiddenList.BorderSizePixel = 0
+	brainrotMenuHiddenList.ScrollBarThickness = 4
+	brainrotMenuHiddenList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	brainrotMenuHiddenList.CanvasSize = UDim2.new(0, 0, 0, 0)
+	brainrotMenuHiddenList.Parent = brainrotMenuBody
+
+	local listPadding = Instance.new("UIPadding")
+	listPadding.PaddingTop = UDim.new(0, 2)
+	listPadding.PaddingBottom = UDim.new(0, 2)
+	listPadding.Parent = brainrotMenuHiddenList
+
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.Padding = UDim.new(0, 4)
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Parent = brainrotMenuHiddenList
+
+	hideBtn.MouseButton1Click:Connect(function()
+		hideCurrentBestBrainrot()
+	end)
+
+	showAllBtn.MouseButton1Click:Connect(function()
+		showAllBrainrots()
+	end)
+
+	refreshBtn.MouseButton1Click:Connect(function()
+		local debris = workspace:FindFirstChild("Debris")
+		if debris then
+			rebuildBestAnimal(debris)
+		end
+		updateBrainrotMenu()
+	end)
+
+	brainrotMenuMinBtn.MouseButton1Click:Connect(function()
+		setBrainrotMenuMinimized(not brainrotMenuMinimized)
+	end)
+
+	closeBtn.MouseButton1Click:Connect(function()
+		brainrotMenuGui.Visible = false
+	end)
+
+	local dragging = false
+	local dragStart
+	local startPos
+	local dragInput
+
+	topbar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = brainrotMenuGui.Position
+		end
+	end)
+
+	topbar.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UIS.InputChanged:Connect(function(input)
+		if dragging and input == dragInput then
+			local delta = input.Position - dragStart
+			brainrotMenuGui.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+
+	topbar.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	createBrainrotLauncher()
+	updateBrainrotMenu()
+end
+
+toggleBrainrotMenu = function()
+	if not brainrotNoticeShown then
+		showBrainrotNotice()
+	end
+
+	if not brainrotMenuGui then
+		createBrainrotMenu()
+		brainrotMenuGui.Visible = true
+		updateBrainrotMenu()
+		return
+	end
+
+	if not brainrotMenuGui.Visible then
+		brainrotMenuGui.Visible = true
+		updateBrainrotMenu()
+		return
+	end
+
+	if brainrotMenuMinimized then
+		setBrainrotMenuMinimized(false)
+	else
+		brainrotMenuGui.Visible = false
+	end
+end
+
+local function clearBrainrotMenuStateIfNeeded()
+	if brainrotMenuGui and not brainrotMenuGui.Parent then
+		brainrotMenuGui = nil
+		brainrotMenuFrame = nil
+		brainrotMenuBody = nil
+		brainrotMenuMinBtn = nil
+		brainrotMenuHiddenList = nil
+		brainrotMenuBestName = nil
+		brainrotMenuBestValue = nil
+		brainrotMenuBestGen = nil
+		brainrotMenuHiddenCount = nil
+		brainrotLauncherGui = nil
+	end
 end
 
 local function createESPForPart(part)
-if bestAnimalPart and (
-not bestAnimalPart.Parent
-or not bestAnimalPart:IsDescendantOf(workspace)
-) then
-bestAnimalPart = nil
-bestAnimalValue = 0
+	if bestAnimalPart and (not bestAnimalPart.Parent or not bestAnimalPart:IsDescendantOf(workspace)) then
+		bestAnimalPart = nil
+		bestAnimalValue = 0
+		bestAnimalName = "Unknown"
+		bestAnimalGenerationText = ""
+		clearAllESP()
+	end
 
-clearAllESP()  
-end  
+	if not part or not part.Parent then
+		return
+	end
 
-if not part or not part.Parent then  
-	return  
-end  
+	local earningValue, animalName, generationText = parseAnimalData(part)
+	if not earningValue then
+		return
+	end
 
-local animalOverhead = part:FindFirstChild("AnimalOverhead")  
+	if ignoredAnimals[part] then
+		return
+	end
 
-if not animalOverhead or not animalOverhead:IsA("SurfaceGui") then  
-	return  
-end  
+	if earningValue < animalESPThreshold then
+		return
+	end
 
-local generationLabel = animalOverhead:FindFirstChild("Generation")  
-local displayNameLabel = animalOverhead:FindFirstChild("DisplayName")  
+	if earningValue < bestAnimalValue then
+		return
+	end
 
-if not generationLabel or not displayNameLabel then  
-	return  
-end  
+	bestAnimalValue = earningValue
+	bestAnimalPart = part
+	bestAnimalName = animalName
+	bestAnimalGenerationText = generationText
 
-local generationText = generationLabel.Text or ""  
-local animalName = displayNameLabel.Text or "Unknown"  
+	clearAllESP()
 
-if generationText == "" or animalName == "" then  
-	return  
-end  
+	if animalESPCache[part] then
+		pcall(function()
+			animalESPCache[part]:Destroy()
+		end)
+		animalESPCache[part] = nil
+	end
 
-local firstValue = generationText:match("^%$([^%s]+)/s")  
-	or generationText:match("^%$([^/]+)/s")  
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "AnimalESP"
+	billboardGui.Adornee = part
+	billboardGui.Size = UDim2.new(0, 260, 0, 70)
+	billboardGui.StudsOffset = Vector3.new(0, -3, 0)
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Parent = part
 
-if not firstValue then  
-	return  
-end  
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, 0, 0, 30)
+	nameLabel.Position = UDim2.new(0, 0, 0, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = animalName
+	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	nameLabel.TextStrokeTransparency = 0
+	nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextSize = 24
+	nameLabel.Parent = billboardGui
 
-local cleanText = firstValue:gsub(" ", "")  
+	local genLabel = Instance.new("TextLabel")
+	genLabel.Size = UDim2.new(1, 0, 0, 30)
+	genLabel.Position = UDim2.new(0, 0, 0, 30)
+	genLabel.BackgroundTransparency = 1
+	genLabel.Text = generationText
+	genLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+	genLabel.TextStrokeTransparency = 0
+	genLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	genLabel.Font = Enum.Font.GothamBold
+	genLabel.TextSize = 22
+	genLabel.Parent = billboardGui
 
-local multiplier = 1  
-local value = cleanText  
+	animalESPCache[part] = billboardGui
+	table.insert(espObjects, billboardGui)
 
-if cleanText:find("T") then  
-	multiplier = 1000000000000  
-	value = cleanText:gsub("T","")  
-
-elseif cleanText:find("B") then  
-	multiplier = 1000000000  
-	value = cleanText:gsub("B","")  
-
-elseif cleanText:find("M") then  
-	multiplier = 1000000  
-	value = cleanText:gsub("M","")  
-
-elseif cleanText:find("K") then  
-	multiplier = 1000  
-	value = cleanText:gsub("K","")  
-end  
-
-local numValue = tonumber(value)  
-local earningValue = numValue and (numValue * multiplier) or 0  
-
-if earningValue < animalESPThreshold then  
-	return  
-end  
-
-if earningValue < bestAnimalValue then  
-	return  
-end  
-
-bestAnimalValue = earningValue  
-bestAnimalPart = part  
-
-clearAllESP()  
-
-if animalESPCache[part] then  
-	pcall(function()  
-		animalESPCache[part]:Destroy()  
-	end)  
-
-	animalESPCache[part] = nil  
-end  
-
-local billboardGui = Instance.new("BillboardGui")  
-billboardGui.Name = "AnimalESP"  
-billboardGui.Adornee = part  
-billboardGui.Size = UDim2.new(0, 260, 0, 70)  
-billboardGui.StudsOffset = Vector3.new(0, -3, 0)  
-billboardGui.AlwaysOnTop = true  
-billboardGui.Parent = part  
-
-local nameLabel = Instance.new("TextLabel")  
-nameLabel.Size = UDim2.new(1, 0, 0, 30)  
-nameLabel.Position = UDim2.new(0, 0, 0, 0)  
-nameLabel.BackgroundTransparency = 1  
-nameLabel.Text = animalName  
-nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)  
-nameLabel.TextStrokeTransparency = 0  
-nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)  
-nameLabel.Font = Enum.Font.GothamBold  
-nameLabel.TextSize = 24  
-nameLabel.Parent = billboardGui  
-
-local genLabel = Instance.new("TextLabel")  
-genLabel.Size = UDim2.new(1, 0, 0, 30)  
-genLabel.Position = UDim2.new(0, 0, 0, 30)  
-genLabel.BackgroundTransparency = 1  
-genLabel.Text = generationText  
-genLabel.TextColor3 = Color3.fromRGB(0, 255, 120)  
-genLabel.TextStrokeTransparency = 0  
-genLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)  
-genLabel.Font = Enum.Font.GothamBold  
-genLabel.TextSize = 22  
-genLabel.Parent = billboardGui  
-
-animalESPCache[part] = billboardGui  
-table.insert(espObjects, billboardGui)  
-
-createBeam(part)
-
+	createBeam(part)
+	updateBrainrotMenu()
 end
 
 local function rebuildBestAnimal(debris)
-bestAnimalPart = nil
-bestAnimalValue = 0
-clearAllESP()
+	bestAnimalPart = nil
+	bestAnimalValue = 0
+	bestAnimalName = "Unknown"
+	bestAnimalGenerationText = ""
+	clearAllESP()
 
-local bestPart = nil  
-local bestValue = 0  
+	local bestPart = nil
+	local bestValue = 0
+	local bestName = "Unknown"
+	local bestGen = ""
 
-for _, newPart in pairs(debris:GetChildren()) do  
-	if newPart.Name == "FastOverheadTemplate" and newPart:IsA("BasePart") then  
-		local animalOverhead = newPart:FindFirstChild("AnimalOverhead")  
+	for _, newPart in pairs(debris:GetChildren()) do
+		if newPart.Name == "FastOverheadTemplate" and newPart:IsA("BasePart") then
+			local earningValue, animalName, generationText = parseAnimalData(newPart)
 
-		if animalOverhead and animalOverhead:IsA("SurfaceGui") then  
-			local generationLabel = animalOverhead:FindFirstChild("Generation")  
-			local displayNameLabel = animalOverhead:FindFirstChild("DisplayName")  
+			if earningValue and not ignoredAnimals[newPart] then
+				if earningValue >= animalESPThreshold and earningValue > bestValue then
+					bestValue = earningValue
+					bestPart = newPart
+					bestName = animalName
+					bestGen = generationText
+				end
+			end
+		end
+	end
 
-			if generationLabel and displayNameLabel then  
-				local generationText = generationLabel.Text or ""  
-				local animalName = displayNameLabel.Text or "Unknown"  
-
-				local firstValue = generationText:match("^%$([^%s]+)/s")  
-					or generationText:match("^%$([^/]+)/s")  
-
-				if firstValue and generationText ~= "" and animalName ~= "" then  
-					local cleanText = firstValue:gsub(" ", "")  
-
-					local multiplier = 1  
-					local value = cleanText  
-
-					if cleanText:find("T") then  
-						multiplier = 1000000000000  
-						value = cleanText:gsub("T","")  
-					elseif cleanText:find("B") then  
-						multiplier = 1000000000  
-						value = cleanText:gsub("B","")  
-					elseif cleanText:find("M") then  
-						multiplier = 1000000  
-						value = cleanText:gsub("M","")  
-					elseif cleanText:find("K") then  
-						multiplier = 1000  
-						value = cleanText:gsub("K","")  
-					end  
-
-					local numValue = tonumber(value)  
-					local earningValue = numValue and (numValue * multiplier) or 0  
-
-					if earningValue >= animalESPThreshold and earningValue > bestValue then  
-						bestValue = earningValue  
-						bestPart = newPart  
-					end  
-				end  
-			end  
-		end  
-	end  
-end  
-
-if bestPart then  
-	createESPForPart(bestPart)  
-end
-
+	if bestPart then
+		bestAnimalPart = bestPart
+		bestAnimalValue = bestValue
+		bestAnimalName = bestName
+		bestAnimalGenerationText = bestGen
+		createESPForPart(bestPart)
+	else
+		updateBrainrotMenu()
+	end
 end
 
 local function startAnimalESP()
-animalESPEnabled = true
+	animalESPEnabled = true
+	bestAnimalPart = nil
+	bestAnimalValue = 0
+	bestAnimalName = "Unknown"
+	bestAnimalGenerationText = ""
 
-bestAnimalPart = nil  
-bestAnimalValue = 0  
+	local debris = workspace:FindFirstChild("Debris")
+	if debris then
+		rebuildBestAnimal(debris)
 
-local debris = workspace:FindFirstChild("Debris")  
+		if not Connections.animalESPAdded then
+			Connections.animalESPAdded = debris.ChildAdded:Connect(function(part)
+				if not animalESPEnabled then
+					return
+				end
 
-if debris then  
-	rebuildBestAnimal(debris)  
+				if part.Name == "FastOverheadTemplate" and part:IsA("BasePart") then
+					task.wait(0.05)
+					createESPForPart(part)
+				end
+			end)
+		end
 
-	if not Connections.animalESPAdded then  
-		Connections.animalESPAdded = debris.ChildAdded:Connect(function(part)  
-			if not animalESPEnabled then  
-				return  
-			end  
+		if not Connections.animalESPRemoved then
+			Connections.animalESPRemoved = debris.ChildRemoved:Connect(function(part)
+				if animalESPCache[part] then
+					pcall(function()
+						animalESPCache[part]:Destroy()
+					end)
+					animalESPCache[part] = nil
+				end
 
-			if part.Name == "FastOverheadTemplate" and part:IsA("BasePart") then  
-				task.wait(0.05)  
-				createESPForPart(part)  
-			end  
-		end)  
-	end  
+				if part == bestAnimalPart then
+					rebuildBestAnimal(debris)
+				else
+					updateBrainrotMenu()
+				end
+			end)
+		end
+	end
 
-	if not Connections.animalESPRemoved then  
-		Connections.animalESPRemoved = debris.ChildRemoved:Connect(function(part)  
-			if animalESPCache[part] then  
-				pcall(function()  
-					animalESPCache[part]:Destroy()  
-				end)  
-				animalESPCache[part] = nil  
-			end  
-
-			if part == bestAnimalPart then  
-				rebuildBestAnimal(debris)  
-			end  
-		end)  
-	end  
-end
-
+	createBrainrotLauncher()
+	updateBrainrotMenu()
 end
 
 local function stopAnimalESP()
-animalESPEnabled = false
+	animalESPEnabled = false
 
-clearAllESP()  
-animalESPCache = {}  
+	clearAllESP()
+	animalESPCache = {}
 
-bestAnimalPart = nil  
-bestAnimalValue = 0  
+	bestAnimalPart = nil
+	bestAnimalValue = 0
+	bestAnimalName = "Unknown"
+	bestAnimalGenerationText = ""
 
-if Connections.animalESPAdded then  
-	Connections.animalESPAdded:Disconnect()  
-	Connections.animalESPAdded = nil  
-end  
+	if Connections.animalESPAdded then
+		Connections.animalESPAdded:Disconnect()
+		Connections.animalESPAdded = nil
+	end
 
-if Connections.animalESPRemoved then  
-	Connections.animalESPRemoved:Disconnect()  
-	Connections.animalESPRemoved = nil  
-end
+	if Connections.animalESPRemoved then
+		Connections.animalESPRemoved:Disconnect()
+		Connections.animalESPRemoved = nil
+	end
 
+	updateBrainrotMenu()
 end
 
 createToggle("Esp Best", function(state)
-if state then
-startAnimalESP()
-else
-stopAnimalESP()
-end
+	if state then
+		startAnimalESP()
+	else
+		stopAnimalESP()
+	end
 end)
+
+-- ================= END ESP BEST + BRAINROT MANAGER =================
+
 -- ================= ANTI RAGDOLL V2 =================
 
 local antiRagdollEnabled = false
