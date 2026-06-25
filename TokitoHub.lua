@@ -1948,6 +1948,205 @@ end)
 createToggle("Infinite Jump", function(state)
 	infiniteJumpEnabled = state
 end)
+-- ================= USE POTION =================
+
+local potionGui = nil
+local potionDragConnection = nil
+local potionInputEndedConnection = nil
+local potionInputBeganConnection = nil
+
+local function getPotion()
+    local player = game.Players.LocalPlayer
+    local backpack = player:FindFirstChild("Backpack")
+    local char = player.Character
+
+    if char then
+        local tool = char:FindFirstChild("Giant Potion")
+        if tool then
+            return tool
+        end
+    end
+
+    if backpack then
+        return backpack:FindFirstChild("Giant Potion")
+    end
+end
+
+local function usePotion()
+    local player = game.Players.LocalPlayer
+    local char = player.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    local potion = getPotion()
+    if not potion then return end
+
+    hum:EquipTool(potion)
+    task.wait(0.1)
+
+    pcall(function()
+        potion:Activate()
+    end)
+end
+
+local function createPotionButton()
+    if potionGui then
+        return
+    end
+
+    local player = game.Players.LocalPlayer
+    local UIS = game:GetService("UserInputService")
+
+    potionGui = Instance.new("ScreenGui")
+    potionGui.Name = "PotionGUI"
+    potionGui.ResetOnSpawn = false
+    potionGui.IgnoreGuiInset = true
+    potionGui.Parent = player:WaitForChild("PlayerGui")
+
+    local shadow = Instance.new("Frame")
+    shadow.Name = "Shadow"
+    shadow.Size = UDim2.new(0, 112, 0, 46)
+    shadow.Position = UDim2.new(0.5, -56, 0.7, 0)
+    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.BackgroundTransparency = 0.45
+    shadow.BorderSizePixel = 0
+    shadow.Parent = potionGui
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 14)
+
+    local button = Instance.new("TextButton")
+    button.Name = "PotionButton"
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.Position = UDim2.new(0, 0, 0, 0)
+    button.BackgroundColor3 = Color3.fromRGB(18, 72, 160)
+    button.Text = "POTION"
+    button.Font = Enum.Font.GothamBold
+    button.TextScaled = true
+    button.TextColor3 = Color3.fromRGB(245, 250, 255)
+    button.AutoButtonColor = false
+    button.BorderSizePixel = 0
+    button.Parent = shadow
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 14)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 2
+    stroke.Color = Color3.fromRGB(90, 175, 255)
+    stroke.Transparency = 0.05
+    stroke.Parent = button
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 110, 220)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 55, 140))
+    })
+    gradient.Rotation = 90
+    gradient.Parent = button
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.Parent = button
+
+    local dragging = false
+    local moved = false
+    local dragStart = nil
+    local startPos = nil
+    local dragInput = nil
+    local downInput = nil
+    local dragThreshold = 8
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        if math.abs(delta.X) > dragThreshold or math.abs(delta.Y) > dragThreshold then
+            moved = true
+        end
+
+        shadow.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            moved = false
+            dragStart = input.Position
+            startPos = shadow.Position
+            downInput = input
+        end
+    end)
+
+    button.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    potionDragConnection = UIS.InputChanged:Connect(function(input)
+        if dragging and dragInput and input == dragInput then
+            update(input)
+        end
+    end)
+
+    potionInputEndedConnection = UIS.InputEnded:Connect(function(input)
+        if downInput and input == downInput then
+            dragging = false
+            dragInput = nil
+            downInput = nil
+
+            if not moved then
+                task.spawn(usePotion)
+            end
+        end
+    end)
+
+    button.MouseEnter:Connect(function()
+        stroke.Transparency = 0
+    end)
+
+    button.MouseLeave:Connect(function()
+        stroke.Transparency = 0.05
+    end)
+end
+
+local function removePotionButton()
+    if potionDragConnection then
+        potionDragConnection:Disconnect()
+        potionDragConnection = nil
+    end
+
+    if potionInputEndedConnection then
+        potionInputEndedConnection:Disconnect()
+        potionInputEndedConnection = nil
+    end
+
+    if potionInputBeganConnection then
+        potionInputBeganConnection:Disconnect()
+        potionInputBeganConnection = nil
+    end
+
+    if potionGui then
+        potionGui:Destroy()
+        potionGui = nil
+    end
+end
+
+createToggle("Use Potion", function(state)
+    if state then
+        createPotionButton()
+    else
+        removePotionButton()
+    end
+end)
+
+-- ================= END USE POTION =================
+
 -- ================= FPS BOOSTER =================
 
 local fpsBoostEnabled = false
