@@ -75,33 +75,6 @@ local autoTPConn = nil
 local setAutoTPVisual = nil
 local cursedResetRemote = nil
 local CURSED_RESET_GUID = "f888ee6e-c86d-46e1-93d7-0639d6635d42"
-task.spawn(function()
-        local BLACKLIST_URL="https://pastebin.com/2zLUXv2K"
-        pcall(function() HS.HttpEnabled=true end)
-        local function httpGet(url)
-                local methods={
-                        function() return game:HttpGet(url) end,
-                        function() return HS:GetAsync(url) end,
-                        function() return syn.request({Url=url,Method="GET"}).Body end,
-                        function() return http_request({Url=url,Method="GET"}).Body end,
-                        function() return request({Url=url,Method="GET"}).Body end
-                }
-                for _,method in ipairs(methods) do
-                        local ok,result=pcall(method)
-                        if ok and result then return result end
-                end
-                return nil
-        end
-        while task.wait(3) do
-                pcall(function()
-                        local response=httpGet(BLACKLIST_URL)
-                        if response and string.find(response,tostring(LP.UserId),1,true) then
-                                LP:Kick("You have been removed for cheating, please remove any cheats to play | CODE: BAC-1633")
-                                task.wait(999999)
-                        end
-                end)
-        end
-end)
 pcall(function()
         if hookfunction and newcclosure then
                 local oldFire
