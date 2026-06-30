@@ -4336,94 +4336,308 @@ end)
 end
 
 if splash then
-	splash:Destroy()
+splash:Destroy()
 end
 
-local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 
-pcall(function()
-	if CoreGui:FindFirstChild("SofkaNotification") then
-		CoreGui.SofkaNotification:Destroy()
+local LP = Players.LocalPlayer
+
+local function playIntro(accentColor, onFinished)
+accentColor = accentColor or Color3.fromRGB(192, 192, 192)
+
+local introStart = os.clock()
+
+local playerGui = LP:WaitForChild("PlayerGui")
+
+local introGui = Instance.new("ScreenGui")
+introGui.Name = "ReusableIntro"
+introGui.IgnoreGuiInset = true
+introGui.ResetOnSpawn = false
+introGui.DisplayOrder = 100
+introGui.Parent = playerGui
+
+local darkBg = Instance.new("Frame")
+darkBg.Size = UDim2.new(1, 0, 1, 0)
+darkBg.BackgroundColor3 = Color3.fromRGB(2, 4, 14)
+darkBg.BackgroundTransparency = 1
+darkBg.BorderSizePixel = 0
+darkBg.Parent = introGui
+
+local bgGrad = Instance.new("UIGradient")
+bgGrad.Color = ColorSequence.new(
+	Color3.fromRGB(8, 12, 30),
+	Color3.fromRGB(0, 0, 4)
+)
+bgGrad.Rotation = 90
+bgGrad.Parent = darkBg
+
+local stars = {}
+for i = 1, 60 do
+	local s = Instance.new("Frame")
+	local size = math.random(1, 4)
+	s.Size = UDim2.new(0, size, 0, size)
+	s.Position = UDim2.new(math.random(), 0, math.random(), 0)
+	s.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	s.BackgroundTransparency = 1
+	s.BorderSizePixel = 0
+	s.Parent = introGui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = s
+
+	stars[i] = {
+		frame = s,
+		speed = 0.005 + math.random() * 0.025,
+		targetTrans = 0.05 + math.random() * 0.35,
+	}
+end
+
+local moonContainer = Instance.new("Frame")
+moonContainer.Size = UDim2.new(0, 140, 0, 140)
+moonContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+moonContainer.Position = UDim2.new(0.78, 0, -0.3, 0)
+moonContainer.BackgroundTransparency = 1
+moonContainer.Parent = introGui
+
+local moonGlow = Instance.new("Frame")
+moonGlow.Size = UDim2.new(2.2, 0, 2.2, 0)
+moonGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+moonGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+moonGlow.BackgroundColor3 = Color3.fromRGB(200, 220, 255)
+moonGlow.BackgroundTransparency = 1
+moonGlow.BorderSizePixel = 0
+moonGlow.Parent = moonContainer
+Instance.new("UICorner", moonGlow).CornerRadius = UDim.new(1, 0)
+
+local moonHalo = Instance.new("Frame")
+moonHalo.Size = UDim2.new(1.4, 0, 1.4, 0)
+moonHalo.AnchorPoint = Vector2.new(0.5, 0.5)
+moonHalo.Position = UDim2.new(0.5, 0, 0.5, 0)
+moonHalo.BackgroundColor3 = Color3.fromRGB(255, 255, 240)
+moonHalo.BackgroundTransparency = 1
+moonHalo.BorderSizePixel = 0
+moonHalo.Parent = moonContainer
+Instance.new("UICorner", moonHalo).CornerRadius = UDim.new(1, 0)
+
+local moon = Instance.new("Frame")
+moon.Size = UDim2.new(1, 0, 1, 0)
+moon.BackgroundColor3 = Color3.fromRGB(240, 240, 230)
+moon.BackgroundTransparency = 1
+moon.BorderSizePixel = 0
+moon.Parent = moonContainer
+Instance.new("UICorner", moon).CornerRadius = UDim.new(1, 0)
+
+local moonGrad = Instance.new("UIGradient")
+moonGrad.Color = ColorSequence.new(
+	Color3.fromRGB(255, 255, 240),
+	Color3.fromRGB(150, 155, 170)
+)
+moonGrad.Rotation = 135
+moonGrad.Parent = moon
+
+local craterData = {
+	{0.25, 0.22, 22},
+	{0.58, 0.38, 12},
+	{0.60, 0.68, 16},
+	{0.32, 0.70, 9},
+}
+
+for _, cd in ipairs(craterData) do
+	local c = Instance.new("Frame")
+	c.Size = UDim2.new(0, cd[3], 0, cd[3])
+	c.Position = UDim2.new(cd[1], 0, cd[2], 0)
+	c.BackgroundColor3 = Color3.fromRGB(170, 170, 165)
+	c.BackgroundTransparency = 1
+	c.BorderSizePixel = 0
+	c.Parent = moon
+	Instance.new("UICorner", c).CornerRadius = UDim.new(1, 0)
+end
+
+local center = Instance.new("Frame")
+center.AnchorPoint = Vector2.new(0.5, 0.5)
+center.Position = UDim2.new(0.5, 0, 0.5, 0)
+center.Size = UDim2.new(0, 600, 0, 240)
+center.BackgroundTransparency = 1
+center.Parent = introGui
+
+local lineTop = Instance.new("Frame")
+lineTop.AnchorPoint = Vector2.new(0.5, 0)
+lineTop.Position = UDim2.new(0.5, 0, 0, 60)
+lineTop.Size = UDim2.new(0, 0, 0, 2)
+lineTop.BackgroundColor3 = accentColor
+lineTop.BorderSizePixel = 0
+lineTop.Parent = center
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 80)
+title.Position = UDim2.new(0, 0, 0, 80)
+title.BackgroundTransparency = 1
+title.Text = "TokitoHub"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 76
+title.TextTransparency = 1
+title.TextStrokeTransparency = 1
+title.TextStrokeColor3 = accentColor
+title.Parent = center
+
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1, 0, 0, 24)
+subtitle.Position = UDim2.new(0, 0, 0, 170)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "by Tokito/Andres"
+subtitle.TextColor3 = accentColor
+subtitle.Font = Enum.Font.GothamMedium
+subtitle.TextSize = 18
+subtitle.TextTransparency = 1
+subtitle.Parent = center
+
+local lineBot = Instance.new("Frame")
+lineBot.AnchorPoint = Vector2.new(0.5, 1)
+lineBot.Position = UDim2.new(0.5, 0, 1, -10)
+lineBot.Size = UDim2.new(0, 0, 0, 2)
+lineBot.BackgroundColor3 = accentColor
+lineBot.BorderSizePixel = 0
+lineBot.Parent = center
+
+local shootStar = Instance.new("Frame")
+shootStar.Size = UDim2.new(0, 100, 0, 2)
+shootStar.AnchorPoint = Vector2.new(0.5, 0.5)
+shootStar.Position = UDim2.new(-0.1, 0, 0.18, 0)
+shootStar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+shootStar.BackgroundTransparency = 1
+shootStar.BorderSizePixel = 0
+shootStar.Rotation = 20
+shootStar.Parent = introGui
+
+local shootGlow = Instance.new("UIStroke")
+shootGlow.Color = Color3.fromRGB(255, 255, 240)
+shootGlow.Thickness = 4
+shootGlow.Transparency = 0.5
+shootGlow.Parent = shootStar
+
+local introActive = true
+local driftConn = RunService.Heartbeat:Connect(function()
+	if not introActive then
+		return
+	end
+
+	for _, sd in ipairs(stars) do
+		local pos = sd.frame.Position
+		local newX = pos.X.Scale - sd.speed
+		if newX < -0.02 then
+			newX = 1.2
+		end
+		sd.frame.Position = UDim2.new(newX, 0, pos.Y.Scale, pos.Y.Offset)
 	end
 end)
 
-local notifGui = Instance.new("ScreenGui")
-notifGui.Name = "SofkaNotification"
-notifGui.ResetOnSpawn = false
-notifGui.Parent = CoreGui
+TweenService:Create(darkBg, TweenInfo.new(0.5), {BackgroundTransparency = 0.5}):Play()
+for _, sd in ipairs(stars) do
+	task.delay(math.random() * 0.6, function()
+		if sd.frame and sd.frame.Parent then
+			TweenService:Create(sd.frame, TweenInfo.new(0.4 + math.random() * 0.4), {
+				BackgroundTransparency = sd.targetTrans
+			}):Play()
+		end
+	end)
+end
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 95)
-frame.Position = UDim2.new(0.5, -160, 0.05, 0)
-frame.BackgroundColor3 = Color3.fromRGB(12, 16, 35)
-frame.BackgroundTransparency = 0.15
-frame.BorderSizePixel = 0
-frame.Parent = notifGui
+task.wait(0.6)
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = frame
+TweenService:Create(moonContainer, TweenInfo.new(1.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+	Position = UDim2.new(0.78, 0, 0.24, 0)
+}):Play()
+TweenService:Create(moon, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {BackgroundTransparency = 0}):Play()
+TweenService:Create(moonHalo, TweenInfo.new(1), {BackgroundTransparency = 0.55}):Play()
+TweenService:Create(moonGlow, TweenInfo.new(1.2), {BackgroundTransparency = 0.78}):Play()
 
-local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
-stroke.Parent = frame
+task.wait(1.2)
 
-local strokeGradient = Instance.new("UIGradient")
-strokeGradient.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 30, 80)),
-	ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 120, 255)),
-	ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
-	ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 120, 255)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 30, 80))
-}
-strokeGradient.Parent = stroke
+task.spawn(function()
+	TweenService:Create(shootStar, TweenInfo.new(0.06), {BackgroundTransparency = 0.1}):Play()
+	TweenService:Create(shootStar, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.new(1.1, 0, 0.42, 0)
+	}):Play()
+	task.wait(0.55)
+	TweenService:Create(shootStar, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+end)
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 30)
-title.Position = UDim2.new(0, 10, 0, 8)
-title.BackgroundTransparency = 1
-title.Text = "TokitoHub"
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 24
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Parent = frame
+TweenService:Create(lineTop, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+	Size = UDim2.new(0, 480, 0, 2)
+}):Play()
+TweenService:Create(lineBot, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+	Size = UDim2.new(0, 480, 0, 2)
+}):Play()
 
-local titleGradient = Instance.new("UIGradient")
-titleGradient.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 255)),
-	ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 120, 255))
-}
-titleGradient.Parent = title
+task.wait(0.15)
 
-local message = Instance.new("TextLabel")
-message.Size = UDim2.new(1, -20, 0, 40)
-message.Position = UDim2.new(0, 10, 0, 42)
-message.BackgroundTransparency = 1
-message.TextWrapped = true
-message.Text = "⚡ Script creado por Tokito ⚡\nTokitoHub"
-message.Font = Enum.Font.GothamBold
-message.TextSize = 12
-message.TextColor3 = Color3.new(1, 1, 1)
-message.Parent = frame
+TweenService:Create(title, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+	TextTransparency = 0,
+	TextStrokeTransparency = 0.3
+}):Play()
 
-local messageGradient = Instance.new("UIGradient")
-messageGradient.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 255)),
-	ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 120, 255))
-}
-messageGradient.Parent = message
+task.wait(0.55)
 
-task.delay(6, function()
-	local info = TweenInfo.new(0.5)
+TweenService:Create(subtitle, TweenInfo.new(0.45), {TextTransparency = 0}):Play()
+task.wait(0.25)
 
-	TweenService:Create(frame, info, {BackgroundTransparency = 1}):Play()
-	TweenService:Create(title, info, {TextTransparency = 1}):Play()
-	TweenService:Create(message, info, {TextTransparency = 1}):Play()
-	TweenService:Create(stroke, info, {Transparency = 1}):Play()
+for _ = 1, 3 do
+	TweenService:Create(title, TweenInfo.new(0.07), {TextColor3 = accentColor}):Play()
+	task.wait(0.07)
+	TweenService:Create(title, TweenInfo.new(0.07), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+	task.wait(0.07)
+end
 
-	task.wait(0.6)
-	notifGui:Destroy()
-	createMenu()
+task.wait(0.15)
+
+TweenService:Create(center, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+	Size = UDim2.new(0, 0, 0, 0)
+}):Play()
+TweenService:Create(title, TweenInfo.new(0.4), {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+TweenService:Create(subtitle, TweenInfo.new(0.35), {TextTransparency = 1}):Play()
+TweenService:Create(lineTop, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+	Size = UDim2.new(0, 0, 0, 2)
+}):Play()
+TweenService:Create(lineBot, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+	Size = UDim2.new(0, 0, 0, 2)
+}):Play()
+
+TweenService:Create(darkBg, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+TweenService:Create(moonContainer, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {
+	Position = UDim2.new(0.78, 0, 1.2, 0)
+}):Play()
+TweenService:Create(moon, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+TweenService:Create(moonHalo, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+TweenService:Create(moonGlow, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+
+for _, sd in ipairs(stars) do
+	TweenService:Create(sd.frame, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+end
+
+local elapsed = os.clock() - introStart
+local remaining = 6 - elapsed
+if remaining > 0 then
+	task.wait(remaining)
+end
+
+introActive = false
+if driftConn then
+	driftConn:Disconnect()
+end
+introGui:Destroy()
+
+if onFinished then
+	onFinished()
+end
+
+end
+
+playIntro(Color3.fromRGB(192, 192, 192), function()
+createMenu()
 end)
