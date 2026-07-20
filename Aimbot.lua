@@ -11,6 +11,12 @@ local AimbotEnabled = false
 local Minimized = false
 local CurrentTarget = nil
 
+-- Lista de usuarios a ignorar (Puedes agregar más nombres aquí si lo necesitas)
+local WhitelistedUsers = {
+    ["Toki"] = true,
+    ["Tokito"] = true
+}
+
 -- --- 1. CREACIÓN DE LA INTERFAZ PREMIUM ---
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TokitoLaserGui"
@@ -118,12 +124,12 @@ MainFrame.InputBegan:Connect(function(input)
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+
+        input.Changed:Connect(function()  
+            if input.UserInputState == Enum.UserInputState.End then  
+                dragging = false  
+            end  
+        end)  
     end
 end)
 
@@ -166,41 +172,42 @@ ToggleBtn.MouseButton1Click:Connect(function()
         ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
         ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
-        CurrentTarget = nil 
+        CurrentTarget = nil
     end
 end)
 
 -- --- 5. BÚSQUEDA DEL OBJETIVO LÁSER (360 GRADOS) ---
 RunService.RenderStepped:Connect(function()
     if not AimbotEnabled then return end
-    
-    local Target = nil
-    local ShortestDistance = math.huge
-    
-    -- Obtenemos la posición de tu personaje para medir desde ahí
-    local MyCharacter = LocalPlayer.Character
-    local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")
 
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-            
-            local Hitbox = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")
-            
-            if Hitbox and (v.Team ~= LocalPlayer.Team or v.Team == nil) then
-                if MyRoot then
-                    -- Calculamos la distancia 3D real entre tu personaje y el enemigo
-                    local Distance = (Hitbox.Position - MyRoot.Position).Magnitude
-                    
-                    -- Selecciona al enemigo más cercano a ti, sin importar si lo miras o no
-                    if Distance < ShortestDistance then
-                        Target = Hitbox
-                        ShortestDistance = Distance
-                    end
-                end
-            end
-        end
-    end
-    
+    local Target = nil  
+    local ShortestDistance = math.huge  
+      
+    -- Obtenemos la posición de tu personaje para medir desde ahí  
+    local MyCharacter = LocalPlayer.Character  
+    local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")  
+
+    for _, v in pairs(Players:GetPlayers()) do  
+        -- Filtro principal: No ser tú mismo, estar vivo, y NO estar en la Whitelist (Revisa Nombre y DisplayName)
+        if v ~= LocalPlayer and not WhitelistedUsers[v.Name] and not WhitelistedUsers[v.DisplayName] and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
+              
+            local Hitbox = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")  
+              
+            if Hitbox and (v.Team ~= LocalPlayer.Team or v.Team == nil) then  
+                if MyRoot then  
+                    -- Calculamos la distancia 3D real entre tu personaje y el enemigo  
+                    local Distance = (Hitbox.Position - MyRoot.Position).Magnitude  
+                      
+                    -- Selecciona al enemigo más cercano a ti, sin importar si lo miras o no  
+                    if Distance < ShortestDistance then  
+                        Target = Hitbox  
+                        ShortestDistance = Distance  
+                    end  
+                end  
+            end  
+        end  
+    end  
+      
     CurrentTarget = Target
 end)
 
@@ -210,32 +217,32 @@ OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
     local Args = {...}
     local Method = getnamecallmethod()
 
-    if AimbotEnabled and CurrentTarget and not checkcaller() then
-        -- 1. Método antiguo (FindPartOnRay, FindPartOnRayWithIgnoreList, etc.)
-        if string.find(Method, "FindPartOnRay") then
-            -- WALLBANG: Falsificamos el resultado del impacto. 
-            -- Ignoramos el cálculo físico y le devolvemos al juego directamente la pieza del objetivo.
-            return CurrentTarget, CurrentTarget.Position, Vector3.new(0, 1, 0), Enum.Material.Plastic
-            
-        -- 2. Método moderno (workspace:Raycast)
-        elseif Method == "Raycast" then
-            local Origin = Args[1]
-            local Direction = (CurrentTarget.Position - Origin).Unit * 10000
-            
-            -- WALLBANG: Creamos nuevos parámetros de Raycast.
-            -- Esto hace que las paredes se vuelvan transparentes para la bala,
-            -- obligando al rayo a interactuar ÚNICAMENTE con el personaje del objetivo.
-            local WallbangParams = RaycastParams.new()
-            WallbangParams.FilterType = Enum.RaycastFilterType.Include -- En motores viejos era Whitelist
-            WallbangParams.FilterDescendantsInstances = {CurrentTarget.Parent} -- El Character entero del objetivo
-            WallbangParams.IgnoreWater = true
-            
-            Args[2] = Direction
-            Args[3] = WallbangParams
-            
-            return OldNamecall(self, unpack(Args))
-        end
-    end
+    if AimbotEnabled and CurrentTarget and not checkcaller() then  
+        -- 1. Método antiguo (FindPartOnRay, FindPartOnRayWithIgnoreList, etc.)  
+        if string.find(Method, "FindPartOnRay") then  
+            -- WALLBANG: Falsificamos el resultado del impacto.   
+            -- Ignoramos el cálculo físico y le devolvemos al juego directamente la pieza del objetivo.  
+            return CurrentTarget, CurrentTarget.Position, Vector3.new(0, 1, 0), Enum.Material.Plastic  
+              
+        -- 2. Método moderno (workspace:Raycast)  
+        elseif Method == "Raycast" then  
+            local Origin = Args[1]  
+            local Direction = (CurrentTarget.Position - Origin).Unit * 10000  
+              
+            -- WALLBANG: Creamos nuevos parámetros de Raycast.  
+            -- Esto hace que las paredes se vuelvan transparentes para la bala,  
+            -- obligando al rayo a interactuar ÚNICAMENTE con el personaje del objetivo.  
+            local WallbangParams = RaycastParams.new()  
+            WallbangParams.FilterType = Enum.RaycastFilterType.Include -- En motores viejos era Whitelist  
+            WallbangParams.FilterDescendantsInstances = {CurrentTarget.Parent} -- El Character entero del objetivo  
+            WallbangParams.IgnoreWater = true  
+              
+            Args[2] = Direction  
+            Args[3] = WallbangParams  
+              
+            return OldNamecall(self, unpack(Args))  
+        end  
+    end  
 
     return OldNamecall(self, ...)
 end))
@@ -245,7 +252,7 @@ OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
     if AimbotEnabled and CurrentTarget and not checkcaller() then
         if self == Mouse then
             if Index == "Hit" or Index == "hit" then
-                return CurrentTarget.CFrame 
+                return CurrentTarget.CFrame
             elseif Index == "Target" or Index == "target" then
                 return CurrentTarget
             end
