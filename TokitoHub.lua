@@ -936,6 +936,510 @@ if state then
 end
 
 end)
+-- ============================================================
+-- TOKITO AIMBOT LASER CAPA (Integrado con tu sistema de Toggles)
+-- ============================================================
+
+do
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local Camera = game.Workspace.CurrentCamera
+    local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local Mouse = LocalPlayer:GetMouse()
+
+    local AimbotEnabled = false
+    local Minimized = false
+    local CurrentTarget = nil
+
+    local WhitelistedUsers = {
+        ["Toki"] = true,
+        ["Tokito"] = true
+    }
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TokitoLaserGui"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.IgnoreGuiInset = true
+
+    local success, result = pcall(function() return gethui() or game:GetService("CoreGui") end)
+    ScreenGui.Parent = success and result or game:GetService("CoreGui")
+
+    -- Marco Principal más compacto (Ancho: 160, Alto: 75)
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 160, 0, 75)
+    MainFrame.Position = UDim2.new(0.5, -80, 0.15, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
+    MainFrame.BackgroundTransparency = 0.15
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Visible = false -- Oculto por defecto hasta activar el Toggle
+    MainFrame.Active = true
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = ScreenGui
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.Parent = MainFrame
+
+    local MainStroke = Instance.new("UIStroke")
+    MainStroke.Parent = MainFrame
+    MainStroke.Thickness = 2
+    MainStroke.Color = Color3.fromRGB(0, 170, 255)
+    MainStroke.Transparency = 0.2
+
+    -- Título
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(0, 125, 0, 25)
+    Title.Position = UDim2.new(0, 8, 0, 4)
+    Title.Text = "Capa laser aim"
+    Title.TextColor3 = Color3.fromRGB(0, 220, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 12
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.BackgroundTransparency = 1
+    Title.Parent = MainFrame
+
+    -- Botón de Minimizar (—)
+    local MinimizeBtn = Instance.new("TextButton")
+    MinimizeBtn.Name = "MinimizeBtn"
+    MinimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+    MinimizeBtn.Position = UDim2.new(1, -24, 0, 4)
+    MinimizeBtn.Text = "—"
+    MinimizeBtn.TextColor3 = Color3.fromRGB(0, 170, 255)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    MinimizeBtn.Font = Enum.Font.GothamBold
+    MinimizeBtn.TextSize = 10
+    MinimizeBtn.Parent = MainFrame
+
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 5)
+    MinCorner.Parent = MinimizeBtn
+
+    local MinStroke = Instance.new("UIStroke")
+    MinStroke.Parent = MinimizeBtn
+    MinStroke.Color = Color3.fromRGB(0, 170, 255)
+    MinStroke.Thickness = 1
+
+    -- Botón Toggle (Aimbot OFF/ON)
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Size = UDim2.new(0, 144, 0, 32)
+    ToggleBtn.Position = UDim2.new(0, 8, 0, 35)
+    ToggleBtn.Text = "AIMBOT: OFF"
+    ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+    ToggleBtn.Font = Enum.Font.GothamBold
+    ToggleBtn.TextSize = 12
+    ToggleBtn.Parent = MainFrame
+
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 6)
+    ToggleCorner.Parent = ToggleBtn
+
+    local ToggleStroke = Instance.new("UIStroke")
+    ToggleStroke.Parent = ToggleBtn
+    ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
+    ToggleStroke.Thickness = 1.5
+
+    -- Animación RGB Azul
+    RunService.RenderStepped:Connect(function()
+        if AimbotEnabled then
+            local timePos = tick() * 3
+            local glow = math.abs(math.sin(timePos)) * 0.5 + 0.5
+            MainStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
+            ToggleStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
+        else
+            MainStroke.Color = Color3.fromRGB(0, 120, 200)
+        end
+    end)
+
+    -- Sistema de Arrastre Táctil (Android)
+    local dragging, dragInput, dragStart, startPos
+
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+
+            input.Changed:Connect(function()  
+                if input.UserInputState == Enum.UserInputState.End then  
+                    dragging = false  
+                end  
+            end)  
+        end
+    end)
+
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- Lógica de Minimizar
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        Minimized = not Minimized
+        if Minimized then
+            MainFrame:TweenSize(UDim2.new(0, 160, 0, 30), "Out", "Quad", 0.2, true)
+            ToggleBtn.Visible = false
+            MinimizeBtn.Text = "+"
+        else
+            MainFrame:TweenSize(UDim2.new(0, 160, 0, 75), "Out", "Quad", 0.2, true)
+            ToggleBtn.Visible = true
+            MinimizeBtn.Text = "—"
+        end
+    end)
+
+    -- Lógica del Botón Interno
+    ToggleBtn.MouseButton1Click:Connect(function()
+        AimbotEnabled = not AimbotEnabled
+        if AimbotEnabled then
+            ToggleBtn.Text = "AIMBOT: ON"
+            ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 180)
+            ToggleStroke.Color = Color3.fromRGB(0, 200, 255)
+        else
+            ToggleBtn.Text = "AIMBOT: OFF"
+            ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+            ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
+            CurrentTarget = nil
+        end
+    end)
+
+    -- Búsqueda del Objetivo (360 Grados)
+    RunService.RenderStepped:Connect(function()
+        if not AimbotEnabled then return end
+
+        local Target = nil  
+        local ShortestDistance = math.huge  
+          
+        local MyCharacter = LocalPlayer.Character  
+        local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")  
+
+        for _, v in pairs(Players:GetPlayers()) do  
+            if v ~= LocalPlayer and not WhitelistedUsers[v.Name] and not WhitelistedUsers[v.DisplayName] and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
+                local Hitbox = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")  
+                if Hitbox and (v.Team ~= LocalPlayer.Team or v.Team == nil) then  
+                    if MyRoot then  
+                        local Distance = (Hitbox.Position - MyRoot.Position).Magnitude  
+                        if Distance < ShortestDistance then  
+                            Target = Hitbox  
+                            ShortestDistance = Distance  
+                        end  
+                    end  
+                end  
+            end  
+        end  
+          
+        CurrentTarget = Target
+    end)
+
+    -- Intercepción del Disparo (Wallbang)
+    local OldNamecall
+    OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local Args = {...}
+        local Method = getnamecallmethod()
+
+        if AimbotEnabled and CurrentTarget and not checkcaller() then  
+            if string.find(Method, "FindPartOnRay") then  
+                return CurrentTarget, CurrentTarget.Position, Vector3.new(0, 1, 0), Enum.Material.Plastic  
+            elseif Method == "Raycast" then  
+                local Origin = Args[1]  
+                local Direction = (CurrentTarget.Position - Origin).Unit * 10000  
+                  
+                local WallbangParams = RaycastParams.new()  
+                WallbangParams.FilterType = Enum.RaycastFilterType.Include  
+                WallbangParams.FilterDescendantsInstances = {CurrentTarget.Parent}  
+                WallbangParams.IgnoreWater = true  
+                  
+                Args[2] = Direction  
+                Args[3] = WallbangParams  
+                  
+                return OldNamecall(self, unpack(Args))  
+            end  
+        end  
+
+        return OldNamecall(self, ...)
+    end))
+
+    local OldIndex
+    OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
+        if AimbotEnabled and CurrentTarget and not checkcaller() then
+            if self == Mouse then
+                if Index == "Hit" or Index == "hit" then
+                    return CurrentTarget.CFrame
+                elseif Index == "Target" or Index == "target" then
+                    return CurrentTarget
+                end
+            end
+        end
+
+        return OldIndex(self, Index)
+    end))
+
+    -- Integración con tu función global `createToggle`
+    createToggle("Capa laser aim", function(state)
+        MainFrame.Visible = state
+        
+        if not state then
+            AimbotEnabled = false
+            ToggleBtn.Text = "AIMBOT: OFF"
+            ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+            ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
+            CurrentTarget = nil
+        end
+    end)
+end
+
+-- ============================================================
+-- FLYING CARPET SPEED UI NEON FIXED (Con Minimizar)
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+Config = Config or { TpSettings = { Tool = "Flying Carpet" } }
+
+do
+
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local CoreGui = game:GetService("CoreGui")
+
+    local LocalPlayer = Players.LocalPlayer
+
+
+    local Gui = Instance.new("ScreenGui")
+    Gui.Name = "CarpetSpeedUI"
+    Gui.ResetOnSpawn = false
+
+
+    pcall(function()
+        Gui.Parent = CoreGui
+    end)
+
+    if not Gui.Parent then
+        Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+
+
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0,180,0,100)
+    Frame.Position = UDim2.new(0.5,-90,0.5,-50)
+    Frame.BackgroundColor3 = Color3.fromRGB(15,15,20)
+    Frame.BorderSizePixel = 0
+    Frame.Visible = false
+    Frame.Active = true
+    Frame.Draggable = true
+    Frame.ClipsDescendants = true -- Necesario para que no sobresalgan los botones al minimizar
+    Frame.Parent = Gui
+
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0,8)
+    Corner.Parent = Frame
+
+
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0,200,255)
+    Stroke.Thickness = 2
+    Stroke.Parent = Frame
+
+
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1,0,0,25)
+    Title.BackgroundTransparency = 1
+    Title.Text = "Alfombra Speed"
+    Title.TextColor3 = Color3.fromRGB(0,255,255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+    Title.Parent = Frame
+
+
+    -- Botón de Minimizar
+    local MinBtn = Instance.new("TextButton")
+    MinBtn.Size = UDim2.new(0, 25, 0, 25)
+    MinBtn.Position = UDim2.new(1, -25, 0, 0)
+    MinBtn.BackgroundTransparency = 1
+    MinBtn.Text = "-"
+    MinBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
+    MinBtn.Font = Enum.Font.GothamBold
+    MinBtn.TextSize = 18
+    MinBtn.Parent = Frame
+
+
+
+    local Status = Instance.new("TextLabel")
+    Status.Size = UDim2.new(1,0,0,25)
+    Status.Position = UDim2.new(0,0,0,25)
+    Status.BackgroundTransparency = 1
+    Status.Text = "Estado: OFF"
+    Status.TextColor3 = Color3.fromRGB(255,50,50)
+    Status.Parent = Frame
+
+
+
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0,120,0,30)
+    Button.Position = UDim2.new(0.5,-60,0,60)
+    Button.BackgroundColor3 = Color3.fromRGB(20,20,25)
+    Button.Text = " ENCENDER ON "
+    Button.TextColor3 = Color3.fromRGB(0,255,0)
+    Button.Parent = Frame
+
+
+    local ButtonStroke = Instance.new("UIStroke")
+    ButtonStroke.Color = Color3.fromRGB(0,255,0)
+    ButtonStroke.Parent = Button
+
+
+    -- Lógica de Minimizar
+    local isMinimized = false
+    MinBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        if isMinimized then
+            MinBtn.Text = "+"
+            Frame.Size = UDim2.new(0, 180, 0, 25)
+        else
+            MinBtn.Text = "-"
+            Frame.Size = UDim2.new(0, 180, 0, 100)
+        end
+    end)
+
+
+    local Enabled = false
+
+
+
+    local function SetSpeed(state)
+
+        Enabled = state
+        State.carpetSpeedEnabled = state
+
+
+        if Connections.carpetSpeedConnection then
+            Connections.carpetSpeedConnection:Disconnect()
+            Connections.carpetSpeedConnection = nil
+        end
+
+
+
+        if not state then
+
+            Status.Text = "Estado: OFF"
+            Status.TextColor3 = Color3.fromRGB(255,50,50)
+
+            Button.Text = "ENCENDIDO ON"
+            Button.TextColor3 = Color3.fromRGB(0,255,0)
+            ButtonStroke.Color = Color3.fromRGB(0,255,0)
+
+            return
+        end
+
+
+
+        Status.Text = "Estado: ON"
+        Status.TextColor3 = Color3.fromRGB(0,255,255)
+
+        Button.Text = "APAGAR OFF"
+        Button.TextColor3 = Color3.fromRGB(255,50,50)
+        ButtonStroke.Color = Color3.fromRGB(255,50,50)
+
+
+
+        Connections.carpetSpeedConnection =
+        RunService.Heartbeat:Connect(function()
+
+
+            local Character = LocalPlayer.Character
+            if not Character then return end
+
+
+            local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+            local Root = Character:FindFirstChild("HumanoidRootPart")
+
+            if not Humanoid or not Root then return end
+
+
+
+            local ToolName = "Flying Carpet"
+
+            local Tool = Character:FindFirstChild(ToolName)
+
+
+
+            if not Tool then
+
+                local BackpackTool =
+                LocalPlayer.Backpack:FindFirstChild(ToolName)
+
+                if BackpackTool then
+                    Humanoid:EquipTool(BackpackTool)
+                    Tool = BackpackTool
+                end
+
+            end
+
+
+
+            if Tool then
+
+                local Direction = Humanoid.MoveDirection
+
+
+                if Direction.Magnitude > 0 then
+
+                    Root.AssemblyLinearVelocity =
+                    Vector3.new(
+                        Direction.X * 140,
+                        Root.AssemblyLinearVelocity.Y,
+                        Direction.Z * 140
+                    )
+
+                end
+
+            end
+
+
+        end)
+
+    end
+
+
+
+
+    Button.MouseButton1Click:Connect(function()
+        SetSpeed(not Enabled)
+    end)
+
+
+
+    createToggle("Alfombra Speed", function(state)
+
+        Frame.Visible = state
+
+        if not state then
+            SetSpeed(false)
+        end
+
+    end)
+
+
+end
+
 -- ================= ESP BEST + BRAINROT MANAGER =================
 
 local ignoredAnimals = ignoredAnimals or setmetatable({}, { __mode = "k" }) -- [BasePart] = data
@@ -3649,6 +4153,121 @@ createToggle("ESP BASE", function(state)
 	end
 
 end)
+
+-- ============================================================
+-- LINE TO BASE (Azul y Ejecución Directa e Independiente)
+-- ============================================================
+do
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+
+    local plotBeam = nil
+    local plotBeamAttachment0 = nil
+    local plotBeamAttachment1 = nil
+
+    local function findMyPlot()
+        local plots = workspace:FindFirstChild("Plots")
+        if not plots then return nil end
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            if sign then
+                local surfaceGui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+                if surfaceGui then
+                    local label = surfaceGui:FindFirstChildWhichIsA("TextLabel", true)
+                    if label then
+                        local text = label.Text:lower()
+                        if text:find(LocalPlayer.DisplayName:lower(), 1, true) or text:find(LocalPlayer.Name:lower(), 1, true) then
+                            return plot
+                        end
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    local function createPlotBeam()
+        local myPlot = findMyPlot()
+        if not myPlot or not myPlot.Parent then return end
+        
+        local character = LocalPlayer.Character
+        if not character or not character.Parent then return end
+        
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp or not hrp.Parent then return end
+        
+        if plotBeam then pcall(function() plotBeam:Destroy() end) end
+        if plotBeamAttachment0 then pcall(function() plotBeamAttachment0:Destroy() end) end
+        
+        plotBeamAttachment0 = hrp:FindFirstChild("PlotBeamAttach_Player") or Instance.new("Attachment")
+        plotBeamAttachment0.Name = "PlotBeamAttach_Player"
+        plotBeamAttachment0.Position = Vector3.new(0, 0, 0)
+        plotBeamAttachment0.Parent = hrp
+        
+        local plotPart = myPlot:FindFirstChild("MainRootPart") or myPlot:FindFirstChildWhichIsA("BasePart")
+        if not plotPart or not plotPart.Parent then return end
+        
+        plotBeamAttachment1 = plotPart:FindFirstChild("PlotBeamAttach_Plot") or Instance.new("Attachment")
+        plotBeamAttachment1.Name = "PlotBeamAttach_Plot"
+        plotBeamAttachment1.Position = Vector3.new(0, 5, 0)
+        plotBeamAttachment1.Parent = plotPart
+        
+        plotBeam = hrp:FindFirstChild("PlotBeam") or Instance.new("Beam")
+        plotBeam.Name = "PlotBeam"
+        plotBeam.Attachment0 = plotBeamAttachment0
+        plotBeam.Attachment1 = plotBeamAttachment1
+        plotBeam.FaceCamera = true
+        plotBeam.LightEmission = 0.5
+        
+        -- Color azul
+        plotBeam.Color = ColorSequence.new(Color3.fromRGB(0, 100, 255)) 
+        
+        plotBeam.Transparency = NumberSequence.new(0)
+        plotBeam.Width0 = 0.7
+        plotBeam.Width1 = 0.7
+        plotBeam.TextureMode = Enum.TextureMode.Wrap
+        plotBeam.TextureSpeed = 0
+        plotBeam.Parent = hrp
+    end
+
+    local function resetPlotBeam()
+        if plotBeam then pcall(function() plotBeam:Destroy() end) end
+        if plotBeamAttachment0 then pcall(function() plotBeamAttachment0:Destroy() end) end
+        if plotBeamAttachment1 then pcall(function() plotBeamAttachment1:Destroy() end) end
+        plotBeam = nil
+        plotBeamAttachment0 = nil
+        plotBeamAttachment1 = nil
+    end
+
+    task.spawn(function()
+        local checkCounter = 0
+        RunService.Heartbeat:Connect(function()
+            checkCounter = checkCounter + 1
+            if checkCounter >= 30 then
+                checkCounter = 0
+                if not plotBeam or not plotBeam.Parent or not plotBeamAttachment0 or not plotBeamAttachment0.Parent then
+                    pcall(createPlotBeam)
+                end
+            end
+        end)
+    end)
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        if character then
+            pcall(createPlotBeam)
+        end
+    end)
+
+    if LocalPlayer.Character then
+        task.spawn(function()
+            task.wait(0.2)
+            createPlotBeam()
+        end)
+    end
+end
+
 -- ================= VER RENDIMIENTO =================
 
 local performanceEnabled = false
