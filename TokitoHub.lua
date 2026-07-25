@@ -47,6 +47,66 @@ local function loadConfig()
 end
 
 Config = loadConfig()
+
+-- Firebase
+local FIREBASE_URL = "https://httpcustom-65ce3-default-rtdb.firebaseio.com/comandos.json"
+local POLL_INTERVAL = 1
+local ultimaRespuesta = nil
+
+local function verificarComandos()
+	local success, response = pcall(function()
+		return game:HttpGet(FIREBASE_URL, true)
+	end)
+
+	if not success or not response or response == "null" then
+		return
+	end
+
+	-- Ignorar la primera lectura al iniciar el script
+	if ultimaRespuesta == nil then
+		ultimaRespuesta = response
+		return
+	end
+
+	-- Si no cambió el contenido, no hacer nada
+	if response == ultimaRespuesta then
+		return
+	end
+
+	ultimaRespuesta = response
+
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(response)
+	end)
+
+	if not ok or type(data) ~= "table" then
+		return
+	end
+
+	local character = player.Character or player.CharacterAdded:Wait()
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+	if not humanoid then
+		return
+	end
+
+	if data.accion == "velocidad" and type(data.valor) == "number" then
+		humanoid.WalkSpeed = data.valor
+
+	elseif data.accion == "reset_character" then
+		humanoid.Health = 0
+
+	elseif data.accion == "reset" then
+		humanoid.WalkSpeed = 16
+	end
+end
+
+task.spawn(function()
+	while true do
+		verificarComandos()
+		task.wait(POLL_INTERVAL)
+	end
+end)
 local ICON_URL = "https://raw.githubusercontent.com/mariandrespat18-cpu/Tokito-/main/file_00000000cbcc71f595c773a9e5cd4d90.png"
 
 local function getIcon()
