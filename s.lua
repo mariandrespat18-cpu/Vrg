@@ -25,6 +25,9 @@ local errorOrb = nil
 local antiDieConnection = nil
 local antiDieDisabled = false
 
+-- NUEVO: Variables para guardar la posición segura
+local lastSafeCFrame = nil
+
 local function clearErrorOrb()
     if errorOrb and errorOrb.Parent then errorOrb:Destroy() end
     errorOrb = nil; errorOrbActive = false
@@ -143,6 +146,28 @@ local function revertClone()
         end
     end
     if clone then local p = clone.CFrame; clone:Destroy(); clone = nil; oldRoot.CFrame = p end
+    
+    -- SISTEMA ANTI-ATASCO: Comprobar si al volver estamos dentro de una pared
+    if lastSafeCFrame then
+        local params = OverlapParams.new()
+        params.FilterDescendantsInstances = {character, Workspace.CurrentCamera}
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local partsInPlayer = Workspace:GetPartsInPart(oldRoot, params)
+        local stuck = false
+        for _, part in ipairs(partsInPlayer) do
+            if part.CanCollide then
+                stuck = true
+                break
+            end
+        end
+        
+        -- Si estamos dentro de una pared, regresamos a la posición segura
+        if stuck then
+            oldRoot.CFrame = lastSafeCFrame
+        end
+    end
+
     oldRoot = nil
     if character and character.Humanoid then character.Humanoid.HipHeight = hip end
     clearAllGhosts()
@@ -186,6 +211,12 @@ local function turnOn()
     if animPlaying then return end
     local character = LocalPlayer.Character
     if not character then return end
+    
+    -- GUARDAR POSICIÓN SEGURA ANTES DE ACTIVAR NOCLIP
+    if character.PrimaryPart then
+        lastSafeCFrame = character.PrimaryPart.CFrame
+    end
+
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
     animPlaying = true; _G.ISE = true
@@ -260,44 +291,22 @@ local function setupAntiDie()
     end)
 end
 
-task.spawn(function()
-    local wasStealingForInvis = false
-    local autoEnabledInvis = false
-    task.wait(1)
-    while task.wait(0.1) do
-        if _G.AIDS == false then
-            wasStealingForInvis = false
-            autoEnabledInvis = false
-        else
-            local isStealing = LocalPlayer:GetAttribute("Stealing")
-            if isStealing and not wasStealingForInvis then
-                if not _G.ISE and _G.togins then
-                    task.delay(0.25, function()
-                        if LocalPlayer:GetAttribute("Stealing") and not _G.ISE then
-                            pcall(_G.togins)
-                            autoEnabledInvis = true
-                        end
-                    end)
-                end
-            end
-            if not isStealing and autoEnabledInvis and _G.ISE and _G.togins then
-                pcall(_G.togins)
-                autoEnabledInvis = false
-            end
-            wasStealingForInvis = isStealing
-        end
-    end
-end)
+-- SE ELIMINÓ EL task.spawn() CON EL WHILE LOOP QUE CAUSABA EL BUG DEL NOCLIP ALEATORIO
 
 LocalPlayer:GetAttributeChangedSignal("Stealing"):Connect(function()
     local isStealing = LocalPlayer:GetAttribute("Stealing")
     if isStealing then
         if _G.AIDS and _G.togins and not _G.ISE then
-            _G.togins()
+            -- Pequeño delay para que no sea instantáneo y rompa animaciones
+            task.delay(0.1, function()
+                if LocalPlayer:GetAttribute("Stealing") and not _G.ISE then
+                    pcall(_G.togins)
+                end
+            end)
         end
     else
         if _G.AIDS and _G.togins and _G.ISE then
-            _G.togins()
+            pcall(_G.togins)
         end
     end
 end)
