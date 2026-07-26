@@ -201,7 +201,7 @@ local function walkForward(seconds)
 end
 
 -- ==========================================
--- CLONACIÓN SEGURA MULTI-EVENTO (ANDROID/PC)
+-- CLONACIÓN SEGURA MULTI-EVENTO
 -- ==========================================
 local function instantClone()
     if _G.isCloning then return end
@@ -312,92 +312,81 @@ local function executeMovement()
     task.wait(0.01)  
     if cancelMovement then return end
 
-    local isSecondFloor = exactPos.Y > 10  
-    local plotIndex = getClosestBaseIdx(exactPos)  
-    local targetBasePos = isSecondFloor and BASES_HIGH[plotIndex] or BASES_LOW[plotIndex]  
+    -- VERIFICACIÓN: ¿Está en una base o está en la alfombra/centro?
+    local isPetOnBase = targetPetData.plot ~= "Unknown"
 
-    -- 1. Vuela hacia la base correspondiente
-    smoothFlyTo(targetBasePos, globalStart)  
-    if tick() - globalStart > 10 or cancelMovement then return end  
+    -- Si está en una base, hacemos la rutina de ir a la entrada y clonar
+    if isPetOnBase then
+        local isSecondFloor = exactPos.Y > 10  
+        local plotIndex = getClosestBaseIdx(exactPos)  
+        local targetBasePos = isSecondFloor and BASES_HIGH[plotIndex] or BASES_LOW[plotIndex]  
 
-    -- =================================================================
-    -- NUEVO: Plataforma de soporte para evitar que caiga al caminar
-    -- =================================================================
-    if isSecondFloor then
-        local supportPlatform = Instance.new("Part")
-        supportPlatform.Size = Vector3.new(12, 1, 12)
-        supportPlatform.Anchored = true
-        supportPlatform.CanCollide = true
-        supportPlatform.Transparency = 1 -- Invisible
-        supportPlatform.Position = hrp.Position - Vector3.new(0, 3.2, 0)
-        supportPlatform.Parent = Workspace
-        Debris:AddItem(supportPlatform, 6) -- Se elimina sola después de 6s
-    end
-    -- =================================================================
-
-    if not isSecondFloor then  
-        local bestSpot = CLONE_POSITIONS_FLOOR[1]  
-        local minDst = math.huge  
-        for _, v in ipairs(CLONE_POSITIONS_FLOOR) do  
-            local d = (targetPart.Position - v).Magnitude  
-            if d < minDst then minDst = d; bestSpot = v end  
-        end  
-        smoothFlyTo(bestSpot, globalStart)  
+        -- 1. Vuela hacia la base correspondiente
+        smoothFlyTo(targetBasePos, globalStart)  
         if tick() - globalStart > 10 or cancelMovement then return end  
-    end  
 
-    -- 2. Orienta al personaje
-    local bestFace = FACE_TARGETS[1]  
-    local minFaceDist = math.huge  
-    for _, v in ipairs(FACE_TARGETS) do  
-        local d = (hrp.Position - v).Magnitude  
-        if d < minFaceDist then  
-            minFaceDist = d  
-            bestFace = v  
+        -- Plataforma de soporte SOLO para evitar que caiga al caminar antes de clonar
+        if isSecondFloor then
+            local supportPlatform = Instance.new("Part")
+            supportPlatform.Size = Vector3.new(12, 1, 12)
+            supportPlatform.Anchored = true
+            supportPlatform.CanCollide = true
+            supportPlatform.Transparency = 1 -- Invisible
+            supportPlatform.Position = hrp.Position - Vector3.new(0, 3.2, 0)
+            supportPlatform.Parent = Workspace
+            Debris:AddItem(supportPlatform, 6)
+        end
+
+        if not isSecondFloor then  
+            local bestSpot = CLONE_POSITIONS_FLOOR[1]  
+            local minDst = math.huge  
+            for _, v in ipairs(CLONE_POSITIONS_FLOOR) do  
+                local d = (targetPart.Position - v).Magnitude  
+                if d < minDst then minDst = d; bestSpot = v end  
+            end  
+            smoothFlyTo(bestSpot, globalStart)  
+            if tick() - globalStart > 10 or cancelMovement then return end  
         end  
-    end  
-      
-    hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(bestFace.X, hrp.Position.Y, bestFace.Z))  
-      
-    -- 3. Camina hacia adelante sobre la plataforma y luego clona
-    if isSecondFloor or not _G._isTargetPlotUnlocked(targetPetData.plot) then  
-        hrp.AssemblyLinearVelocity = Vector3.zero  
-        hrp.AssemblyAngularVelocity = Vector3.zero  
-        task.wait(0.05)  
-        if cancelMovement then return end
-          
-        walkForward(0.4) -- Ahora caminará sin caerse gracias a la plataforma
-        task.wait(0.4)  
-        if cancelMovement then return end
 
-        instantClone()  
-        task.wait(0.3)  
-        if cancelMovement then return end
-    end  
-    if tick() - globalStart > 10 or cancelMovement then return end  
-      
+        -- 2. Orienta al personaje
+        local bestFace = FACE_TARGETS[1]  
+        local minFaceDist = math.huge  
+        for _, v in ipairs(FACE_TARGETS) do  
+            local d = (hrp.Position - v).Magnitude  
+            if d < minFaceDist then  
+                minFaceDist = d  
+                bestFace = v  
+            end  
+        end  
+          
+        hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(bestFace.X, hrp.Position.Y, bestFace.Z))  
+          
+        -- 3. Camina hacia adelante y luego clona
+        if isSecondFloor or not _G._isTargetPlotUnlocked(targetPetData.plot) then  
+            hrp.AssemblyLinearVelocity = Vector3.zero  
+            hrp.AssemblyAngularVelocity = Vector3.zero  
+            task.wait(0.05)  
+            if cancelMovement then return end
+              
+            walkForward(0.4) 
+            task.wait(0.4)  
+            if cancelMovement then return end
+
+            instantClone()  
+            task.wait(0.3)  
+            if cancelMovement then return end
+        end  
+        if tick() - globalStart > 10 or cancelMovement then return end  
+    end
+    -- FINAL DE RUTINA DE BASE
+
     if carpet then hum:EquipTool(carpet) end  
 
-    -- 4. Vuelo final a la mascota
+    -- 4. Vuelo final directamente a la mascota (Sin crear plataformas extrañas al final)
     local finalPos = targetPart.Position + Vector3.new(0, 3, 0)  
     smoothFlyTo(finalPos, globalStart)  
     
     if cancelMovement then return end
-
-    -- === CREACIÓN DE LA PLATAFORMA FINAL SI Y > 10 ===
-    if exactPos.Y > 10 then
-        local platform = Instance.new("Part")
-        platform.Size = Vector3.new(6, 0.5, 6)
-        platform.Anchored = true
-        platform.CanCollide = true
-        platform.Material = Enum.Material.Neon
-        platform.Color = Color3.fromRGB(0, 85, 255)
-        platform.Position = hrp.Position - Vector3.new(0, 3.2, 0)
-        platform.Parent = Workspace
-        
-        Debris:AddItem(platform, 4)
-    end
-    -- ===========================================
 
     hrp.AssemblyLinearVelocity = Vector3.zero  
     hrp.AssemblyAngularVelocity = Vector3.zero  
