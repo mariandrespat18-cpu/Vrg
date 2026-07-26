@@ -1499,6 +1499,119 @@ do
 
 
 end
+-- ============================================================
+-- RESET TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetReset(state)
+        State.ResetEnabled = state
+
+        if state then
+            if not ScriptLoaded then
+                ScriptLoaded = true
+                
+                pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/reset.lua"))()
+                end)
+            end
+        else
+        end
+    end
+
+    createToggle("Reset", function(state)
+        SetReset(state)
+    end)
+end
+
+-- ============================================================
+-- SEMI INVISIBLE TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false -- Evita descargar el script múltiples veces
+
+    local function SetSemiInvisible(state)
+        State.SemiInvisibleEnabled = state
+
+        if state then
+            -- Si el toggle se activa por primera vez, ejecuta el script
+            if not ScriptLoaded then
+                ScriptLoaded = true
+                
+                -- Ejecución segura con pcall
+                pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/s.lua"))()
+                end)
+            end
+            
+            -- Opcional: Si el script 's.lua' se enciende por variable global
+            -- getgenv().SemiInvisible = true
+
+        else
+            -- Opcional: Si el script 's.lua' se apaga por variable global
+            -- getgenv().SemiInvisible = false
+        end
+    end
+
+    -- Creamos el toggle en tu interfaz
+    createToggle("Semi Invisible", function(state)
+        SetSemiInvisible(state)
+    end)
+end
+
+-- ============================================================
+-- TP TO BEST TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false -- Evita volver a descargar el script si ya se ejecutó
+
+    local function SetTpToBest(state)
+        State.TpToBestEnabled = state
+
+        if state then
+            -- Si el toggle se activa y es la primera vez, ejecutamos el loadstring
+            if not ScriptLoaded then
+                ScriptLoaded = true
+                
+                -- Ejecutamos el script externo de forma segura
+                pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/u.lua"))()
+                end)
+            end
+            
+            -- Opcional: Si el script 'u.lua' usa una variable global para funcionar, 
+            -- puedes activarla aquí. Ejemplo:
+            -- getgenv().AutoTp = true
+
+        else
+            -- Si el toggle se apaga
+            
+            -- Opcional: Desactiva la variable global de 'u.lua' para detenerlo
+            -- getgenv().AutoTp = false
+        end
+    end
+
+    -- Creamos el toggle en la interfaz de tu hub
+    createToggle("Tp To Best", function(state)
+        SetTpToBest(state)
+    end)
+end
 
 -- ================= ESP BEST + BRAINROT MANAGER =================
 
