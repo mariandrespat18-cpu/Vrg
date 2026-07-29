@@ -48,6 +48,15 @@ end
 
 Config = loadConfig()
 
+-- valor por defecto
+if Config.SkipIntro == nil then
+	Config.SkipIntro = false
+end
+
+local function shouldSkipIntro()
+	return getgenv().TokitoHubSkipIntro == true or Config.SkipIntro == true
+end
+
 -- Firebase
 local FIREBASE_URL = "https://httpcustom-65ce3-default-rtdb.firebaseio.com/comandos.json"
 local POLL_INTERVAL = 1
@@ -1529,6 +1538,12 @@ do
         SetReset(state)
     end)
 end
+
+-- skip intro
+createToggle("Skip Intro", function(state)
+	Config.SkipIntro = state
+	saveConfig()
+end)
 
 -- ============================================================
 -- SEMI INVISIBLE TOGGLE SYSTEM
@@ -5430,6 +5445,10 @@ end
 
 end
 
-playIntro(Color3.fromRGB(192, 192, 192), function()
-createMenu()
-end)
+if shouldSkipIntro() then
+	createMenu()
+else
+	playIntro(Color3.fromRGB(192, 192, 192), function()
+		createMenu()
+	end)
+end
