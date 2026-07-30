@@ -25,6 +25,10 @@ local errorOrb = nil
 local antiDieConnection = nil
 local antiDieDisabled = false
 
+-- NUEVO: Velocidad deseada del jugador
+local TARGET_SPEED = 18.5
+local speedConnection = nil
+
 -- NUEVO: Variables para guardar la posición segura
 local lastSafeCFrame = nil
 
@@ -291,6 +295,20 @@ local function setupAntiDie()
     end)
 end
 
+-- NUEVO: Función para mantener siempre la velocidad en 18.5
+local function setupSpeedLock()
+    if speedConnection then speedConnection:Disconnect() end
+    speedConnection = RunService.RenderStepped:Connect(function()
+        local character = LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                humanoid.WalkSpeed = TARGET_SPEED
+            end
+        end
+    end)
+end
+
 -- SE ELIMINÓ EL task.spawn() CON EL WHILE LOOP QUE CAUSABA EL BUG DEL NOCLIP ALEATORIO
 
 LocalPlayer:GetAttributeChangedSignal("Stealing"):Connect(function()
@@ -327,3 +345,4 @@ end
 
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 setupAntiDie()
+setupSpeedLock() -- Iniciar el bucle de velocidad al ejecutar el script
