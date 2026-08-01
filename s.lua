@@ -5,6 +5,7 @@ _G.SSV = 5
 _G.ARL = true
 _G.RIP = false
 _G.togins = nil
+_G.AnimSpeed = 18.5 -- Variable de velocidad
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
 local RunService = game:GetService("RunService")
@@ -25,12 +26,59 @@ local errorOrb = nil
 local antiDieConnection = nil
 local antiDieDisabled = false
 
--- NUEVO: Velocidad deseada del jugador
-local TARGET_SPEED = 18.5
-local speedConnection = nil
-
 -- NUEVO: Variables para guardar la posición segura
 local lastSafeCFrame = nil
+
+-- ==========================================
+-- UI DE VELOCIDAD SÚPER COMPACTA
+-- ==========================================
+local guiName = "SpeedModUI_Compact"
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild(guiName) then
+    playerGui[guiName]:Destroy()
+end
+
+local speedGui = Instance.new("ScreenGui")
+speedGui.Name = guiName
+speedGui.ResetOnSpawn = false
+speedGui.Parent = playerGui
+
+local bgFrame = Instance.new("Frame")
+bgFrame.Size = UDim2.new(0, 65, 0, 18)
+bgFrame.Position = UDim2.new(0, 5, 0, 5) -- Arriba a la izquierda
+bgFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+bgFrame.BackgroundTransparency = 0.2
+bgFrame.BorderSizePixel = 0
+bgFrame.Parent = speedGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 4)
+uiCorner.Parent = bgFrame
+
+local speedInput = Instance.new("TextBox")
+speedInput.Size = UDim2.new(1, -6, 1, 0)
+speedInput.Position = UDim2.new(0, 3, 0, 0)
+speedInput.BackgroundTransparency = 1
+speedInput.Text = tostring(_G.AnimSpeed)
+speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedInput.Font = Enum.Font.SourceSansBold
+speedInput.TextSize = 12
+speedInput.TextXAlignment = Enum.TextXAlignment.Left
+speedInput.ClearTextOnFocus = false
+speedInput.Parent = bgFrame
+
+speedInput.FocusLost:Connect(function()
+    local num = tonumber(speedInput.Text)
+    if num then
+        _G.AnimSpeed = num
+        for _, t in pairs(tracks) do
+            pcall(function() t:AdjustSpeed(_G.AnimSpeed) end)
+        end
+    else
+        speedInput.Text = tostring(_G.AnimSpeed)
+    end
+end)
+-- ==========================================
 
 local function clearErrorOrb()
     if errorOrb and errorOrb.Parent then errorOrb:Destroy() end
@@ -191,7 +239,7 @@ local function animationTrickery()
         animTrack.Stopped:Connect(function() if animPlaying then animationTrickery() end end)
         task.delay(0, function()
             animTrack.TimePosition = 0.7
-            task.delay(0.3, function() if animTrack then animTrack:AdjustSpeed(math.huge) end end)
+            task.delay(0.3, function() if animTrack then animTrack:AdjustSpeed(_G.AnimSpeed) end end)
         end)
     end
 end
@@ -248,7 +296,10 @@ local function turnOn()
                             end
                         end
                     end
-                    if clone then clone.CanCollide = false end
+                    
+                    -- ANTI NOCLIP: Mantiene las colisiones del clon verdaderas para que no atraviese paredes
+                    if clone then clone.CanCollide = true end 
+                    
                     for _, c in pairs(oldRoot:GetChildren()) do
                         if c:IsA("Attachment") or c:IsA("Beam") then c:Destroy() end
                     end
@@ -295,20 +346,6 @@ local function setupAntiDie()
     end)
 end
 
--- NUEVO: Función para mantener siempre la velocidad en 18.5
-local function setupSpeedLock()
-    if speedConnection then speedConnection:Disconnect() end
-    speedConnection = RunService.RenderStepped:Connect(function()
-        local character = LocalPlayer.Character
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                humanoid.WalkSpeed = TARGET_SPEED
-            end
-        end
-    end)
-end
-
 -- SE ELIMINÓ EL task.spawn() CON EL WHILE LOOP QUE CAUSABA EL BUG DEL NOCLIP ALEATORIO
 
 LocalPlayer:GetAttributeChangedSignal("Stealing"):Connect(function()
@@ -345,4 +382,3 @@ end
 
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 setupAntiDie()
-setupSpeedLock() -- Iniciar el bucle de velocidad al ejecutar el script
