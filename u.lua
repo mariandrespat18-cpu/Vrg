@@ -167,7 +167,7 @@ local function smoothFlyTo(targetPos, globalStart)
         if distance < 15 then  
             lv.VectorVelocity = dir * 35  -- Desaceleración suave al llegar
         else  
-            lv.VectorVelocity = dir * 120 -- Velocidad máxima a ~120 sps
+            lv.VectorVelocity = dir * 200 -- Velocidad máxima a ~120 sps
         end  
           
         ao.CFrame = CFrame.lookAt(currentPos, currentPos + Vector3.new(dir.X, 0, dir.Z))  
