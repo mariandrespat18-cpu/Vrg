@@ -1,5 +1,4 @@
 local LocalPlayer = game:GetService("Players").LocalPlayer
-local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
 local cursedResetRemote = nil
@@ -93,6 +92,10 @@ local function cursedInstaReset()
     end)
 end
 
+-- ==========================================
+-- INTERFAZ GRÁFICA (UI) - CORREGIDA
+-- ==========================================
+
 local resetPanel = Instance.new("ScreenGui")
 resetPanel.Name = "InstaResetButton_Small"
 resetPanel.ResetOnSpawn = false
@@ -111,94 +114,37 @@ end) then
     resetPanel.Parent = LocalPlayer.PlayerGui
 end
 
-local btnFrame = Instance.new("Frame")
-btnFrame.Parent = resetPanel
-btnFrame.Size = UDim2.new(0,28,0,28)
-btnFrame.Position = UDim2.new(1,-40,0.9,0)
-btnFrame.BackgroundColor3 = Color3.fromRGB(0,130,255)
-btnFrame.BorderSizePixel = 0
+-- Usamos TextButton en lugar de Frame para tener clics 100% precisos
+local btnButton = Instance.new("TextButton")
+btnButton.Parent = resetPanel
+btnButton.Size = UDim2.new(0, 28, 0, 28)
+btnButton.Position = UDim2.new(1, -40, 0.9, 0)
+btnButton.BackgroundColor3 = Color3.fromRGB(0, 130, 255)
+btnButton.BorderSizePixel = 0
+btnButton.AutoButtonColor = false -- Apagamos el efecto por defecto para usar el nuestro
+btnButton.Text = "R"
+btnButton.Font = Enum.Font.GothamBold
+btnButton.TextSize = 11
+btnButton.TextColor3 = Color3.new(1, 1, 1)
 
-Instance.new("UICorner", btnFrame).CornerRadius = UDim.new(1,0)
+Instance.new("UICorner", btnButton).CornerRadius = UDim.new(1, 0)
 
-local stroke = Instance.new("UIStroke", btnFrame)
-stroke.Color = Color3.new(1,1,1)
+local stroke = Instance.new("UIStroke", btnButton)
+stroke.Color = Color3.new(1, 1, 1)
 stroke.Thickness = 1.5
 
-local txt = Instance.new("TextLabel")
-txt.Parent = btnFrame
-txt.Size = UDim2.fromScale(1,1)
-txt.BackgroundTransparency = 1
-txt.Text = "R"
-txt.Font = Enum.Font.GothamBold
-txt.TextSize = 11
-txt.TextColor3 = Color3.new(1,1,1)
-
-local function setActive(state)
-    btnFrame.BackgroundColor3 = state
-        and Color3.fromRGB(0,90,180)
-        or Color3.fromRGB(0,130,255)
-end
-
-local dragging = false
-local moved = false
-local dragStart
-local startPos
-
-btnFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        moved = false
-        dragStart = input.Position
-        startPos = btnFrame.Position
-    end
+-- Evento de clic nativo de Roblox (funciona perfecto en PC y Móvil sin fallar por movimiento)
+btnButton.Activated:Connect(function()
+    -- Efecto visual de presionado
+    btnButton.BackgroundColor3 = Color3.fromRGB(0, 90, 180)
+    
+    -- Ejecuta la función principal
+    cursedInstaReset()
+    
+    -- Regresa el color a la normalidad después de 0.3 segundos
+    task.delay(0.3, function()
+        if btnButton.Parent then
+            btnButton.BackgroundColor3 = Color3.fromRGB(0, 130, 255)
+        end
+    end)
 end)
-
-local function finish(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-
-        if dragging then
-            if not moved then
-                setActive(true)
-                cursedInstaReset()
-
-                task.delay(0.3,function()
-                    if btnFrame.Parent then
-                        setActive(false)
-                    end
-                end)
-            end
-
-            dragging = false
-            moved = false
-        end
-    end
-end
-
-btnFrame.InputEnded:Connect(finish)
-
-UserInputService.InputChanged:Connect(function(input)
-    if not dragging then return end
-
-    if input.UserInputType == Enum.UserInputType.MouseMovement
-    or input.UserInputType == Enum.UserInputType.Touch then
-
-        local delta = input.Position - dragStart
-
-        if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
-            moved = true
-        end
-
-        if moved then
-            btnFrame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(finish)
