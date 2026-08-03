@@ -4249,183 +4249,490 @@ createToggle("Anti Torreta (Mas agresivo)", function(state)
         stopAggressiveWatch()
     end
 end)
--- ================= PLAYER ESP =================
+-- ============================================================
+-- MULTIPLE EMPTY BASES ESP (Rojo, Texto "Empty Base" a distancia)
+-- ============================================================
+do
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local playerESPEnabled = false
-local playerHighlights = {}
-local playerNameLabels = {}
-local characterConnections = {}
-local playerAddedConnection = nil
+local emptyESPEnabled = false
+local emptyESPBillboards = {}
+local emptyESPConnection = nil
 
-local function addGradient(obj)
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(0,170,255)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255))
-	})
-	gradient.Parent = obj
+-- Función para detectar si el texto indica base vacía (Múltiples idiomas y variantes)
+local function isEmptyBase(text)
+    if not text then return false end
+    local lowerText = text:lower()
+    
+    local keywords = {
+        "empty", 
+        "vacía", 
+        "vacia", 
+        "unclaimed", 
+        "libre", 
+        "free", 
+        "vacante", 
+        "available"
+    }
+    
+    for _, word in ipairs(keywords) do
+        if lowerText:find(word, 1, true) then
+            return true
+        end
+    end
+    return false
 end
 
-local function clearPlayerESP()
-	for _, highlight in pairs(playerHighlights) do
-		if highlight then
-			pcall(function()
-				highlight:Destroy()
-			end)
-		end
-	end
-
-	playerHighlights = {}
-
-	for _, label in pairs(playerNameLabels) do
-		if label then
-			pcall(function()
-				label:Destroy()
-			end)
-		end
-	end
-
-	playerNameLabels = {}
+-- Limpiar todos los ESP de bases vacías activos
+local function clearEmptyESP()
+    for plot, billboard in pairs(emptyESPBillboards) do
+        pcall(function()
+            if billboard then billboard:Destroy() end
+        end)
+    end
+    table.clear(emptyESPBillboards)
 end
 
-local function removePlayerESP(otherPlayer)
-	if playerHighlights[otherPlayer] then
-		pcall(function()
-			playerHighlights[otherPlayer]:Destroy()
-		end)
-		playerHighlights[otherPlayer] = nil
-	end
+-- Actualizar y crear los BillboardGuis en todas las bases vacías detectadas
+local function updateEmptyESP()
+    if not emptyESPEnabled then return end
+    
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return end
 
-	if playerNameLabels[otherPlayer] then
-		pcall(function()
-			playerNameLabels[otherPlayer]:Destroy()
-		end)
-		playerNameLabels[otherPlayer] = nil
-	end
+    local currentActivePlots = {}
+
+    for _, plot in ipairs(plots:GetChildren()) do
+        local sign = plot:FindFirstChild("PlotSign")
+        if sign then
+            local surfaceGui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+            local label = surfaceGui and surfaceGui:FindFirstChildWhichIsA("TextLabel", true)
+            
+            if label and isEmptyBase(label.Text) then
+                currentActivePlots[plot] = true
+                
+                -- Si no tiene un ESP creado, se lo creamos en rojo
+                if not emptyESPBillboards[plot] or not emptyESPBillboards[plot].Parent then
+                    local billboard = Instance.new("BillboardGui")
+                    billboard.Name = "EmptyBaseESP_GUI"
+                    billboard.Adornee = sign
+                    billboard.Size = UDim2.new(0, 200, 0, 50)
+                    billboard.StudsOffset = Vector3.new(0, 3, 0)
+                    billboard.AlwaysOnTop = true
+                    billboard.MaxDistance = math.huge
+                    
+                    local textLabel = Instance.new("TextLabel")
+                    textLabel.Size = UDim2.new(1, 0, 1, 0)
+                    textLabel.BackgroundTransparency = 1
+                    textLabel.Text = "Empty Base"
+                    textLabel.TextColor3 = Color3.fromRGB(255, 60, 60) -- Rojo brillante
+                    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    textLabel.TextStrokeTransparency = 0
+                    textLabel.Font = Enum.Font.GothamBold
+                    textLabel.TextSize = 16
+                    textLabel.Parent = billboard
+                    
+                    billboard.Parent = sign
+                    emptyESPBillboards[plot] = billboard
+                end
+            end
+        end
+    end
+
+    -- Remover ESP de bases que ya fueron reclamadas o eliminadas
+    for plot, billboard in pairs(emptyESPBillboards) do
+        if not currentActivePlots[plot] or not plot.Parent then
+            pcall(function() billboard:Destroy() end)
+            emptyESPBillboards[plot] = nil
+        end
+    end
 end
 
-local function addESPToPlayer(otherPlayer)
-	if not playerESPEnabled then return end
-	if otherPlayer == player then return end
-
-	local character = otherPlayer.Character
-	if not character then return end
-
-	removePlayerESP(otherPlayer)
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "PlayerESP"
-	highlight.Adornee = character
-	highlight.FillColor = Color3.fromRGB(140,100,200)
-	highlight.OutlineColor = Color3.fromRGB(255,255,255)
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Parent = character
-
-	playerHighlights[otherPlayer] = highlight
-
-	local hrp = character:WaitForChild("HumanoidRootPart", 5)
-
-	if hrp then
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "PlayerESPLabel"
-		billboard.Adornee = hrp
-		billboard.Size = UDim2.new(0,200,0,50)
-		billboard.StudsOffset = Vector3.new(0,3,0)
-		billboard.AlwaysOnTop = true
-		billboard.MaxDistance = math.huge
-		billboard.Parent = hrp
-
-		local label = Instance.new("TextLabel")
-		label.Size = UDim2.new(1,0,1,0)
-		label.BackgroundTransparency = 1
-		label.Text = otherPlayer.DisplayName
-		label.TextColor3 = Color3.new(1,1,1)
-		label.TextStrokeTransparency = 0
-		label.Font = Enum.Font.GothamBold
-		label.TextSize = 16
-		label.Parent = billboard
-
-		addGradient(label)
-
-		playerNameLabels[otherPlayer] = billboard
-	end
+-- Activar el sistema
+local function startEmptyESP()
+    emptyESPEnabled = true
+    if emptyESPConnection then
+        emptyESPConnection:Disconnect()
+    end
+    
+    local counter = 0
+    emptyESPConnection = RunService.Heartbeat:Connect(function()
+        if not emptyESPEnabled then return end
+        counter = counter + 1
+        if counter >= 30 then -- Optimizado para ejecutarse cada ~0.5 segundos
+            counter = 0
+            pcall(updateEmptyESP)
+        end
+    end)
+    
+    pcall(updateEmptyESP)
 end
 
-local function setupPlayer(plr)
-	if plr == player then
-		return
-	end
-
-	if characterConnections[plr] then
-		characterConnections[plr]:Disconnect()
-	end
-
-	characterConnections[plr] = plr.CharacterAdded:Connect(function(character)
-		task.wait(1)
-
-		if playerESPEnabled and character then
-			addESPToPlayer(plr)
-		end
-	end)
-
-	plr.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			removePlayerESP(plr)
-
-			if characterConnections[plr] then
-				characterConnections[plr]:Disconnect()
-				characterConnections[plr] = nil
-			end
-		end
-	end)
-
-	if plr.Character and playerESPEnabled then
-		task.spawn(function()
-			addESPToPlayer(plr)
-		end)
-	end
+-- Desactivar el sistema
+local function stopEmptyESP()
+    emptyESPEnabled = false
+    if emptyESPConnection then
+        emptyESPConnection:Disconnect()
+        emptyESPConnection = nil
+    end
+    clearEmptyESP()
 end
 
-local function startPlayerESP()
-	playerESPEnabled = true
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		setupPlayer(plr)
-	end
-
-	if not playerAddedConnection then
-		playerAddedConnection = Players.PlayerAdded:Connect(function(plr)
-			setupPlayer(plr)
-		end)
-	end
+-- Integración con el Toggle del Hub
+if type(createToggle) == "function" then
+    createToggle("Empty Bases ESP", function(state)
+        if state then
+            startEmptyESP()
+        else
+            stopEmptyESP()
+        end
+    end)
 end
 
-local function stopPlayerESP()
-	playerESPEnabled = false
-
-	clearPlayerESP()
-
-	for _, conn in pairs(characterConnections) do
-		if conn then
-			conn:Disconnect()
-		end
-	end
-
-	characterConnections = {}
-
-	if playerAddedConnection then
-		playerAddedConnection:Disconnect()
-		playerAddedConnection = nil
-	end
 end
 
-createToggle("Player ESP", function(state)
-	if state then
-		startPlayerESP()
-	else
-		stopPlayerESP()
-	end
+
+-- ============================================================
+-- ULTIMATE STABLE HUB MODULE (Icono Arriba, Nombre Abajo)
+-- ============================================================
+task.spawn(function()
+    local success, err = pcall(function()
+        local Players = game:GetService("Players")
+        
+        -- Obtener LocalPlayer de forma segura sin bloquear
+        local LocalPlayer = Players.LocalPlayer
+        local startTime = tick()
+        while not LocalPlayer and (tick() - startTime) < 5 do
+            task.wait(0.1)
+            LocalPlayer = Players.LocalPlayer
+        end
+        if not LocalPlayer then return end
+
+        -- Sistema seguro para registrar toggles
+        local function registerToggle(name, callback)
+            task.spawn(function()
+                local timeout = 0
+                while type(createToggle) ~= "function" and timeout < 50 do
+                    task.wait(0.1)
+                    timeout = timeout + 1
+                end
+                if type(createToggle) == "function" then
+                    pcall(function()
+                        createToggle(name, callback)
+                    end)
+                end
+            end)
+        end
+
+        -- ==========================================
+        -- 1. ITEMS ESP (Icono Arriba - Offset 4.4)
+        -- ==========================================
+        local itemsESPEnabled = false
+        local playerBillboards = {}
+        local itemESPLoopRunning = false
+
+        local function getToolIcon(p)
+            if not p or not p.Character then return "" end
+            for _, o in ipairs(p.Character:GetChildren()) do
+                if o and o:IsA("Tool") then
+                    if o.TextureId and o.TextureId ~= "" then
+                        return o.TextureId
+                    else
+                        local handle = o:FindFirstChild("Handle")
+                        if handle then
+                            if handle:IsA("MeshPart") and handle.TextureID and handle.TextureID ~= "" then
+                                return handle.TextureID
+                            else
+                                for _, child in ipairs(handle:GetChildren()) do
+                                    if child and (child:IsA("Texture") or child:IsA("Decal")) and child.Texture and child.Texture ~= "" then
+                                        return child.Texture
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            return ""
+        end
+
+        local function clearItemsESP()
+            for _, entry in pairs(playerBillboards) do
+                if entry and entry.bb then
+                    pcall(function() entry.bb:Destroy() end)
+                end
+            end
+            table.clear(playerBillboards)
+        end
+
+        local function createOrRefreshItemsESP(plr)
+            if not plr or plr == LocalPlayer then return end
+            local char = plr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+            if not hrp then
+                if playerBillboards[plr.UserId] then
+                    pcall(function() playerBillboards[plr.UserId].bb:Destroy() end)
+                    playerBillboards[plr.UserId] = nil
+                end
+                return
+            end
+
+            local entry = playerBillboards[plr.UserId]
+
+            if not entry or not entry.bb or not entry.bb.Parent then
+                local bb = Instance.new("BillboardGui")
+                bb.Name = "ItemsESP_" .. tostring(plr.UserId)
+                bb.Size = UDim2.new(0, 26, 0, 26)
+                bb.Adornee = hrp
+                bb.StudsOffset = Vector3.new(0, 7.5, 0) -- Icono ubicado arriba del nombre
+                bb.AlwaysOnTop = true
+                bb.LightInfluence = 0
+                bb.ResetOnSpawn = false
+
+                local iconImg = Instance.new("ImageLabel")
+                iconImg.Name = "IconLabel"
+                iconImg.Size = UDim2.new(1, 0, 1, 0)
+                iconImg.BackgroundTransparency = 1
+                iconImg.Image = ""
+                iconImg.Visible = false
+                iconImg.Parent = bb
+
+                bb.Parent = hrp
+
+                playerBillboards[plr.UserId] = {
+                    bb = bb,
+                    iconImg = iconImg,
+                    player = plr
+                }
+            else
+                entry.player = plr
+            end
+        end
+
+        local function enableItemsESP()
+            if itemsESPEnabled then return end
+            itemsESPEnabled = true
+
+            if itemESPLoopRunning then return end
+            itemESPLoopRunning = true
+
+            task.spawn(function()
+                while itemsESPEnabled do
+                    task.wait(0.4)
+
+                    pcall(function()
+                        for _, plr in ipairs(Players:GetPlayers()) do
+                            if plr ~= LocalPlayer then
+                                createOrRefreshItemsESP(plr)
+                            end
+                        end
+
+                        for _, entry in pairs(playerBillboards) do
+                            if entry and entry.bb and entry.bb.Parent and entry.player then
+                                local icon = getToolIcon(entry.player)
+                                if icon ~= "" then
+                                    entry.iconImg.Image = icon
+                                    entry.iconImg.Visible = true
+                                else
+                                    entry.iconImg.Visible = false
+                                end
+                            end
+                        end
+                    end)
+                end
+
+                clearItemsESP()
+                itemESPLoopRunning = false
+            end)
+        end
+
+        local function disableItemsESP()
+            itemsESPEnabled = false
+            clearItemsESP()
+        end
+
+        Players.PlayerRemoving:Connect(function(plr)
+            if playerBillboards[plr.UserId] then
+                pcall(function() playerBillboards[plr.UserId].bb:Destroy() end)
+                playerBillboards[plr.UserId] = nil
+            end
+        end)
+
+        registerToggle("Items Esp", function(state)
+            if state then
+                enableItemsESP()
+            else
+                disableItemsESP()
+            end
+        end)
+
+
+        -- ==========================================
+        -- 2. PLAYER ESP (Nombre Abajo - Offset 2.8)
+        -- ==========================================
+        local playerESPEnabled = false
+        local playerHighlights = {}
+        local playerNameLabels = {}
+        local characterConnections = {}
+        local playerAddedConnection = nil
+
+        local function addGradient(obj)
+            local gradient = Instance.new("UIGradient")
+            gradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 170, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+            })
+            gradient.Parent = obj
+        end
+
+        local function clearPlayerESP()
+            for _, highlight in pairs(playerHighlights) do
+                pcall(function() highlight:Destroy() end)
+            end
+            playerHighlights = {}
+
+            for _, label in pairs(playerNameLabels) do
+                pcall(function() label:Destroy() end)
+            end
+            playerNameLabels = {}
+        end
+
+        local function removePlayerESP(otherPlayer)
+            if playerHighlights[otherPlayer] then
+                pcall(function() playerHighlights[otherPlayer]:Destroy() end)
+                playerHighlights[otherPlayer] = nil
+            end
+
+            if playerNameLabels[otherPlayer] then
+                pcall(function() playerNameLabels[otherPlayer]:Destroy() end)
+                playerNameLabels[otherPlayer] = nil
+            end
+        end
+
+        local function addESPToPlayer(otherPlayer)
+            if not playerESPEnabled or otherPlayer == LocalPlayer then return end
+
+            local character = otherPlayer.Character
+            if not character then return end
+
+            removePlayerESP(otherPlayer)
+
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "PlayerESP"
+            highlight.Adornee = character
+            highlight.FillColor = Color3.fromRGB(140, 100, 200)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = character
+
+            playerHighlights[otherPlayer] = highlight
+
+            local hrp = character:WaitForChild("HumanoidRootPart", 5)
+
+            if hrp then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "PlayerESPLabel"
+                billboard.Adornee = hrp
+                billboard.Size = UDim2.new(0, 200, 0, 40)
+                billboard.StudsOffset = Vector3.new(0, 2.8, 0) -- Nombre ubicado debajo del icono
+                billboard.AlwaysOnTop = true
+                billboard.MaxDistance = math.huge
+                billboard.Parent = hrp
+
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Text = otherPlayer.DisplayName
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.TextStrokeTransparency = 0
+                label.Font = Enum.Font.GothamBold
+                label.TextSize = 15
+                label.Parent = billboard
+
+                addGradient(label)
+
+                playerNameLabels[otherPlayer] = billboard
+            end
+        end
+
+        local function setupPlayer(plr)
+            if plr == LocalPlayer then return end
+
+            if characterConnections[plr] then
+                characterConnections[plr]:Disconnect()
+            end
+
+            characterConnections[plr] = plr.CharacterAdded:Connect(function(character)
+                task.wait(1)
+                if playerESPEnabled and character then
+                    addESPToPlayer(plr)
+                end
+            end)
+
+            plr.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                    removePlayerESP(plr)
+                    if characterConnections[plr] then
+                        characterConnections[plr]:Disconnect()
+                        characterConnections[plr] = nil
+                    end
+                end
+            end)
+
+            if plr.Character and playerESPEnabled then
+                task.spawn(function()
+                    addESPToPlayer(plr)
+                end)
+            end
+        end
+
+        local function startPlayerESP()
+            playerESPEnabled = true
+
+            for _, plr in ipairs(Players:GetPlayers()) do
+                setupPlayer(plr)
+            end
+
+            if not playerAddedConnection then
+                playerAddedConnection = Players.PlayerAdded:Connect(function(plr)
+                    setupPlayer(plr)
+                end)
+            end
+        end
+
+        local function stopPlayerESP()
+            playerESPEnabled = false
+            clearPlayerESP()
+
+            for _, conn in pairs(characterConnections) do
+                if conn then conn:Disconnect() end
+            end
+            characterConnections = {}
+
+            if playerAddedConnection then
+                playerAddedConnection:Disconnect()
+                playerAddedConnection = nil
+            end
+        end
+
+        registerToggle("Player ESP", function(state)
+            if state then
+                startPlayerESP()
+            else
+                stopPlayerESP()
+            end
+        end)
+
+    end)
+
+    if not success then
+        warn("Hub Critical Error: " .. tostring(err))
+    end
 end)
+
+
 
 -- ================= XRAY =================
 
