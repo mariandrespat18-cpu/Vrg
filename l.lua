@@ -9,7 +9,7 @@ local CoreGui = game:GetService("CoreGui")
 local LP = Players.LocalPlayer
 
 local KEY = "LARP-7xQ9-Vm2K-84pR-Zd6N"
-local SCRIPT_URL = "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/l.lua"
+local SCRIPT_URL = "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/Test.lua"
 
 local function make(className, props)
 	local obj = Instance.new(className)
