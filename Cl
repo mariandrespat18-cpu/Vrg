@@ -86,7 +86,8 @@ local button = Instance.new("TextButton")
 button.Name = "CloneButton"
 button.Text = "Clonar"
 button.Size = UDim2.new(0, 60, 0, 30)
-button.Position = UDim2.new(1, -30, 0.5, -95)
+-- AQUI ESTÁ EL CAMBIO: Se cambió -95 por -40 para bajar el botón
+button.Position = UDim2.new(1, -30, 0.5, -40)
 button.AnchorPoint = Vector2.new(1, 0.5)
 button.BackgroundColor3 = Color3.new(0, 0, 0)
 button.TextColor3 = Color3.new(1, 1, 1)
