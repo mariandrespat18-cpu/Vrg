@@ -1026,6 +1026,8 @@ do
     local WhitelistedUsers = {
         ["Toki"] = true,
         ["Tokito"] = true
+        ["DavidAlejandro78892"] = true
+        ["davidalejandro78892"] = true
     }
 
     local ScreenGui = Instance.new("ScreenGui")
