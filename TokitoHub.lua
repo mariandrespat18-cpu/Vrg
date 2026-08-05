@@ -1006,7 +1006,7 @@ end
 
 end)
 -- ============================================================
--- TOKITO AIMBOT LASER CAPA (Integrado con tu sistema de Toggles)
+-- TOKITO AIMBOT LASER CAPA (Con Memoria de Posición Segura)
 -- ============================================================
 
 do
@@ -1016,6 +1016,8 @@ do
     local UserInputService = game:GetService("UserInputService")
     local RunService = game:GetService("RunService")
     local Mouse = LocalPlayer:GetMouse()
+
+    Config = Config or {}
 
     local AimbotEnabled = false
     local Minimized = false
@@ -1034,11 +1036,24 @@ do
     local success, result = pcall(function() return gethui() or game:GetService("CoreGui") end)
     ScreenGui.Parent = success and result or game:GetService("CoreGui")
 
+    -- ================= CARGAR POSICIÓN GUARDADA =================
+    local defaultPos = UDim2.new(0.5, -80, 0.15, 0)
+    local framePos = defaultPos
+
+    pcall(function()
+        if Config and Config["CapaAimbotPos"] then
+            local p = Config["CapaAimbotPos"]
+            if type(p) == "table" and #p >= 4 then
+                framePos = UDim2.new(p[1], p[2], p[3], p[4])
+            end
+        end
+    end)
+
     -- Marco Principal más compacto (Ancho: 160, Alto: 75)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 160, 0, 75)
-    MainFrame.Position = UDim2.new(0.5, -80, 0.15, 0)
+    MainFrame.Position = framePos
     MainFrame.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
     MainFrame.BackgroundTransparency = 0.15
     MainFrame.BorderSizePixel = 0
@@ -1114,17 +1129,19 @@ do
 
     -- Animación RGB Azul
     RunService.RenderStepped:Connect(function()
-        if AimbotEnabled then
-            local timePos = tick() * 3
-            local glow = math.abs(math.sin(timePos)) * 0.5 + 0.5
-            MainStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
-            ToggleStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
-        else
-            MainStroke.Color = Color3.fromRGB(0, 120, 200)
-        end
+        pcall(function()
+            if AimbotEnabled then
+                local timePos = tick() * 3
+                local glow = math.abs(math.sin(timePos)) * 0.5 + 0.5
+                MainStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
+                ToggleStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
+            else
+                MainStroke.Color = Color3.fromRGB(0, 120, 200)
+            end
+        end)
     end)
 
-    -- Sistema de Arrastre Táctil (Android)
+    -- Sistema de Arrastre Táctil (Android) con Guardado de Posición
     local dragging, dragInput, dragStart, startPos
 
     MainFrame.InputBegan:Connect(function(input)
@@ -1136,6 +1153,12 @@ do
             input.Changed:Connect(function()  
                 if input.UserInputState == Enum.UserInputState.End then  
                     dragging = false  
+                    pcall(function()
+                        if Config then
+                            Config["CapaAimbotPos"] = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset, MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
+                            if saveConfig then saveConfig() end
+                        end
+                    end)
                 end  
             end)  
         end
@@ -1187,74 +1210,78 @@ do
 
     -- Búsqueda del Objetivo (360 Grados)
     RunService.RenderStepped:Connect(function()
-        if not AimbotEnabled then return end
+        pcall(function()
+            if not AimbotEnabled then return end
 
-        local Target = nil  
-        local ShortestDistance = math.huge  
-          
-        local MyCharacter = LocalPlayer.Character  
-        local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")  
+            local Target = nil  
+            local ShortestDistance = math.huge  
+              
+            local MyCharacter = LocalPlayer.Character  
+            local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")  
 
-        for _, v in pairs(Players:GetPlayers()) do  
-            if v ~= LocalPlayer and not WhitelistedUsers[v.Name] and not WhitelistedUsers[v.DisplayName] and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
-                local Hitbox = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")  
-                if Hitbox and (v.Team ~= LocalPlayer.Team or v.Team == nil) then  
-                    if MyRoot then  
-                        local Distance = (Hitbox.Position - MyRoot.Position).Magnitude  
-                        if Distance < ShortestDistance then  
-                            Target = Hitbox  
-                            ShortestDistance = Distance  
+            for _, v in pairs(Players:GetPlayers()) do  
+                if v ~= LocalPlayer and not WhitelistedUsers[v.Name] and not WhitelistedUsers[v.DisplayName] and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
+                    local Hitbox = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")  
+                    if Hitbox and (v.Team ~= LocalPlayer.Team or v.Team == nil) then  
+                        if MyRoot then  
+                            local Distance = (Hitbox.Position - MyRoot.Position).Magnitude  
+                            if Distance < ShortestDistance then  
+                                Target = Hitbox  
+                                ShortestDistance = Distance  
+                            end  
                         end  
                     end  
                 end  
             end  
-        end  
-          
-        CurrentTarget = Target
+              
+            CurrentTarget = Target
+        end)
     end)
 
-    -- Intercepción del Disparo (Wallbang)
-    local OldNamecall
-    OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local Args = {...}
-        local Method = getnamecallmethod()
+    -- Intercepción del Disparo (Wallbang) protegido
+    pcall(function()
+        local OldNamecall
+        OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local Args = {...}
+            local Method = getnamecallmethod()
 
-        if AimbotEnabled and CurrentTarget and not checkcaller() then  
-            if string.find(Method, "FindPartOnRay") then  
-                return CurrentTarget, CurrentTarget.Position, Vector3.new(0, 1, 0), Enum.Material.Plastic  
-            elseif Method == "Raycast" then  
-                local Origin = Args[1]  
-                local Direction = (CurrentTarget.Position - Origin).Unit * 10000  
-                  
-                local WallbangParams = RaycastParams.new()  
-                WallbangParams.FilterType = Enum.RaycastFilterType.Include  
-                WallbangParams.FilterDescendantsInstances = {CurrentTarget.Parent}  
-                WallbangParams.IgnoreWater = true  
-                  
-                Args[2] = Direction  
-                Args[3] = WallbangParams  
-                  
-                return OldNamecall(self, unpack(Args))  
+            if AimbotEnabled and CurrentTarget and not checkcaller() then  
+                if string.find(Method, "FindPartOnRay") then  
+                    return CurrentTarget, CurrentTarget.Position, Vector3.new(0, 1, 0), Enum.Material.Plastic  
+                elseif Method == "Raycast" then  
+                    local Origin = Args[1]  
+                    local Direction = (CurrentTarget.Position - Origin).Unit * 10000  
+                      
+                    local WallbangParams = RaycastParams.new()  
+                    WallbangParams.FilterType = Enum.RaycastFilterType.Include  
+                    WallbangParams.FilterDescendantsInstances = {CurrentTarget.Parent}  
+                    WallbangParams.IgnoreWater = true  
+                      
+                    Args[2] = Direction  
+                    Args[3] = WallbangParams  
+                      
+                    return OldNamecall(self, unpack(Args))  
+                end  
             end  
-        end  
 
-        return OldNamecall(self, ...)
-    end))
+            return OldNamecall(self, ...)
+        end))
 
-    local OldIndex
-    OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
-        if AimbotEnabled and CurrentTarget and not checkcaller() then
-            if self == Mouse then
-                if Index == "Hit" or Index == "hit" then
-                    return CurrentTarget.CFrame
-                elseif Index == "Target" or Index == "target" then
-                    return CurrentTarget
+        local OldIndex
+        OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
+            if AimbotEnabled and CurrentTarget and not checkcaller() then
+                if self == Mouse then
+                    if Index == "Hit" or Index == "hit" then
+                        return CurrentTarget.CFrame
+                    elseif Index == "Target" or Index == "target" then
+                        return CurrentTarget
+                    end
                 end
             end
-        end
 
-        return OldIndex(self, Index)
-    end))
+            return OldIndex(self, Index)
+        end))
+    end)
 
     -- Integración con tu función global `createToggle`
     createToggle("Capa laser aim", function(state)
@@ -1270,6 +1297,333 @@ do
         end
     end)
 end
+
+
+-- ========================================================
+-- TOKITO PVP SCRIPT V3 (SOLO LASER) - CON MEMORIA Y ESTABLE
+-- ========================================================
+
+do
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local Workspace = game:GetService("Workspace")
+    local Lighting = game:GetService("Lighting")
+
+    local LocalPlayer = Players.LocalPlayer
+    Config = Config or {}
+
+    -- ================= ANTI BEE (POR DEFECTO) =================
+    local antiBeeEnabled = false
+    local antiBeeConnections = {}
+    local antiBeeData = {
+        originalMoveFunction = nil,
+        controlsProtected = false,
+        badLightingNames = { Blue = true, DiscoEffect = true, BeeBlur = true, ColorCorrection = true }
+    }
+
+    local function destroyBeeEffect(obj)
+        pcall(function()
+            if not obj or not obj.Parent then return end
+            if antiBeeData.badLightingNames[obj.Name] then
+                obj:Destroy()
+            end
+        end)
+    end
+
+    local function protectControls()
+        if antiBeeData.controlsProtected then return end
+        pcall(function()
+            local PlayerModule = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
+            if not PlayerModule then return end
+            local Controls = require(PlayerModule):GetControls()
+            if not Controls then return end
+            if not antiBeeData.originalMoveFunction then
+                antiBeeData.originalMoveFunction = Controls.moveFunction
+            end
+            local function protectedMove(self, moveVector, relativeToCamera)
+                pcall(function()
+                    if antiBeeData.originalMoveFunction then
+                        antiBeeData.originalMoveFunction(self, moveVector, relativeToCamera)
+                    end
+                end)
+            end
+            Controls.moveFunction = protectedMove
+            table.insert(antiBeeConnections, RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    if not antiBeeEnabled then return end
+                    if Controls.moveFunction ~= protectedMove then
+                        Controls.moveFunction = protectedMove
+                    end
+                end)
+            end))
+            antiBeeData.controlsProtected = true
+        end)
+    end
+
+    local function blockBuzzing()
+        pcall(function()
+            local beeScript = LocalPlayer.PlayerScripts:FindFirstChild("Bee", true)
+            if beeScript then
+                local buzzing = beeScript:FindFirstChild("Buzzing")
+                if buzzing and buzzing:IsA("Sound") then
+                    buzzing:Stop()
+                    buzzing.Volume = 0
+                end
+            end
+        end)
+    end
+
+    local function lockFOV()
+        pcall(function()
+            local cam = Workspace.CurrentCamera
+            if cam then cam.FieldOfView = 70 end
+        end)
+    end
+
+    local function enableAntiBee()
+        if antiBeeEnabled then return end
+        antiBeeEnabled = true
+        pcall(function()
+            for _, obj in ipairs(Lighting:GetDescendants()) do destroyBeeEffect(obj) end
+        end)
+        table.insert(antiBeeConnections, Lighting.DescendantAdded:Connect(function(obj)
+            pcall(function()
+                if antiBeeEnabled then destroyBeeEffect(obj) end
+            end)
+        end))
+        protectControls()
+        table.insert(antiBeeConnections, RunService.Heartbeat:Connect(function()
+            pcall(function()
+                if not antiBeeEnabled then return end
+                blockBuzzing()
+                lockFOV()
+            end)
+        end))
+    end
+
+    pcall(enableAntiBee)
+
+    -- ================= HERRAMIENTA LASER =================
+    local function getLaserTool()
+        local success, result = pcall(function()
+            local char = LocalPlayer.Character
+            local backpack = LocalPlayer.Backpack
+            if not char or not backpack then return nil end
+            
+            local function searchFolder(folder)
+                for _, item in ipairs(folder:GetChildren()) do
+                    if item:IsA("Tool") and string.find(string.lower(item.Name), "laser") then
+                        return item
+                    end
+                end
+                return nil
+            end
+            return searchFolder(char) or searchFolder(backpack)
+        end)
+        if success then return result end
+        return nil
+    end
+
+    -- ================= INTERFAZ GRÁFICA CON TOGGLE Y POSICIÓN =================
+    local tokitoGui = nil
+    local tokitoConnections = {}
+
+    local function createTokitoGui()
+        pcall(function()
+            if tokitoGui then tokitoGui:Destroy() end
+        end)
+
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "TokitoPvPGUI"
+        ScreenGui.ResetOnSpawn = false
+        
+        -- Asignación segura de UI (Evita el WaitForChild que rompía todo)
+        local parentSuccess, coreGuiResult = pcall(function() return gethui() or game:GetService("CoreGui") end)
+        ScreenGui.Parent = parentSuccess and coreGuiResult or game:GetService("CoreGui")
+        
+        tokitoGui = ScreenGui
+
+        local uiWidth = 140
+        local uiHeight = 85 
+
+        -- Posición por defecto
+        local defaultPos = UDim2.new(0.5, -(uiWidth/2), 0.5, -(uiHeight/2))
+        local framePos = defaultPos
+        
+        pcall(function()
+            if Config and Config["TokitoPos"] then
+                local p = Config["TokitoPos"]
+                if type(p) == "table" and #p >= 4 then
+                    framePos = UDim2.new(p[1], p[2], p[3], p[4])
+                end
+            end
+        end)
+
+        local MainFrame = Instance.new("Frame")
+        MainFrame.Name = "MainFrame"
+        MainFrame.Size = UDim2.new(0, uiWidth, 0, uiHeight)
+        MainFrame.Position = framePos
+        MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+        MainFrame.BorderSizePixel = 0
+        MainFrame.Parent = ScreenGui
+
+        local UIStroke = Instance.new("UIStroke")
+        UIStroke.Parent = MainFrame
+        UIStroke.Thickness = 2
+        UIStroke.Color = Color3.fromRGB(0, 170, 255)
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 8)
+        Corner.Parent = MainFrame
+
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(1, 0, 0, 30)
+        Title.BackgroundTransparency = 1
+        Title.Text = "Auto Laser"
+        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Title.Font = Enum.Font.GothamBold
+        Title.TextSize = 14
+        Title.Parent = MainFrame
+
+        local Line = Instance.new("Frame")
+        Line.Size = UDim2.new(1, -20, 0, 1)
+        Line.Position = UDim2.new(0, 10, 0, 30)
+        Line.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        Line.BorderSizePixel = 0
+        Line.Parent = MainFrame
+
+        -- ================= LÓGICA DE ARRASTRE (Igual al Aimbot) =================
+        local dragging, dragInput, dragStart, startPos
+        MainFrame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = MainFrame.Position
+
+                input.Changed:Connect(function()  
+                    if input.UserInputState == Enum.UserInputState.End then  
+                        if dragging then
+                            dragging = false  
+                            pcall(function()
+                                if Config then
+                                    Config["TokitoPos"] = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset, MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
+                                    if saveConfig then saveConfig() end
+                                end
+                            end)
+                        end
+                    end  
+                end)  
+            end
+        end)
+
+        MainFrame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+
+        table.insert(tokitoConnections, UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end))
+        -- ========================================================================
+
+        table.insert(tokitoConnections, RunService.RenderStepped:Connect(function()
+            pcall(function()
+                if not ScreenGui.Parent then return end
+                local t = tick() * 2
+                local blueShade = Color3.fromHSV(0.55 + (math.sin(t) * 0.05), 1, 1)
+                UIStroke.Color = blueShade
+                Line.BackgroundColor3 = blueShade
+                Title.TextColor3 = blueShade
+            end)
+        end))
+
+        -- Botón de Laser
+        local laserBtn = Instance.new("TextButton")
+        laserBtn.Size = UDim2.new(0.8, 0, 0, 35)
+        laserBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+        laserBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+        laserBtn.TextColor3 = Color3.new(1, 1, 1)
+        laserBtn.Font = Enum.Font.GothamSemibold
+        laserBtn.TextSize = 13
+        laserBtn.Text = "Activar Laser"
+        laserBtn.Parent = MainFrame
+        Instance.new("UICorner", laserBtn).CornerRadius = UDim.new(0, 6)
+
+        -- LÓGICA DEL LÁSER
+        local laserActive = false
+        laserBtn.MouseButton1Click:Connect(function()
+            pcall(function()
+                laserActive = not laserActive
+                
+                if laserActive then
+                    local tool = getLaserTool()
+                    if not tool then
+                        laserActive = false
+                        return
+                    end
+                    
+                    laserBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                    laserBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+                    laserBtn.Text = "Laser Activo"
+                    
+                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if hum then hum:EquipTool(tool) end
+                    
+                    task.spawn(function()
+                        while laserActive do
+                            local success = pcall(function()
+                                if not tool or tool.Parent ~= LocalPlayer.Character then
+                                    laserActive = false
+                                    laserBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+                                    laserBtn.TextColor3 = Color3.new(1, 1, 1)
+                                    laserBtn.Text = "Activar Laser"
+                                    return
+                                end
+                                tool:Activate()
+                            end)
+                            if not success or not laserActive then break end
+                            task.wait(0.02)
+                        end
+                    end)
+                else
+                    laserBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+                    laserBtn.TextColor3 = Color3.new(1, 1, 1)
+                    laserBtn.Text = "Activar Laser"
+                end
+            end)
+        end)
+    end
+
+    local function destroyTokitoGui()
+        pcall(function()
+            for _, conn in ipairs(tokitoConnections) do
+                if conn then conn:Disconnect() end
+            end
+            tokitoConnections = {}
+            if tokitoGui then
+                tokitoGui:Destroy()
+                tokitoGui = nil
+            end
+        end)
+    end
+
+    -- Integración con el sistema de Toggles
+    if createToggle then
+        createToggle("Auto Spam Laser (Se ocupa tener activo aimbot)", function(state)
+            if state then
+                createTokitoGui()
+            else
+                destroyTokitoGui()
+            end
+        end)
+    end
+end
+
 
 -- ============================================================
 -- FLYING CARPET SPEED UI NEON FIXED (Con Minimizar)
