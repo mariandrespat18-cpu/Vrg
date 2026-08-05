@@ -1025,8 +1025,8 @@ do
 
     local WhitelistedUsers = {
         ["Toki"] = true,
-        ["Tokito"] = true
-        ["DavidAlejandro78892"] = true
+        ["Tokito"] = true,
+        ["DavidAlejandro78892"] = true,
         ["davidalejandro78892"] = true
     }
 
