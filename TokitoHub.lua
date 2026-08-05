@@ -3297,6 +3297,148 @@ createToggle("Use Potion", function(state)
 end)
 
 -- ================= END USE POTION =================
+-- ============================================================
+--           TOKITO FPS BOOST :3 - MÓDULO DE TOGGLE FIXED
+-- ============================================================
+
+local TokitoFpsBoost = {
+    Enabled = false,
+    Connections = {},
+    OriginalSettings = {},
+    SavedObjects = {},
+    GCLoop = nil
+}
+
+local Services = {
+    Workspace = game:GetService("Workspace"),
+    Lighting = game:GetService("Lighting")
+}
+
+local function SetFpsBoost(state)
+    TokitoFpsBoost.Enabled = state
+
+    if state then
+        -- 1. Guardar y optimizar Lighting (Sin 'Technology' por seguridad de ejecución)
+        pcall(function()
+            TokitoFpsBoost.OriginalSettings.GlobalShadows = Services.Lighting.GlobalShadows
+            TokitoFpsBoost.OriginalSettings.FogEnd = Services.Lighting.FogEnd
+            
+            Services.Lighting.GlobalShadows = false
+            Services.Lighting.FogEnd = 9e9
+        end)
+
+        -- 2. Modificar partes progresivamente para evitar congelamiento de pantalla (Crash)
+        task.spawn(function()
+            local descendants = Services.Workspace:GetDescendants()
+            for i, obj in ipairs(descendants) do
+                if not TokitoFpsBoost.Enabled then break end -- Detener si se desactiva en medio del proceso
+                
+                pcall(function()
+                    if obj:IsA("BasePart") and not TokitoFpsBoost.SavedObjects[obj] then
+                        TokitoFpsBoost.SavedObjects[obj] = {
+                            Material = obj.Material,
+                            CastShadow = obj.CastShadow
+                        }
+                        obj.Material = Enum.Material.SmoothPlastic
+                        obj.CastShadow = false
+                    elseif obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                        if obj.Enabled then
+                            TokitoFpsBoost.SavedObjects[obj] = { Enabled = true }
+                            obj.Enabled = false
+                        end
+                    end
+                end)
+                
+                -- Ceder el hilo cada 500 objetos para mantener los FPS estables durante la carga
+                if i % 500 == 0 then 
+                    task.wait() 
+                end
+            end
+        end)
+
+        -- 3. Optimizar nuevos elementos en tiempo real
+        local conn = Services.Workspace.DescendantAdded:Connect(function(obj)
+            if not TokitoFpsBoost.Enabled then return end
+            task.defer(function()
+                pcall(function()
+                    if obj:IsA("BasePart") then
+                        obj.CastShadow = false
+                        obj.Material = Enum.Material.SmoothPlastic
+                    elseif obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                        obj.Enabled = false
+                    end
+                end)
+            end)
+        end)
+        table.insert(TokitoFpsBoost.Connections, conn)
+
+        -- 4. Colector de basura periódico seguro
+        if TokitoFpsBoost.GCLoop then task.cancel(TokitoFpsBoost.GCLoop) end
+        TokitoFpsBoost.GCLoop = task.spawn(function()
+            while TokitoFpsBoost.Enabled do
+                task.wait(60)
+                pcall(function() collectgarbage("collect") end)
+            end
+        end)
+
+    else
+        -- RESTAURAR ESTADO ORIGINAL AL DESACTIVAR
+        pcall(function()
+            if TokitoFpsBoost.OriginalSettings.GlobalShadows ~= nil then
+                Services.Lighting.GlobalShadows = TokitoFpsBoost.OriginalSettings.GlobalShadows
+                Services.Lighting.FogEnd = TokitoFpsBoost.OriginalSettings.FogEnd
+            end
+        end)
+
+        -- Restaurar objetos progresivamente
+        task.spawn(function()
+            local count = 0
+            for obj, data in pairs(TokitoFpsBoost.SavedObjects) do
+                count = count + 1
+                if obj and obj.Parent then
+                    pcall(function()
+                        if data.Material then obj.Material = data.Material end
+                        if data.CastShadow ~= nil then obj.CastShadow = data.CastShadow end
+                        if data.Enabled ~= nil then obj.Enabled = data.Enabled end
+                    end)
+                end
+                
+                if count % 500 == 0 then task.wait() end
+            end
+            table.clear(TokitoFpsBoost.SavedObjects)
+        end)
+
+        -- Desconectar eventos activos
+        for _, conn in ipairs(TokitoFpsBoost.Connections) do
+            if typeof(conn) == "RBXScriptConnection" and conn.Connected then
+                conn:Disconnect()
+            end
+        end
+        table.clear(TokitoFpsBoost.Connections)
+        
+        -- Detener hilo de limpieza de RAM
+        if TokitoFpsBoost.GCLoop then 
+            task.cancel(TokitoFpsBoost.GCLoop)
+            TokitoFpsBoost.GCLoop = nil
+        end
+    end
+end
+
+-- ============================================================
+-- INTEGRACIÓN SEGURA EN EL MENÚ
+-- ============================================================
+
+pcall(function()
+    createToggle("Tokito Fps Boost :3", function(state)
+        -- Encapsulamos la ejecución para que, en caso extremo, el menú nunca se rompa
+        local ok, err = pcall(function()
+            SetFpsBoost(state)
+        end)
+        if not ok then
+            warn("[Tokito Hub Safe Error]: Fps Boost falló internamente ->", tostring(err))
+        end
+    end)
+end)
 
 -- ============================================================
 -- FPS BOOST V2
