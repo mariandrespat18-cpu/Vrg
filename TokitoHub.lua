@@ -1285,6 +1285,7 @@ do
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local CoreGui = game:GetService("CoreGui")
+    local UserInputService = game:GetService("UserInputService")
 
     local LocalPlayer = Players.LocalPlayer
 
@@ -1302,16 +1303,25 @@ do
         Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
 
+    -- Posición segura por defecto (Centro de la pantalla)
+    local defaultPos = UDim2.new(0.5, -90, 0.5, -50)
+    local framePos = defaultPos
 
+    if Config["CarpetPos"] then
+        local p = Config["CarpetPos"]
+        if type(p) == "table" and #p >= 4 then
+            framePos = UDim2.new(p[1], p[2], p[3], p[4])
+        end
+    end
 
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(0,180,0,100)
-    Frame.Position = UDim2.new(0.5,-90,0.5,-50)
+    Frame.Position = framePos
     Frame.BackgroundColor3 = Color3.fromRGB(15,15,20)
     Frame.BorderSizePixel = 0
     Frame.Visible = false
     Frame.Active = true
-    Frame.Draggable = true
+    -- Quitamos Frame.Draggable = true para usar el arrastre personalizado que guarda la pos
     Frame.ClipsDescendants = true -- Necesario para que no sobresalgan los botones al minimizar
     Frame.Parent = Gui
 
@@ -1389,9 +1399,53 @@ do
     end)
 
 
+    -- ================= LOGICA DE ARRASTRE Y GUARDADO =================
+    local dragging = false
+    local dragStart
+    local startPos
+    local dragInput
+
+    local function updateDrag(input)
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+
+    Frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    Config["CarpetPos"] = {Frame.Position.X.Scale, Frame.Position.X.Offset, Frame.Position.Y.Scale, Frame.Position.Y.Offset}
+                    if saveConfig then saveConfig() end
+                end
+            end)
+        end
+    end)
+
+    Frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            updateDrag(input)
+        end
+    end)
+    -- ================= FIN DE LOGICA DE ARRASTRE =================
+
+
     local Enabled = false
-
-
 
     local function SetSpeed(state)
 
@@ -1411,7 +1465,7 @@ do
             Status.Text = "Estado: OFF"
             Status.TextColor3 = Color3.fromRGB(255,50,50)
 
-            Button.Text = "ENCENDIDO ON"
+            Button.Text = "ENCENDER ON"
             Button.TextColor3 = Color3.fromRGB(0,255,0)
             ButtonStroke.Color = Color3.fromRGB(0,255,0)
 
@@ -1502,12 +1556,17 @@ do
 
         if not state then
             SetSpeed(false)
+            
+            -- Resetea la posición al apagar el toggle
+            Config["CarpetPos"] = nil
+            if saveConfig then saveConfig() end
+            Frame.Position = defaultPos
         end
 
     end)
 
-
 end
+
 -- ============================================================
 -- RESET TOGGLE SYSTEM
 -- ============================================================
@@ -1628,6 +1687,34 @@ do
     end)
 end
 
+-- ============================================================
+--  CLONAR TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetClone(state)
+        State.CloneEnabled = state
+        getgenv().CloneEnabled = state
+
+        if state then
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/Cl"))()
+                end)
+            end
+        end
+    end
+
+    createToggle("Clonarse", function(state)
+        SetClone(state)
+    end)
+end
 -- ================= ESP BEST + BRAINROT MANAGER =================
 
 local ignoredAnimals = ignoredAnimals or setmetatable({}, { __mode = "k" }) -- [BasePart] = data
@@ -2690,6 +2777,17 @@ local function createPotionButton()
 
     local player = game.Players.LocalPlayer
     local UIS = game:GetService("UserInputService")
+    
+    -- Posición segura por defecto (Abajo al centro, separada del botón Drop)
+    local defaultPos = UDim2.new(0.5, -56, 0.7, 0)
+    local btnPos = defaultPos
+    
+    if Config["PotionPos"] then
+        local p = Config["PotionPos"]
+        if type(p) == "table" and #p >= 4 then
+            btnPos = UDim2.new(p[1], p[2], p[3], p[4])
+        end
+    end
 
     potionGui = Instance.new("ScreenGui")
     potionGui.Name = "PotionGUI"
@@ -2700,7 +2798,7 @@ local function createPotionButton()
     local shadow = Instance.new("Frame")
     shadow.Name = "Shadow"
     shadow.Size = UDim2.new(0, 112, 0, 46)
-    shadow.Position = UDim2.new(0.5, -56, 0.7, 0)
+    shadow.Position = btnPos
     shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     shadow.BackgroundTransparency = 0.45
     shadow.BorderSizePixel = 0
@@ -2794,6 +2892,10 @@ local function createPotionButton()
 
             if not moved then
                 task.spawn(usePotion)
+            else
+                -- Guarda la posición exacta donde lo soltó el jugador
+                Config["PotionPos"] = {shadow.Position.X.Scale, shadow.Position.X.Offset, shadow.Position.Y.Scale, shadow.Position.Y.Offset}
+                saveConfig()
             end
         end
     end)
@@ -2833,11 +2935,15 @@ createToggle("Use Potion", function(state)
     if state then
         createPotionButton()
     else
+        -- Resetea la posición al apagar el toggle
+        Config["PotionPos"] = nil
+        saveConfig()
         removePotionButton()
     end
 end)
 
 -- ================= END USE POTION =================
+
 -- ============================================================
 -- FPS BOOST V2
 -- ============================================================
@@ -3435,12 +3541,42 @@ do
 
 end
 -- ================= END FPS BOOST ULTRA =================
-
 -- ================= PREMIUM KICK PANEL =================
 
 local kickButtonEnabled = false
 local kickGui = nil
-local lastPosition = UDim2.new(1, -180, 0, 20) -- Guarda la posición en memoria entre ejecuciones
+
+-- Calculamos el centro exacto basado en el tamaño del panel (140x65)
+local defaultPosition = UDim2.new(0.5, -70, 0.5, -32.5) 
+local lastPosition = defaultPosition 
+
+-- Sistema de guardado persistente entre sesiones (si el ejecutor soporta writefile/readfile)
+local saveFileName = "KickButton_LastPos.json"
+local HttpService = game:GetService("HttpService")
+
+pcall(function()
+	if readfile and isfile and isfile(saveFileName) then
+		local data = HttpService:JSONDecode(readfile(saveFileName))
+		if data and data.XScale and data.XOffset and data.YScale and data.YOffset then
+			lastPosition = UDim2.new(data.XScale, data.XOffset, data.YScale, data.YOffset)
+		end
+	end
+end)
+
+local function savePosition(pos)
+	lastPosition = pos
+	pcall(function()
+		if writefile then
+			local data = {
+				XScale = pos.X.Scale,
+				XOffset = pos.X.Offset,
+				YScale = pos.Y.Scale,
+				YOffset = pos.Y.Offset
+			}
+			writefile(saveFileName, HttpService:JSONEncode(data))
+		end
+	end)
+end
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -3460,8 +3596,8 @@ local function createKickButton()
 	-- 2. Marco Principal (Fondo Base)
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Size = UDim2.new(0, 140, 0, 65)
-	mainFrame.Position = lastPosition -- Carga el estado de la última posición utilizada
-	mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Base blanca para no alterar el UIGradient
+	mainFrame.Position = lastPosition -- Carga el estado de la última posición (persistente o reseteada)
+	mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	mainFrame.Active = true
 	mainFrame.ClipsDescendants = false
 	mainFrame.Parent = gui
@@ -3493,7 +3629,7 @@ local function createKickButton()
 	shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
 	shadow.Size = UDim2.new(1, 30, 1, 30)
 	shadow.BackgroundTransparency = 1
-	shadow.Image = "rbxassetid://1316045217" -- Textura estándar de sombra difuminada de Roblox
+	shadow.Image = "rbxassetid://1316045217"
 	shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
 	shadow.ImageTransparency = 0.4
 	shadow.ScaleType = Enum.ScaleType.Slice
@@ -3532,8 +3668,8 @@ local function createKickButton()
 	kickBtn.Text = "⚡ Kick"
 	kickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	kickBtn.TextStrokeTransparency = 0
-kickBtn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-kickBtn.Font = Enum.Font.GothamBold
+	kickBtn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	kickBtn.Font = Enum.Font.GothamBold
 	kickBtn.TextSize = 13
 	kickBtn.Parent = mainFrame
 
@@ -3553,7 +3689,6 @@ kickBtn.Font = Enum.Font.GothamBold
 	-- ANIMACIONES Y EFECTOS VISUALES (TWEEN)
 	-- ==========================================
 	
-	-- Estado inicial para la animación de entrada
 	mainFrame.Size = UDim2.new(0, 0, 0, 0)
 	mainFrame.BackgroundTransparency = 1
 	shadow.ImageTransparency = 1
@@ -3563,7 +3698,6 @@ kickBtn.Font = Enum.Font.GothamBold
 	kickBtn.BackgroundTransparency = 1
 	kickBtn.TextTransparency = 1
 
-	-- Ejecución del Tween de apertura
 	local openTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	TweenService:Create(mainFrame, openTweenInfo, {Size = UDim2.new(0, 140, 0, 65), BackgroundTransparency = 0}):Play()
 	
@@ -3577,7 +3711,6 @@ kickBtn.Font = Enum.Font.GothamBold
 		TweenService:Create(kickBtn, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
 	end)
 
-	-- Función de cierre controlada y desconexión segura
 	local function closeGui()
 		if inputChangedConnection then
 			inputChangedConnection:Disconnect()
@@ -3599,7 +3732,6 @@ kickBtn.Font = Enum.Font.GothamBold
 
 	closeBtn.MouseButton1Click:Connect(closeGui)
 
-	-- Efectos Hover (PC) con transiciones suaves
 	kickBtn.MouseEnter:Connect(function()
 		TweenService:Create(btnGradient, TweenInfo.new(0.2), {Offset = Vector2.new(0, -0.15)}):Play()
 		TweenService:Create(kickBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 37)}):Play()
@@ -3616,7 +3748,6 @@ kickBtn.Font = Enum.Font.GothamBold
 		TweenService:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(140, 140, 140)}):Play()
 	end)
 
-	-- Lógica del Kick
 	kickBtn.MouseButton1Click:Connect(function()
 		player:Kick("Has sido kickeado por el botón de Kick.")
 	end)
@@ -3638,7 +3769,7 @@ kickBtn.Font = Enum.Font.GothamBold
 			input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
 					dragging = false
-					lastPosition = mainFrame.Position -- Guarda la posición actual al soltar la interfaz
+					savePosition(mainFrame.Position) -- Guarda la posición de forma persistente al soltar
 				end
 			end)
 		end
@@ -3650,12 +3781,10 @@ kickBtn.Font = Enum.Font.GothamBold
 		end
 	end)
 
-	-- Limpieza preventiva de conexiones previas antes de reasignar
 	if inputChangedConnection then
 		inputChangedConnection:Disconnect()
 	end
 
-	-- Almacenamiento directo de la conexión activa
 	inputChangedConnection = UserInputService.InputChanged:Connect(function(input)
 		if dragging and input == dragInput then
 			local delta = input.Position - dragStart
@@ -3681,7 +3810,6 @@ local function disableKickButton()
 	if not kickButtonEnabled then return end
 	kickButtonEnabled = false
 
-	-- Desconexión manual obligatoria al desactivar mediante la función externa
 	if inputChangedConnection then
 		inputChangedConnection:Disconnect()
 		inputChangedConnection = nil
@@ -3691,6 +3819,9 @@ local function disableKickButton()
 		kickGui:Destroy()  
 		kickGui = nil  
 	end
+	
+	-- Al desactivar por el Toggle, reseteamos la posición guardada al centro para la próxima vez que se active
+	savePosition(defaultPosition)
 end
 
 -- TOGGLE
@@ -3703,6 +3834,8 @@ createToggle("Kick Boton", function(state)
 end)
 
 -- ================= END =================
+
+
 
 -- ================= ANTI BEE =================
 
@@ -5360,7 +5493,6 @@ createToggle("Ver rendimiento", function(state)
 	end
 end)
 
--- Activar automáticamente al ejecutar el script
 -- ================= DROP BRAINROT BUTTON =================
 
 local dropBrainrotGui = nil
@@ -5461,6 +5593,15 @@ local function createDropBrainrotButton()
 		destroyDropBrainrotGui()
 	end
 
+	local defaultPos = UDim2.new(0, 10, 0, 10)
+	local btnPos = defaultPos
+	if Config["DropBrainrotPos"] then
+		local p = Config["DropBrainrotPos"]
+		if type(p) == "table" and #p >= 4 then
+			btnPos = UDim2.new(p[1], p[2], p[3], p[4])
+		end
+	end
+
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "DropBrainrotGui"
 	gui.ResetOnSpawn = false
@@ -5474,7 +5615,7 @@ local function createDropBrainrotButton()
 	shadow.Parent = gui
 	shadow.BackgroundTransparency = 1
 	shadow.Size = UDim2.new(0, 92, 0, 92)
-	shadow.Position = UDim2.new(0, 13, 0, 13)
+	shadow.Position = UDim2.new(btnPos.X.Scale, btnPos.X.Offset + 3, btnPos.Y.Scale, btnPos.Y.Offset + 3)
 	shadow.Image = "rbxassetid://6014261993"
 	shadow.ImageTransparency = 0.78
 	shadow.ScaleType = Enum.ScaleType.Slice
@@ -5484,7 +5625,7 @@ local function createDropBrainrotButton()
 	local btn = Instance.new("TextButton")
 	btn.Name = "DropButton"
 	btn.Size = UDim2.new(0, 72, 0, 72)
-	btn.Position = UDim2.new(0, 10, 0, 10)
+	btn.Position = btnPos
 	btn.BackgroundColor3 = Color3.fromRGB(14, 18, 30)
 	btn.BorderSizePixel = 0
 	btn.AutoButtonColor = false
@@ -5724,6 +5865,7 @@ local function createDropBrainrotButton()
 
 	close.MouseButton1Click:Connect(function()
 		Config["Drop Brainrot Btn"] = false
+		Config["DropBrainrotPos"] = nil
 		saveConfig()
 		destroyDropBrainrotGui()
 	end)
@@ -5764,6 +5906,8 @@ local function createDropBrainrotButton()
 			input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
 					dragging = false
+					Config["DropBrainrotPos"] = {btn.Position.X.Scale, btn.Position.X.Offset, btn.Position.Y.Scale, btn.Position.Y.Offset}
+					saveConfig()
 				end
 			end)
 		end
@@ -5787,6 +5931,7 @@ end
 createButton("Drop Brainrot Btn", function()
 	if dropBrainrotGui then
 		Config["Drop Brainrot Btn"] = false
+		Config["DropBrainrotPos"] = nil
 		saveConfig()
 		destroyDropBrainrotGui()
 		return
@@ -5804,6 +5949,8 @@ if Config["Drop Brainrot Btn"] then
 end
 
 -- ================= END =================
+
+
 -- ================= SERVER HOPPER =================
 
 local TeleportService = game:GetService("TeleportService")
