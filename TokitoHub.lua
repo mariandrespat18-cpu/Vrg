@@ -5619,6 +5619,8 @@ task.spawn(function()
         end)
 
 
+
+-- ============================================================
         -- ==========================================
         -- 2. PLAYER ESP (Nombre Abajo - Offset 2.8)
         -- ==========================================
@@ -5627,6 +5629,9 @@ task.spawn(function()
         local playerNameLabels = {}
         local characterConnections = {}
         local playerAddedConnection = nil
+
+        -- Variable global para saber a quién targetea el ESP específico
+        _G.SpecificESP_SelectedPlayer = nil 
 
         local function addGradient(obj)
             local gradient = Instance.new("UIGradient")
@@ -5662,7 +5667,12 @@ task.spawn(function()
         end
 
         local function addESPToPlayer(otherPlayer)
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
             if not playerESPEnabled or otherPlayer == LocalPlayer then return end
+            
+            -- EVITAR DUPLICACIÓN: Si tiene el ESP rojo específico, cancelamos este
+            if _G.SpecificESP_SelectedPlayer == otherPlayer then return end
 
             local character = otherPlayer.Character
             if not character then return end
@@ -5686,7 +5696,7 @@ task.spawn(function()
                 billboard.Name = "PlayerESPLabel"
                 billboard.Adornee = hrp
                 billboard.Size = UDim2.new(0, 200, 0, 40)
-                billboard.StudsOffset = Vector3.new(0, 2.8, 0) -- Nombre ubicado debajo del icono
+                billboard.StudsOffset = Vector3.new(0, 2.8, 0)
                 billboard.AlwaysOnTop = true
                 billboard.MaxDistance = math.huge
                 billboard.Parent = hrp
@@ -5707,7 +5717,13 @@ task.spawn(function()
             end
         end
 
+        -- Funciones globales para que el ESP Específico las pueda llamar
+        _G.RemoveGeneralESP = removePlayerESP
+        _G.AddGeneralESP = addESPToPlayer
+        _G.IsGeneralESPEnabled = function() return playerESPEnabled end
+
         local function setupPlayer(plr)
+            local LocalPlayer = game:GetService("Players").LocalPlayer
             if plr == LocalPlayer then return end
 
             if characterConnections[plr] then
@@ -5739,6 +5755,7 @@ task.spawn(function()
         end
 
         local function startPlayerESP()
+            local Players = game:GetService("Players")
             playerESPEnabled = true
 
             for _, plr in ipairs(Players:GetPlayers()) do
@@ -5781,6 +5798,565 @@ task.spawn(function()
         warn("Hub Critical Error: " .. tostring(err))
     end
 end)
+-- ============================================================
+-- PLAYER ESP ESPECIFICO (BULLETPROOF / INTERFAZ COMPACTA / ANTI-OPTIMIZACIÓN)
+-- ============================================================
+task.spawn(function()
+    local success, err = pcall(function()
+        
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local TweenService = game:GetService("TweenService")
+        local UserInputService = game:GetService("UserInputService")
+        local HttpService = game:GetService("HttpService")
+        local LocalPlayer = Players.LocalPlayer
+
+        -- ================== SISTEMA DE GUARDADO DE CONFIGURACIÓN ==================
+        local configFileName = "TokitoSpecificESP_Config.json"
+        local defaultMainPos = UDim2.new(0.5, -95, 0.5, -125)
+        local defaultMiniPos = UDim2.new(0.5, -20, 0.5, -20)
+
+        local savedMainPosition = defaultMainPos
+        local savedMiniPosition = defaultMiniPos
+        local savedMinimizedState = false
+        local isFirstLoad = true
+
+        local function loadConfig()
+            pcall(function()
+                if readfile and isfile and isfile(configFileName) then
+                    local data = HttpService:JSONDecode(readfile(configFileName))
+                    if data and data.mainX and data.mainY and data.miniX and data.miniY then
+                        -- Validación de seguridad: si las coordenadas están en la esquina (0,0) o muy cerca, se restablecen al centro
+                        if data.mainX > 50 and data.mainY > 50 then
+                            savedMainPosition = UDim2.new(0, data.mainX, 0, data.mainY)
+                        else
+                            savedMainPosition = defaultMainPos
+                        end
+                        
+                        if data.miniX and data.miniY and data.miniX > 20 and data.miniY > 20 then
+                            savedMiniPosition = UDim2.new(0, data.miniX, 0, data.miniY)
+                        else
+                            savedMiniPosition = defaultMiniPos
+                        end
+                        
+                        savedMinimizedState = false
+                    end
+                end
+            end)
+        end
+
+        local function saveConfig(mainPos, miniPos, isMiniState)
+            pcall(function()
+                if writefile then
+                    local data = {
+                        mainX = mainPos.X.Offset,
+                        mainY = mainPos.Y.Offset,
+                        miniX = miniPos.X.Offset,
+                        miniY = miniPos.Y.Offset,
+                        minimized = isMiniState
+                    }
+                    writefile(configFileName, HttpService:JSONEncode(data))
+                end
+            end)
+        end
+
+        loadConfig()
+
+        -- ================== OBTENCIÓN SEGURA DE GUI ==================
+        local function getSafeGuiParent()
+            local ok, gui = pcall(function() return gethui() end)
+            if ok and gui then return gui end
+            
+            ok, gui = pcall(function() return game:GetService("CoreGui") end)
+            if ok and gui then return gui end
+            
+            return LocalPlayer:WaitForChild("PlayerGui", 5)
+        end
+        local targetGuiParent = getSafeGuiParent()
+        if not targetGuiParent then return end 
+
+        local specificESPEnabled = false
+        local selectedPlayer = nil
+
+        local ESP_Gui, MainFrame, MiniButton, TracerLine
+        local PlayerListScroll
+        local renderConnection
+        local playerAddedConn, playerRemovingConn
+        local currentHighlight, currentBillboard
+
+        local function safeTween(object, properties, duration)
+            pcall(function()
+                local tweenInfo = TweenInfo.new(duration or 0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                TweenService:Create(object, tweenInfo, properties):Play()
+            end)
+        end
+
+        local function makeDraggable(topbar, object, isMini)
+            local dragging, dragInput, dragStart, startPos
+            
+            pcall(function()
+                topbar.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        dragStart = input.Position
+                        startPos = object.Position
+                        input.Changed:Connect(function()
+                            if input.UserInputState == Enum.UserInputState.End then
+                                dragging = false
+                                if isMini then 
+                                    savedMiniPosition = object.Position 
+                                else 
+                                    savedMainPosition = object.Position 
+                                end
+                                saveConfig(savedMainPosition, savedMiniPosition, not MainFrame.Visible)
+                            end
+                        end)
+                    end
+                end)
+                topbar.InputChanged:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                        dragInput = input
+                    end
+                end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if input == dragInput and dragging then
+                        local delta = input.Position - dragStart
+                        object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                    end
+                end)
+            end)
+        end
+
+        local function clearTargetESP()
+            pcall(function()
+                if currentHighlight then currentHighlight:Destroy() currentHighlight = nil end
+                if currentBillboard then currentBillboard:Destroy() currentBillboard = nil end
+                if TracerLine then TracerLine.Visible = false end
+            end)
+        end
+
+        local function applyTargetESP(target)
+            clearTargetESP()
+            if not target or not target.Character then return end
+            
+            pcall(function()
+                local char = target.Character
+
+                currentHighlight = Instance.new("Highlight")
+                currentHighlight.Name = "SpecificTargetESP"
+                currentHighlight.Adornee = char
+                currentHighlight.FillColor = Color3.fromRGB(255, 0, 0)
+                currentHighlight.OutlineColor = Color3.fromRGB(255, 100, 100)
+                currentHighlight.FillTransparency = 0.5
+                currentHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                currentHighlight.Parent = char
+
+                -- CAMBIO APLICADO: Head como prioridad sobre HumanoidRootPart
+                local hrp = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    currentBillboard = Instance.new("BillboardGui")
+                    currentBillboard.Size = UDim2.new(0, 200, 0, 50)
+                    currentBillboard.StudsOffset = Vector3.new(0, 3, 0)
+                    currentBillboard.AlwaysOnTop = true
+                    currentBillboard.Parent = hrp
+
+                    local txt = Instance.new("TextLabel")
+                    txt.Size = UDim2.new(1, 0, 1, 0)
+                    txt.BackgroundTransparency = 1
+                    txt.Text = target.DisplayName
+                    txt.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    txt.TextStrokeTransparency = 0
+                    txt.Font = Enum.Font.GothamBlack
+                    txt.TextSize = 16
+                    txt.Parent = currentBillboard
+                end
+            end)
+        end
+
+        local function createUI()
+            pcall(function()
+                if targetGuiParent:FindFirstChild("Tokito_SpecificESP") then
+                    targetGuiParent.Tokito_SpecificESP:Destroy()
+                end
+
+                if not isFirstLoad then
+                    savedMainPosition = defaultMainPos
+                    savedMiniPosition = defaultMiniPos
+                    savedMinimizedState = false
+                end
+                isFirstLoad = false
+
+                ESP_Gui = Instance.new("ScreenGui")
+                ESP_Gui.Name = "Tokito_SpecificESP"
+                ESP_Gui.ResetOnSpawn = false
+                ESP_Gui.Parent = targetGuiParent
+
+                -- TRACER ANTI-OPTIMIZACIÓN
+                TracerLine = Instance.new("Frame")
+                TracerLine.Name = "ImmuneTracerLine"
+                TracerLine.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                TracerLine.BorderSizePixel = 0
+                TracerLine.AnchorPoint = Vector2.new(0.5, 0.5)
+                TracerLine.ZIndex = 99999
+                TracerLine.Visible = false
+                TracerLine.Parent = ESP_Gui
+
+                local uiGradientLine = Instance.new("UIGradient")
+                uiGradientLine.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 0, 0))
+                })
+                uiGradientLine.Parent = TracerLine
+
+                MiniButton = Instance.new("TextButton")
+                MiniButton.Size = UDim2.new(0, 40, 0, 40)
+                MiniButton.Position = savedMiniPosition
+                MiniButton.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+                MiniButton.Text = "Pl"
+                MiniButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+                MiniButton.Font = Enum.Font.GothamBold
+                MiniButton.TextSize = 18
+                MiniButton.Visible = savedMinimizedState
+                MiniButton.ClipsDescendants = true
+                MiniButton.AutoButtonColor = false
+                MiniButton.Parent = ESP_Gui
+
+                Instance.new("UICorner", MiniButton).CornerRadius = UDim.new(1, 0)
+                local miniStroke = Instance.new("UIStroke")
+                miniStroke.Color = Color3.fromRGB(0, 170, 255)
+                miniStroke.Thickness = 2
+                miniStroke.Parent = MiniButton
+                makeDraggable(MiniButton, MiniButton, true)
+
+                -- INTERFAZ PRINCIPAL
+                MainFrame = Instance.new("Frame")
+                MainFrame.Size = UDim2.new(0, 190, 0, 230)
+                MainFrame.Position = savedMainPosition
+                MainFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+                MainFrame.Visible = not savedMinimizedState
+                MainFrame.ClipsDescendants = true
+                MainFrame.Parent = ESP_Gui
+
+                Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+                local mainStroke = Instance.new("UIStroke")
+                mainStroke.Color = Color3.fromRGB(0, 170, 255)
+                mainStroke.Thickness = 2
+                mainStroke.Parent = MainFrame
+
+                local Topbar = Instance.new("Frame")
+                Topbar.Size = UDim2.new(1, 0, 0, 30)
+                Topbar.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+                Topbar.BorderSizePixel = 0
+                Topbar.Parent = MainFrame
+                makeDraggable(Topbar, MainFrame, false)
+
+                Instance.new("UICorner", Topbar).CornerRadius = UDim.new(0, 8)
+                local topFix = Instance.new("Frame")
+                topFix.Size = UDim2.new(1, 0, 0, 5)
+                topFix.Position = UDim2.new(0, 0, 1, -5)
+                topFix.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+                topFix.BorderSizePixel = 0
+                topFix.Parent = Topbar
+
+                local Title = Instance.new("TextLabel")
+                Title.Size = UDim2.new(1, -35, 1, 0)
+                Title.Position = UDim2.new(0, 8, 0, 0)
+                Title.BackgroundTransparency = 1
+                Title.Text = "ESP Específico"
+                Title.TextColor3 = Color3.fromRGB(0, 170, 255)
+                Title.Font = Enum.Font.GothamBold
+                Title.TextSize = 13
+                Title.TextXAlignment = Enum.TextXAlignment.Left
+                Title.Parent = Topbar
+
+                local MinBtn = Instance.new("TextButton")
+                MinBtn.Size = UDim2.new(0, 22, 0, 22)
+                MinBtn.Position = UDim2.new(1, -26, 0.5, -11)
+                MinBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
+                MinBtn.Text = "-"
+                MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                MinBtn.Font = Enum.Font.GothamBold
+                MinBtn.TextSize = 16
+                MinBtn.AutoButtonColor = false
+                MinBtn.Parent = Topbar
+                Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
+
+                PlayerListScroll = Instance.new("ScrollingFrame")
+                PlayerListScroll.Size = UDim2.new(1, -16, 1, -40)
+                PlayerListScroll.Position = UDim2.new(0, 8, 0, 34)
+                PlayerListScroll.BackgroundTransparency = 1
+                PlayerListScroll.ScrollBarThickness = 3
+                PlayerListScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 170, 255)
+                PlayerListScroll.Parent = MainFrame
+
+                local UIListLayout = Instance.new("UIListLayout")
+                UIListLayout.Padding = UDim.new(0, 4)
+                UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                UIListLayout.Parent = PlayerListScroll
+
+                MinBtn.MouseButton1Click:Connect(function()
+                    saveConfig(savedMainPosition, savedMiniPosition, true)
+                    safeTween(MainFrame, {Size = UDim2.new(0, 190, 0, 0)}, 0.3)
+                    task.delay(0.3, function()
+                        MainFrame.Visible = false
+                        MiniButton.Visible = true
+                        MiniButton.Size = UDim2.new(0, 40, 0, 40)
+                    end)
+                end)
+
+                MiniButton.MouseButton1Click:Connect(function()
+                    saveConfig(savedMainPosition, savedMiniPosition, false)
+                    MiniButton.Visible = false
+                    MainFrame.Visible = true
+                    MainFrame.Size = UDim2.new(0, 190, 0, 230)
+                end)
+            end)
+        end
+
+        local function updatePlayerList()
+            if not PlayerListScroll then return end
+            
+            pcall(function()
+                for _, child in pairs(PlayerListScroll:GetChildren()) do
+                    if child:IsA("Frame") then child:Destroy() end
+                end
+
+                for _, plr in pairs(Players:GetPlayers()) do
+                    if plr == LocalPlayer then continue end
+
+                    local PlayerRow = Instance.new("Frame")
+                    PlayerRow.Size = UDim2.new(1, -4, 0, 34)
+                    PlayerRow.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+                    PlayerRow.Parent = PlayerListScroll
+                    Instance.new("UICorner", PlayerRow).CornerRadius = UDim.new(0, 5)
+
+                    local UIStrokeRow = Instance.new("UIStroke")
+                    UIStrokeRow.Color = Color3.fromRGB(0, 170, 255)
+                    UIStrokeRow.Transparency = (selectedPlayer == plr) and 0 or 1
+                    UIStrokeRow.Parent = PlayerRow
+
+                    local HeadIcon = Instance.new("ImageLabel")
+                    HeadIcon.Size = UDim2.new(0, 24, 0, 24)
+                    HeadIcon.Position = UDim2.new(0, 4, 0.5, -12)
+                    HeadIcon.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
+                    HeadIcon.Parent = PlayerRow
+                    Instance.new("UICorner", HeadIcon).CornerRadius = UDim.new(1, 0)
+                    
+                    task.spawn(function()
+                        local ok, content, isReady = pcall(function()
+                            return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+                        end)
+                        if ok and isReady and HeadIcon and HeadIcon.Parent then 
+                            HeadIcon.Image = content 
+                        end
+                    end)
+
+                    local NameLabel = Instance.new("TextLabel")
+                    NameLabel.Size = UDim2.new(1, -32, 1, 0)
+                    NameLabel.Position = UDim2.new(0, 32, 0, 0)
+                    NameLabel.BackgroundTransparency = 1
+                    NameLabel.Text = plr.DisplayName
+                    NameLabel.TextColor3 = (selectedPlayer == plr) and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(255, 255, 255)
+                    NameLabel.Font = Enum.Font.GothamSemibold
+                    NameLabel.TextSize = 12
+                    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    NameLabel.Parent = PlayerRow
+
+                    local SelectBtn = Instance.new("TextButton")
+                    SelectBtn.Size = UDim2.new(1, 0, 1, 0)
+                    SelectBtn.BackgroundTransparency = 1
+                    SelectBtn.Text = ""
+                    SelectBtn.Parent = PlayerRow
+
+                    SelectBtn.MouseEnter:Connect(function()
+                        if selectedPlayer ~= plr then safeTween(PlayerRow, {BackgroundColor3 = Color3.fromRGB(35, 40, 55)}, 0.2) end
+                    end)
+                    SelectBtn.MouseLeave:Connect(function()
+                        if selectedPlayer ~= plr then safeTween(PlayerRow, {BackgroundColor3 = Color3.fromRGB(25, 30, 40)}, 0.2) end
+                    end)
+
+                    SelectBtn.MouseButton1Click:Connect(function()
+                        if selectedPlayer == plr then
+                            local oldPlayer = selectedPlayer
+                            selectedPlayer = nil
+                            _G.SpecificESP_SelectedPlayer = nil
+                            clearTargetESP()
+                            
+                            if oldPlayer and _G.IsGeneralESPEnabled and _G.IsGeneralESPEnabled() then
+                                if _G.AddGeneralESP then _G.AddGeneralESP(oldPlayer) end
+                            end
+                        else
+                            local oldPlayer = selectedPlayer
+                            selectedPlayer = plr
+                            _G.SpecificESP_SelectedPlayer = plr
+                            
+                            if oldPlayer and _G.IsGeneralESPEnabled and _G.IsGeneralESPEnabled() then
+                                if _G.AddGeneralESP then _G.AddGeneralESP(oldPlayer) end
+                            end
+                            
+                            if _G.RemoveGeneralESP then _G.RemoveGeneralESP(plr) end
+                            
+                            applyTargetESP(plr)
+                        end
+                        updatePlayerList() 
+                    end)
+                end
+            end)
+        end
+
+local function handleTracer()
+    pcall(function()
+        local Camera = workspace.CurrentCamera
+
+        if specificESPEnabled and selectedPlayer and selectedPlayer.Character and Camera then
+
+            if not TracerLine or not TracerLine.Parent then
+                if ESP_Gui then
+                    TracerLine = Instance.new("Frame")
+                    TracerLine.Name = "ImmuneTracerLine"
+                    TracerLine.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                    TracerLine.BorderSizePixel = 0
+                    TracerLine.AnchorPoint = Vector2.new(0.5, 0.5)
+                    TracerLine.ZIndex = 99999
+                    TracerLine.Parent = ESP_Gui
+
+                    local uiGradientLine = Instance.new("UIGradient")
+                    uiGradientLine.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 0, 0))
+                    })
+                    uiGradientLine.Parent = TracerLine
+                end
+            end
+
+            local char = selectedPlayer.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local head = char:FindFirstChild("Head")
+
+            if not hrp then
+                if TracerLine then TracerLine.Visible = false end
+                return
+            end
+
+            local pos = hrp.Position
+            local headPos = head and head.Position or (pos + Vector3.new(0, 2, 0))
+
+            local topV3 = headPos + Vector3.new(0, 0.6, 0)
+            local bottomV3 = pos - Vector3.new(0, 2.8, 0)
+
+            local top2D, topOnScreen = Camera:WorldToViewportPoint(topV3)
+            local bottom2D, bottomOnScreen = Camera:WorldToViewportPoint(bottomV3)
+
+            local center2D, centerOnScreen = Camera:WorldToViewportPoint(pos + Vector3.new(0, 0.5, 0))
+
+            if topOnScreen and bottomOnScreen and centerOnScreen and center2D.Z > 0 then
+                if not currentHighlight or not currentHighlight.Parent then
+                    applyTargetESP(selectedPlayer)
+                end
+
+                local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y - 25)
+                local center = Vector2.new(center2D.X, center2D.Y)
+
+                local dir = center - origin
+                if dir.Magnitude < 1 then
+                    if TracerLine then TracerLine.Visible = false end
+                    return
+                end
+
+                local bodyScreenHeight = math.abs(top2D.Y - bottom2D.Y)
+
+                -- Esto hace que la línea atraviese todo el personaje
+                local extraPixels = math.max(bodyScreenHeight * 0.9, 24)
+
+                dir = dir.Unit
+                local endPos = center + (dir * extraPixels)
+
+                local length = (endPos - origin).Magnitude
+                local lineCenter = (origin + endPos) / 2
+                local angle = math.deg(math.atan2(endPos.Y - origin.Y, endPos.X - origin.X))
+
+                if TracerLine then
+                    TracerLine.AnchorPoint = Vector2.new(0.5, 0.5)
+                    TracerLine.Size = UDim2.new(0, length, 0, 3)
+                    TracerLine.Position = UDim2.new(0, lineCenter.X, 0, lineCenter.Y)
+                    TracerLine.Rotation = angle
+                    TracerLine.Visible = true
+                end
+            else
+                if TracerLine then TracerLine.Visible = false end
+            end
+        else
+            if TracerLine then TracerLine.Visible = false end
+        end
+    end)
+end
+
+        local function startSpecificESP()
+            specificESPEnabled = true
+            createUI()
+            updatePlayerList()
+
+            playerAddedConn = Players.PlayerAdded:Connect(function() task.wait(1) updatePlayerList() end)
+            playerRemovingConn = Players.PlayerRemoving:Connect(function(plr)
+                if selectedPlayer == plr then
+                    selectedPlayer = nil
+                    _G.SpecificESP_SelectedPlayer = nil
+                    clearTargetESP()
+                end
+                updatePlayerList()
+            end)
+
+            renderConnection = RunService.RenderStepped:Connect(handleTracer)
+        end
+
+        local function stopSpecificESP()
+            specificESPEnabled = false
+            
+            local oldPlayer = selectedPlayer
+            selectedPlayer = nil
+            _G.SpecificESP_SelectedPlayer = nil
+            clearTargetESP()
+
+            if oldPlayer and _G.IsGeneralESPEnabled and _G.IsGeneralESPEnabled() then
+                if _G.AddGeneralESP then _G.AddGeneralESP(oldPlayer) end
+            end
+
+            pcall(function()
+                if renderConnection then renderConnection:Disconnect() renderConnection = nil end
+                if playerAddedConn then playerAddedConn:Disconnect() playerAddedConn = nil end
+                if playerRemovingConn then playerRemovingConn:Disconnect() playerRemovingConn = nil end
+                if ESP_Gui then ESP_Gui:Destroy() ESP_Gui = nil end
+            end)
+        end
+
+        task.spawn(function()
+            local timeout = 0
+            while type(createToggle) ~= "function" and timeout < 100 do
+                task.wait(0.1)
+                timeout = timeout + 1
+            end
+
+            if type(createToggle) == "function" then
+                pcall(function()
+                    createToggle("Player ESP Especifico", function(state)
+                        if state then
+                            startSpecificESP()
+                        else
+                            stopSpecificESP()
+                        end
+                    end)
+                end)
+            end
+        end)
+
+    end)
+
+    if not success then
+        warn("El Player ESP Especifico ha fallado silenciosamente sin romper el menú:", tostring(err))
+    end
+end)
+
+
 
 
 
