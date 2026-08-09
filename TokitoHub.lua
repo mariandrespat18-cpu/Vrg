@@ -2461,7 +2461,76 @@ do
         SetTpToBest(state)
     end)
 end
+-- ============================================================
+-- AP SPAMMER TOGGLE SYSTEM
+-- ============================================================
 
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local AP_SPAMMER_URL =
+        "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/as"
+
+    local function SetAPSpammer(state)
+        State.APSpammerEnabled = state
+
+        if state then
+            -- Ejecutar una sola vez al activar
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet(AP_SPAMMER_URL))()
+                end)
+            end
+
+        else
+            -- Desactivado.
+            -- Si el script externo tiene una función/variable
+            -- para detenerse, habría que conectarla aquí.
+            State.APSpammerEnabled = false
+        end
+    end
+
+    -- Toggle mostrado en la GUI
+    createToggle("AP Spammer", function(state)
+        SetAPSpammer(state)
+    end)
+end
+-- ============================================================
+-- AP CIRCLE TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local AP_CIRCLE_URL =
+        "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/ac"
+
+    local function SetAPCircle(state)
+        State.APCircleEnabled = state
+
+        if state and not ScriptLoaded then
+            ScriptLoaded = true
+
+            pcall(function()
+                loadstring(game:HttpGet(AP_CIRCLE_URL))()
+            end)
+        end
+    end
+
+    createToggle("AP Circle", function(state)
+        SetAPCircle(state)
+    end)
+end
 -- ============================================================
 --  CLONAR TOGGLE SYSTEM
 -- ============================================================
