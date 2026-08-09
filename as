@@ -45,7 +45,7 @@ end
 local function runSingleCmd(targetPlayer,cmd)
 pcall(runAdminCommand,targetPlayer,cmd)
 end
-local cmdsToSpam={"rocket","morph","inverse","ragdoll","balloon","nightvision","jumpscare","jail","tiny"}
+local cmdsToSpam={"rocket","morph","inverse","ragdoll","balloon","nightvision","jumpscare", "control", "jail","tiny"}
 local function spamPlayer(targetPlayer)
 task.spawn(function()
 for _,cmd in ipairs(cmdsToSpam) do
