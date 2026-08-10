@@ -2462,6 +2462,39 @@ do
     end)
 end
 -- ============================================================
+-- INVENTARIO CUSTOM TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetInventarioCustom(state)
+        State.InventarioCustomEnabled = state
+
+        if state then
+            -- Cargar el inventario una sola vez
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet(
+                        "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/inv.lua"
+                    ))()
+                end)
+            end
+        end
+    end
+
+    -- Toggle en la interfaz del hub
+    createToggle("Inventario Custom", function(state)
+        SetInventarioCustom(state)
+    end)
+end
+-- ============================================================
 -- AP SPAMMER TOGGLE SYSTEM
 -- ============================================================
 
