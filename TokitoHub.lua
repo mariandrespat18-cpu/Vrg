@@ -2418,7 +2418,72 @@ do
         SetSemiInvisible(state)
     end)
 end
+-- ============================================================
+-- STEAL FLOOR TOGGLE SYSTEM
+-- ============================================================
 
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetStealFloor(state)
+        State.StealFloorEnabled = state
+
+        if state then
+            -- Cargar el script una sola vez
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet(
+                        "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/Stfl"
+                    ))()
+                end)
+            end
+        end
+    end
+
+    -- Toggle en la interfaz del hub
+    createToggle("Steal Floor", function(state)
+        SetStealFloor(state)
+    end)
+end
+-- ============================================================
+-- AUTO KICK AL ROBAR TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetAutoKickAlRobar(state)
+        State.AutoKickAlRobarEnabled = state
+
+        if state then
+            -- Cargar el script una sola vez
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet(
+                        "https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/Atk"
+                    ))()
+                end)
+            end
+        end
+    end
+
+    -- Toggle en la interfaz del hub
+    createToggle("Auto Kick Al Robar", function(state)
+        SetAutoKickAlRobar(state)
+    end)
+end
 -- ============================================================
 -- TP TO BEST TOGGLE SYSTEM
 -- ============================================================
