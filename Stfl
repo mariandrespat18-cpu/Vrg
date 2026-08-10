@@ -1,0 +1,258 @@
+local Pl=game:GetService("Players")
+local Rs=game:GetService("RunService")
+local UIS=game:GetService("UserInputService")
+local Ws=workspace
+local Me=Pl.LocalPlayer
+
+local plat=nil
+local conn=nil
+local H_OFF=10.2
+local R_SPD=18
+local act=false
+
+-- ==========================================
+-- LIMPIAR PLATAFORMA
+-- ==========================================
+local function kill()
+	if plat then
+		plat:Destroy()
+		plat=nil
+	end
+
+	if conn then
+		conn:Disconnect()
+		conn=nil
+	end
+end
+
+-- ==========================================
+-- CREAR PLATAFORMA
+-- ==========================================
+local function spawn()
+	if plat then
+		kill()
+		return
+	end
+
+	local c=Me.Character
+	local r=c and c:FindFirstChild("HumanoidRootPart")
+	if not r then return end
+
+	plat=Instance.new("Part")
+	plat.Name="jack"
+	plat.Size=Vector3.new(4,0.5,4)
+	plat.Anchored=true
+	plat.CanCollide=true
+	plat.Material=Enum.Material.SmoothPlastic
+	plat.Color=Color3.new(1,1,1)
+	plat.Position=r.Position-Vector3.new(0,3.5,0)
+	plat.Parent=Ws
+
+	conn=Rs.Heartbeat:Connect(function(dt)
+		if plat and c and r and r.Parent then
+			local p=RaycastParams.new()
+			p.FilterDescendantsInstances={c,plat}
+			p.FilterType=Enum.RaycastFilterType.Exclude
+
+			local ray=Ws:Raycast(
+				r.Position,
+				Vector3.new(0,-1000,0),
+				p
+			)
+
+			if ray then
+				local ty=ray.Position.Y+H_OFF
+				local cy=plat.Position.Y
+
+				local ny=
+					cy < ty
+					and math.min(cy+(R_SPD*dt),ty)
+					or ty
+
+				plat.Position=Vector3.new(
+					r.Position.X,
+					ny,
+					r.Position.Z
+				)
+			end
+		end
+	end)
+end
+
+-- ==========================================
+-- EQUIPAR / DESEQUIPAR BATE
+-- ==========================================
+local function bat(e)
+	local c=Me.Character
+	if not c then return end
+
+	local h=c:FindFirstChild("Humanoid")
+	if not h then return end
+
+	local t=nil
+
+	for _,v in c:GetChildren() do
+		if v:IsA("Tool") and v.Name:lower():find("bat") then
+			t=v
+			break
+		end
+	end
+
+	if not t then
+		for _,v in Me.Backpack:GetChildren() do
+			if v:IsA("Tool") and v.Name:lower():find("bat") then
+				t=v
+				break
+			end
+		end
+	end
+
+	if t then
+		if e then
+			h:EquipTool(t)
+		else
+			t.Parent=Me.Backpack
+		end
+	end
+end
+
+-- ==========================================
+-- ELIMINAR GUI ANTERIOR
+-- ==========================================
+if sfGui then
+	pcall(function()
+		sfGui:Destroy()
+	end)
+end
+
+-- ==========================================
+-- GUI
+-- ==========================================
+sfGui=Instance.new("ScreenGui")
+sfGui.Name="SF_G"
+sfGui.ResetOnSpawn=false
+
+local s=pcall(function()
+	sfGui.Parent=game:GetService("CoreGui")
+end)
+
+if not s then
+	sfGui.Parent=Me:WaitForChild("PlayerGui")
+end
+
+-- ==========================================
+-- BOTÓN STEAL FLOOR
+-- MISM0 TAMAÑO QUE "CLONAR"
+-- APARECE DEBAJO
+-- ==========================================
+local btn=Instance.new("TextButton")
+btn.Name="StealFloorButton"
+btn.Size=UDim2.new(0,60,0,30)
+btn.Position=UDim2.new(1,-30,0.5,0)
+btn.AnchorPoint=Vector2.new(1,0.5)
+btn.Text="Steal Floor"
+btn.BackgroundColor3=Color3.new(0,0,0)
+btn.TextColor3=Color3.new(1,1,1)
+btn.Font=Enum.Font.GothamBold
+btn.TextSize=14
+btn.Parent=sfGui
+
+Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+
+-- ==========================================
+-- SISTEMA PARA MOVER EL BOTÓN
+-- ==========================================
+local dragging=false
+local dragInput=nil
+local dragStart=nil
+local startPos=nil
+
+btn.InputBegan:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.MouseButton1
+	or input.UserInputType==Enum.UserInputType.Touch then
+
+		dragging=true
+		dragStart=input.Position
+		startPos=btn.Position
+	end
+end)
+
+btn.InputChanged:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.MouseMovement
+	or input.UserInputType==Enum.UserInputType.Touch then
+
+		dragInput=input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input==dragInput and dragging then
+		local delta=input.Position-dragStart
+
+		btn.Position=UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset+delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset+delta.Y
+		)
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.MouseButton1
+	or input.UserInputType==Enum.UserInputType.Touch then
+
+		dragging=false
+	end
+end)
+
+-- ==========================================
+-- ACTIVAR / DESACTIVAR
+-- ==========================================
+btn.MouseButton1Click:Connect(function()
+	act=not act
+
+	if act then
+		btn.BackgroundColor3=Color3.new(0,1,0)
+
+		spawn()
+		bat(true)
+	else
+		btn.BackgroundColor3=Color3.new(0,0,0)
+
+		kill()
+		bat(false)
+	end
+end)
+
+-- ==========================================
+-- AL MORIR
+-- ==========================================
+Me.CharacterAdded:Connect(function(c)
+	local h=c:WaitForChild("Humanoid")
+
+	h.Died:Connect(function()
+		kill()
+
+		if act then
+			act=false
+			btn.BackgroundColor3=Color3.new(0,0,0)
+		end
+	end)
+end)
+
+-- ==========================================
+-- LIMPIEZA GLOBAL
+-- ==========================================
+sfCl=function()
+	kill()
+
+	if sfGui and sfGui.Parent then
+		pcall(function()
+			sfGui:Destroy()
+		end)
+	end
+
+	bat(false)
+	act=false
+end
