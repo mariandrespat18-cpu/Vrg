@@ -4151,477 +4151,379 @@ end)
 -- ================= END FPS BOOSTER =================
 -- ================= FPS BOOST ULTRA =================
 do
-local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local WorkspaceService = game:GetService("Workspace")
-local MaterialService = game:GetService("MaterialService")
+	local Players = game:GetService("Players")
+	local Lighting = game:GetService("Lighting")
+	local WorkspaceService = game:GetService("Workspace")
 
--- Protecciones para evitar errores si tu hub no tiene estas funciones globales
-local _Config = type(Config) == "table" and Config or {}
-local _saveConfig = type(saveConfig) == "function" and saveConfig or function() end
-local _setToggle = type(setToggle) == "function" and setToggle or function() end
+	-- Protecciones para evitar errores si tu hub no tiene estas funciones globales
+	local _Config = type(Config) == "table" and Config or {}
+	local _saveConfig = type(saveConfig) == "function" and saveConfig or function() end
+	local _setToggle = type(setToggle) == "function" and setToggle or function() end
 
-local OriginalTransparency = setmetatable({}, { __mode = "k" })
-local _ultraThreads = {}
-local _ultraConnections = {}
+	local OriginalTransparency = setmetatable({}, {__mode = "k"})
+	local _ultraThreads = {}
+	local _ultraConnections = {}
 
-local function AddUltraThread(f)
-	table.insert(_ultraThreads, task.spawn(f))
-end
-
-local function AddUltraConnection(c)
-	table.insert(_ultraConnections, c)
-end
-
-local function SafeDestroyUltra(obj)
-	if not obj then
-		return
+	local function AddUltraThread(f)
+		table.insert(_ultraThreads, task.spawn(f))
 	end
 
-	-- No tocar nada del overhead ni del sistema que usa el ESP
-	if obj.Name == "Overhead"
-		or obj.Name == "AnimalOverhead"
-		or obj.Name == "Generation"
-		or obj.Name == "DisplayName"
-		or obj.Name == "FastOverheadTemplate" then
-		return
+	local function AddUltraConnection(c)
+		table.insert(_ultraConnections, c)
 	end
 
-	pcall(function()
-		obj:Destroy()
-	end)
-end
+	local function SafeDestroyUltra(obj)
+		if obj.Name == "Overhead" then return end
+		pcall(function() obj:Destroy() end)
+	end
 
-local ClothingClasses = {
-	"Shirt", "Pants", "ShirtGraphic",
-	"Accessory", "Hat", "HairAccessory",
-	"FaceAccessory", "NeckAccessory", "ShoulderAccessory",
-	"FrontAccessory", "BackAccessory", "WaistAccessory",
-}
+	local ClothingClasses = {
+		"Shirt","Pants","ShirtGraphic",
+		"Accessory","Hat","HairAccessory",
+		"FaceAccessory","NeckAccessory","ShoulderAccessory",
+		"FrontAccessory","BackAccessory","WaistAccessory",
+	}
 
-local function IsClothing(obj)
-	for _, c in ipairs(ClothingClasses) do
-		if obj:IsA(c) then
-			return true
+	local function IsClothing(obj)
+		for _, c in ipairs(ClothingClasses) do
+			if obj:IsA(c) then return true end
 		end
-	end
-	return false
-end
-
-local function IsCharacterPart(obj)
-	local parent = obj.Parent
-	while parent and parent ~= WorkspaceService do
-		if parent:IsA("Model") and Players:GetPlayerFromCharacter(parent) then
-			return true
-		end
-		parent = parent.Parent
-	end
-	return false
-end
-
-local function IsOutOfRange(obj)
-	if obj:IsA("BasePart") then
-		local x = obj.Position.X
-		return x < -560 or x > -240
-	end
-	return false
-end
-
-local BASE_NAMES = {
-	["baseplate"] = true,
-	["spawnlocation"] = true,
-	["spawn location"] = true,
-	["spawn"] = true,
-}
-
-local function IsBase(obj)
-	if not obj:IsA("BasePart") then
 		return false
 	end
 
-	local nameLower = obj.Name:lower()
-	if BASE_NAMES[nameLower] then
-		return true
+	local function IsCharacterPart(obj)
+		local parent = obj.Parent
+		while parent and parent ~= WorkspaceService do 
+			if parent:IsA("Model") and Players:GetPlayerFromCharacter(parent) then
+				return true
+			end
+			parent = parent.Parent
+		end
+		return false
 	end
 
-	for n in pairs(BASE_NAMES) do
-		if nameLower:find(n, 1, true) then
-			return true
+	local function IsOutOfRange(obj)
+		if obj:IsA("BasePart") then
+			local x = obj.Position.X
+			return x < -560 or x > -240
 		end
+		return false
 	end
 
-	return false
-end
+	local BASE_NAMES = {
+		["baseplate"] = true, ["spawnlocation"] = true, ["spawn location"] = true, ["spawn"] = true,
+	}
 
-local function IsInBase(obj)
-	local p = obj.Parent
-	while p and p ~= WorkspaceService do
-		if IsBase(p) then
-			return true
+	local function IsBase(obj)
+		if not obj:IsA("BasePart") then return false end
+		local nameLower = obj.Name:lower()
+		if BASE_NAMES[nameLower] then return true end
+		for n in pairs(BASE_NAMES) do
+			if nameLower:find(n, 1, true) then return true end
 		end
-		p = p.Parent
-	end
-	return false
-end
-
-local function IsProtectedFromBoost(obj)
-	local p = obj
-	while p and p ~= WorkspaceService do
-		if p.Name == "Debris" then
-			return true
-		end
-		if p.Name == "FastOverheadTemplate" then
-			return true
-		end
-		if p.Name == "AnimalOverhead" then
-			return true
-		end
-		p = p.Parent
-	end
-	return false
-end
-
-local function MakeTransparentUltra(obj)
-	pcall(function()
-		if IsBase(obj) and not IsCharacterPart(obj) then
-			if OriginalTransparency[obj] == nil then
-				OriginalTransparency[obj] = {
-					trans = obj.Transparency,
-					shadow = obj.CastShadow
-				}
-			end
-			obj.Transparency = 1
-			obj.CastShadow = false
-		end
-	end)
-end
-
-local function StripObjectUltra(obj)
-	pcall(function()
-		if IsProtectedFromBoost(obj) then
-			return
-		end
-
-		if obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("SpecialMesh") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam")
-			or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-			pcall(function() obj.Enabled = false end)
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("SurfaceAppearance") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("BasePart") then
-			obj.CastShadow = false
-			obj.Material = Enum.Material.Plastic
-			obj.MaterialVariant = ""
-			obj.Reflectance = 0
-		end
-	end)
-end
-
-local function CleanObjectUltra(obj)
-	pcall(function()
-		if IsProtectedFromBoost(obj) then
-			return
-		end
-
-		if obj:IsA("SurfaceAppearance") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("Decal") or obj:IsA("Texture") then
-			if not (obj.Name == "face" and obj.Parent and obj.Parent.Name == "Head") then
-				SafeDestroyUltra(obj)
-			end
-
-		elseif obj:IsA("SpecialMesh") then
-			obj.TextureId = ""
-
-		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Explosion") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("Animation") or obj:IsA("AnimationController") then
-			SafeDestroyUltra(obj)
-
-		elseif obj:IsA("BasePart") then
-			obj.CastShadow = false
-			obj.Material = Enum.Material.Plastic
-			obj.MaterialVariant = ""
-			obj.Reflectance = 0
-		end
-	end)
-end
-
-local function StopAnimationsUltra(animator)
-	pcall(function()
-		for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-			local isChar = false
-			for _, plr in ipairs(Players:GetPlayers()) do
-				if plr.Character and animator:IsDescendantOf(plr.Character) then
-					isChar = true
-					break
-				end
-			end
-			if not isChar then
-				track:Stop()
-			end
-		end
-	end)
-end
-
-local function OptimizeCharacterUltra(char)
-	if not char then
-		return
+		return false
 	end
 
-	task.spawn(function()
-		task.wait(0.3)
-		for _, obj in ipairs(char:GetDescendants()) do
-			if IsClothing(obj) then
-				SafeDestroyUltra(obj)
-			else
-				CleanObjectUltra(obj)
-			end
+	local function IsInBase(obj)
+		local p = obj.Parent
+		while p and p ~= WorkspaceService do
+			if IsBase(p) then return true end
+			p = p.Parent
 		end
-	end)
-end
-
-local function ApplyGreySkyUltra()
-	pcall(function()
-		for _, obj in ipairs(Lighting:GetChildren()) do
-			if obj:IsA("Sky") then
-				obj:Destroy()
-			end
-		end
-
-		local sky = Instance.new("Sky")
-		sky.SkyboxBk = ""
-		sky.SkyboxDn = ""
-		sky.SkyboxFt = ""
-		sky.SkyboxLf = ""
-		sky.SkyboxRt = ""
-		sky.SkyboxUp = ""
-		sky.CelestialBodiesShown = false
-		sky.Parent = Lighting
-	end)
-end
-
-local function OptimizeLightingUltra()
-	pcall(function()
-		Lighting.GlobalShadows = false
-		Lighting.FogEnd = 9e9
-		Lighting.FogStart = 9e9
-		Lighting.EnvironmentDiffuseScale = 0
-		Lighting.EnvironmentSpecularScale = 0
-		Lighting.Brightness = 1.5
-		Lighting.Ambient = Color3.fromRGB(60, 60, 60)
-	end)
-
-	for _, v in ipairs(Lighting:GetChildren()) do
-		if v:IsA("PostEffect") then
-			pcall(function()
-				v.Enabled = false
-			end)
-		elseif v:IsA("Atmosphere") or v:IsA("Clouds") then
-			v:Destroy()
-		end
+		return false
 	end
 
-	ApplyGreySkyUltra()
-end
-
-local function ApplyTerrainUltra()
-	pcall(function()
-		local T = WorkspaceService.Terrain
-		T.Decoration = false
-		T.WaterWaveSize = 0
-		T.WaterWaveSpeed = 0
-		T.WaterReflectance = 0
-		T.WaterTransparency = 1
-	end)
-end
-
-local function setFPSBoostUltra(enabled)
-	_Config.FPSBoostUltra = enabled
-	_saveConfig()
-	_setToggle("FPS Boost Ultra", enabled)
-
-	if enabled then
+	local function MakeTransparentUltra(obj)
 		pcall(function()
-			settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-			settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
-			settings().Physics.AllowSleep = true
-			settings().Physics.PhysicsEnvironmentalThrottle = 1
-		end)
-
-		if type(setfpscap) == "function" then
-			pcall(setfpscap, 0)
-		end
-
-		OptimizeLightingUltra()
-		ApplyTerrainUltra()
-
-		AddUltraThread(function()
-			local allDesc = WorkspaceService:GetDescendants()
-			local BATCH_SIZE = 200
-
-			for i = 1, #allDesc, BATCH_SIZE do
-				if not _Config.FPSBoostUltra then
-					break
+			if IsBase(obj) and not IsCharacterPart(obj) then
+				if OriginalTransparency[obj] == nil then
+					OriginalTransparency[obj] = {trans = obj.Transparency, shadow = obj.CastShadow}
 				end
+				obj.Transparency = 1
+				obj.CastShadow   = false
+			end
+		end)
+	end
 
-				local batchEnd = math.min(i + BATCH_SIZE - 1, #allDesc)
-				for j = i, batchEnd do
-					local obj = allDesc[j]
-					if obj and obj.Parent then
-						if IsProtectedFromBoost(obj) then
-							-- No tocar los animales / overhead / debris
-						elseif IsBase(obj) then
-							MakeTransparentUltra(obj)
-						elseif IsClothing(obj) then
-							SafeDestroyUltra(obj)
-						elseif IsInBase(obj) then
-							-- skip
-						elseif IsCharacterPart(obj) then
-							-- skip
-						elseif IsOutOfRange(obj) then
-							SafeDestroyUltra(obj)
-						else
-							CleanObjectUltra(obj)
-							StripObjectUltra(obj)
-							if obj:IsA("Animator") then
-								StopAnimationsUltra(obj)
-							end
-						end
+	local function StripObjectUltra(obj)
+		pcall(function()
+			if obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("SpecialMesh") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam")
+				or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+				pcall(function() obj.Enabled = false end)
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("SurfaceAppearance") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("BasePart") then
+				obj.CastShadow      = false
+				obj.Material        = Enum.Material.Plastic
+				obj.MaterialVariant = ""
+				obj.Reflectance     = 0
+			end
+		end)
+	end
+
+	local function CleanObjectUltra(obj)
+		pcall(function()
+			if obj:IsA("SurfaceAppearance") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("Decal") or obj:IsA("Texture") then
+				if not (obj.Name == "face" and obj.Parent and obj.Parent.Name == "Head") then
+					SafeDestroyUltra(obj)
+				end
+			elseif obj:IsA("SpecialMesh") then
+				obj.TextureId = ""
+			elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Explosion") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("Animation") or obj:IsA("AnimationController") then
+				SafeDestroyUltra(obj)
+			elseif obj:IsA("BasePart") then
+				obj.CastShadow      = false
+				obj.Material        = Enum.Material.Plastic
+				obj.MaterialVariant = ""
+				obj.Reflectance     = 0
+			end
+		end)
+	end
+
+	local function StopAnimationsUltra(animator)
+		pcall(function()
+			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+				local isChar = false
+				for _, plr in ipairs(Players:GetPlayers()) do
+					if plr.Character and animator:IsDescendantOf(plr.Character) then
+						isChar = true
+						break
 					end
 				end
-
-				if i + BATCH_SIZE <= #allDesc then
-					task.wait()
+				if not isChar then
+					track:Stop()
 				end
 			end
 		end)
+	end
 
-		AddUltraConnection(WorkspaceService.DescendantAdded:Connect(function(obj)
-			task.defer(function()
-				if not _Config.FPSBoostUltra then
-					return
-				end
-
-				if IsProtectedFromBoost(obj) then
-					return
-				end
-
-				if IsBase(obj) then
-					MakeTransparentUltra(obj)
-					return
-				end
-
+	local function OptimizeCharacterUltra(char)
+		if not char then return end
+		task.spawn(function()
+			task.wait(0.3)
+			for _, obj in ipairs(char:GetDescendants()) do
 				if IsClothing(obj) then
-					SafeDestroyUltra(obj)
-				elseif IsInBase(obj) then
-					-- skip
-				elseif IsCharacterPart(obj) then
-					-- skip
-				elseif IsOutOfRange(obj) then
 					SafeDestroyUltra(obj)
 				else
 					CleanObjectUltra(obj)
-					StripObjectUltra(obj)
-					if obj:IsA("Animator") then
-						StopAnimationsUltra(obj)
-					end
-				end
-			end)
-		end))
-
-		AddUltraConnection(Lighting.DescendantAdded:Connect(function(obj)
-			if obj:IsA("PostEffect") then
-				pcall(function()
-					obj.Enabled = false
-				end)
-			elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then
-				SafeDestroyUltra(obj)
-			end
-		end))
-
-		AddUltraConnection(MaterialService.DescendantAdded:Connect(function(obj)
-			SafeDestroyUltra(obj)
-		end))
-
-		for _, plr in ipairs(Players:GetPlayers()) do
-			OptimizeCharacterUltra(plr.Character)
-			AddUltraConnection(plr.CharacterAdded:Connect(OptimizeCharacterUltra))
-		end
-
-		AddUltraConnection(Players.PlayerAdded:Connect(function(plr)
-			AddUltraConnection(plr.CharacterAdded:Connect(OptimizeCharacterUltra))
-		end))
-
-		AddUltraThread(function()
-			while _Config.FPSBoostUltra do
-				task.wait(15)
-				pcall(function()
-					collectgarbage("collect")
-				end)
-			end
-		end)
-	else
-		for _, conn in ipairs(_ultraConnections) do
-			if typeof(conn) == "RBXScriptConnection" then
-				conn:Disconnect()
-			end
-		end
-		_ultraConnections = {}
-
-		for _, thr in ipairs(_ultraThreads) do
-			pcall(function()
-				task.cancel(thr)
-			end)
-		end
-		_ultraThreads = {}
-
-		pcall(function()
-			for part, data in pairs(OriginalTransparency) do
-				if part and part.Parent then
-					part.Transparency = data.trans
-					part.CastShadow = data.shadow
 				end
 			end
-		end)
-		OriginalTransparency = {}
-
-		pcall(function()
-			settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-			settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Automatic
-			Lighting.GlobalShadows = true
-			Lighting.Brightness = 2
-			Lighting.FogEnd = 100000
-			WorkspaceService.Terrain.WaterWaveSize = 0.15
-			WorkspaceService.Terrain.WaterWaveSpeed = 1
-			WorkspaceService.Terrain.WaterReflectance = 0.5
-			WorkspaceService.Terrain.WaterTransparency = 0.3
-			WorkspaceService.Terrain.Decoration = true
 		end)
 	end
-end
 
--- TOGGLE (Validación adicional por si usas otro nombre en tu librería UI)
-if type(createToggle) == "function" then
-	createToggle("FPS Boost Ultra", function(state)
-		setFPSBoostUltra(state)
-	end)
-else
-	warn("[HUB] Asegúrate de que la función createToggle existe en este punto del script.")
-end
+	local function ApplyGreySkyUltra()
+		pcall(function()
+			for _, obj in ipairs(Lighting:GetChildren()) do
+				if obj:IsA("Sky") then
+					obj:Destroy()
+				end
+			end
+			local sky = Instance.new("Sky")
+			sky.SkyboxBk = ""
+			sky.SkyboxDn = ""
+			sky.SkyboxFt = ""
+			sky.SkyboxLf = ""
+			sky.SkyboxRt = ""
+			sky.SkyboxUp = ""
+			sky.CelestialBodiesShown = false
+			sky.Parent = Lighting
+		end)
+	end
+
+	local function OptimizeLightingUltra()
+		pcall(function()
+			Lighting.GlobalShadows = false
+			Lighting.FogEnd = 9e9
+			Lighting.FogStart = 9e9
+			Lighting.EnvironmentDiffuseScale = 0
+			Lighting.EnvironmentSpecularScale = 0
+			Lighting.Brightness = 1.5
+			Lighting.Ambient = Color3.fromRGB(60, 60, 60)
+		end)
+
+		for _, v in ipairs(Lighting:GetChildren()) do  
+			if v:IsA("PostEffect") then  
+				pcall(function() v.Enabled = false end)  
+			elseif v:IsA("Atmosphere") or v:IsA("Clouds") then  
+				v:Destroy()  
+			end  
+		end  
+		ApplyGreySkyUltra()
+	end
+
+	local function ApplyTerrainUltra()
+		pcall(function()
+			local T = WorkspaceService.Terrain
+			T.Decoration = false
+			T.WaterWaveSize = 0
+			T.WaterWaveSpeed = 0
+			T.WaterReflectance = 0
+			T.WaterTransparency = 1
+		end)
+	end
+
+	local function setFPSBoostUltra(enabled)
+		_Config.FPSBoostUltra = enabled
+		_saveConfig()
+		_setToggle("FPS Boost Ultra", enabled)
+
+		if enabled then  
+			pcall(function()  
+				settings().Rendering.QualityLevel = Enum.QualityLevel.Level01  
+				settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01  
+				settings().Physics.AllowSleep = true  
+				settings().Physics.PhysicsEnvironmentalThrottle = 1 
+			end)  
+
+			if type(setfpscap) == "function" then
+				pcall(setfpscap, 0)
+			end
+
+			OptimizeLightingUltra()  
+			ApplyTerrainUltra()  
+
+			AddUltraThread(function()
+				local allDesc = WorkspaceService:GetDescendants()  
+				local BATCH_SIZE = 200  
+				for i = 1, #allDesc, BATCH_SIZE do  
+					if not _Config.FPSBoostUltra then break end 
+					local batchEnd = math.min(i + BATCH_SIZE - 1, #allDesc)  
+					for j = i, batchEnd do  
+						local obj = allDesc[j]  
+						if obj and obj.Parent then  
+							if IsBase(obj) then  
+								MakeTransparentUltra(obj)  
+							elseif IsClothing(obj) then  
+								SafeDestroyUltra(obj)  
+							elseif IsInBase(obj) then  
+								-- skip  
+							elseif IsCharacterPart(obj) then  
+								-- skip  
+							elseif IsOutOfRange(obj) then  
+								SafeDestroyUltra(obj)  
+							else  
+								CleanObjectUltra(obj)  
+								StripObjectUltra(obj)  
+								if obj:IsA("Animator") then  
+									StopAnimationsUltra(obj)  
+								end  
+							end  
+						end  
+					end  
+					if i + BATCH_SIZE <= #allDesc then task.wait() end  
+				end
+			end)
+
+			AddUltraConnection(WorkspaceService.DescendantAdded:Connect(function(obj)  
+				task.defer(function()  
+					if not _Config.FPSBoostUltra then return end  
+					if IsBase(obj) then  
+						MakeTransparentUltra(obj)  
+						return  
+					end  
+					if IsClothing(obj) then  
+						SafeDestroyUltra(obj)  
+					elseif IsInBase(obj) then  
+						-- skip  
+					elseif IsCharacterPart(obj) then  
+						-- skip  
+					elseif IsOutOfRange(obj) then  
+						SafeDestroyUltra(obj)  
+					else  
+						CleanObjectUltra(obj)  
+						StripObjectUltra(obj)  
+						if obj:IsA("Animator") then  
+							StopAnimationsUltra(obj)  
+						end  
+					end  
+				end)  
+			end))  
+
+			AddUltraConnection(Lighting.DescendantAdded:Connect(function(obj)  
+				if obj:IsA("PostEffect") then  
+					pcall(function() obj.Enabled = false end)  
+				elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then  
+					SafeDestroyUltra(obj)  
+				end  
+			end))  
+
+			local MaterialService = game:GetService("MaterialService")  
+			AddUltraConnection(MaterialService.DescendantAdded:Connect(function(obj)  
+				SafeDestroyUltra(obj)  
+			end))  
+
+			for _, plr in ipairs(Players:GetPlayers()) do  
+				OptimizeCharacterUltra(plr.Character)  
+				AddUltraConnection(plr.CharacterAdded:Connect(OptimizeCharacterUltra))  
+			end  
+
+			AddUltraConnection(Players.PlayerAdded:Connect(function(plr)  
+				AddUltraConnection(plr.CharacterAdded:Connect(OptimizeCharacterUltra))  
+			end))  
+
+			AddUltraThread(function()  
+				while _Config.FPSBoostUltra do  
+					task.wait(15)  
+					pcall(function() collectgarbage("collect") end)  
+				end  
+			end)  
+		else  
+			for _, conn in ipairs(_ultraConnections) do  
+				if typeof(conn) == "RBXScriptConnection" then  
+					conn:Disconnect()  
+				end  
+			end  
+			_ultraConnections = {}  
+
+			for _, thr in ipairs(_ultraThreads) do  
+				pcall(function() task.cancel(thr) end)  
+			end  
+			_ultraThreads = {}  
+
+			pcall(function()  
+				for part, data in pairs(OriginalTransparency) do  
+					if part and part.Parent then  
+						part.Transparency = data.trans  
+						part.CastShadow = data.shadow  
+					end  
+				end  
+			end)  
+			OriginalTransparency = {}  
+
+			pcall(function()  
+				settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic  
+				settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Automatic  
+				Lighting.GlobalShadows = true  
+				Lighting.Brightness = 2  
+				Lighting.FogEnd = 100000  
+				WorkspaceService.Terrain.WaterWaveSize = 0.15  
+				WorkspaceService.Terrain.WaterWaveSpeed = 1  
+				WorkspaceService.Terrain.WaterReflectance = 0.5  
+				WorkspaceService.Terrain.WaterTransparency = 0.3  
+				WorkspaceService.Terrain.Decoration = true  
+			end)  
+		end
+	end
+
+	-- TOGGLE (Validación adicional por si usas otro nombre en tu librería UI)
+	if type(createToggle) == "function" then
+		createToggle("FPS Boost Ultra", function(state)
+			setFPSBoostUltra(state)
+		end)
+	else
+		warn("[HUB] Asegúrate de que la función createToggle existe en este punto del script.")
+	end
 
 end
 -- ================= END FPS BOOST ULTRA =================
@@ -6527,13 +6429,120 @@ end)
 
 
 
--- ================= XRAY =================
+-- ================= XRAY V2 =================
 
 local xrayEnabled = false
 local xrayConnection = nil
-local originalDecorationsTransparency = {}
+local originalStates = {}
 
 local XRayTransparency = 1 -- 1 = invisible total
+
+local function saveState(inst, prop, value)
+	if originalStates[inst] == nil then
+		originalStates[inst] = {}
+	end
+
+	if originalStates[inst][prop] == nil then
+		originalStates[inst][prop] = value
+	end
+end
+
+local function hideInstance(inst)
+	if inst:IsA("BasePart") then
+		saveState(inst, "Transparency", inst.Transparency)
+		saveState(inst, "CanCollide", inst.CanCollide)
+		saveState(inst, "CastShadow", inst.CastShadow)
+
+		inst.Transparency = XRayTransparency
+		inst.LocalTransparencyModifier = 1
+		inst.CanCollide = false
+		inst.CastShadow = false
+
+	elseif inst:IsA("Decal") or inst:IsA("Texture") then
+		saveState(inst, "Transparency", inst.Transparency)
+		inst.Transparency = 1
+
+	elseif inst:IsA("ParticleEmitter")
+		or inst:IsA("Trail")
+		or inst:IsA("Beam")
+		or inst:IsA("Smoke")
+		or inst:IsA("Fire")
+		or inst:IsA("Sparkles")
+		or inst:IsA("Explosion") then
+
+		saveState(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+
+	elseif inst:IsA("PointLight")
+		or inst:IsA("SpotLight")
+		or inst:IsA("SurfaceLight") then
+
+		saveState(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+
+	elseif inst:IsA("Highlight") then
+		saveState(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+
+	elseif inst:IsA("BillboardGui") or inst:IsA("SurfaceGui") then
+		saveState(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+	end
+end
+
+local function restoreInstance(inst)
+	if not originalStates[inst] then
+		return
+	end
+
+	local state = originalStates[inst]
+
+	for prop, value in pairs(state) do
+		pcall(function()
+			inst[prop] = value
+		end)
+	end
+
+	originalStates[inst] = nil
+end
+
+local function applyXRayToPlots()
+	local plots = workspace:FindFirstChild("Plots")
+	if not plots then
+		return
+	end
+
+	for _, plot in ipairs(plots:GetChildren()) do
+		local decorations = plot:FindFirstChild("Decorations")
+
+		if plot:IsA("Model") and decorations then
+			for _, obj in ipairs(decorations:GetDescendants()) do
+				hideInstance(obj)
+			end
+		end
+	end
+end
+
+local function restorePlots()
+	local plots = workspace:FindFirstChild("Plots")
+	if not plots then
+		return
+	end
+
+	for _, plot in ipairs(plots:GetChildren()) do
+		local decorations = plot:FindFirstChild("Decorations")
+
+		if plot:IsA("Model") and decorations then
+			for _, obj in ipairs(decorations:GetDescendants()) do
+				restoreInstance(obj)
+
+				if obj:IsA("BasePart") then
+					obj.LocalTransparencyModifier = 0
+				end
+			end
+		end
+	end
+end
 
 local function startXRay()
 	if xrayConnection then
@@ -6541,26 +6550,7 @@ local function startXRay()
 		xrayConnection = nil
 	end
 
-	local plots = workspace:FindFirstChild("Plots")
-
-	if plots then
-		for _, plot in ipairs(plots:GetChildren()) do
-			local decorations = plot:FindFirstChild("Decorations")
-
-			if plot:IsA("Model") and decorations then
-				for _, part in ipairs(decorations:GetDescendants()) do
-					if part:IsA("BasePart") then
-						if originalDecorationsTransparency[part] == nil then
-							originalDecorationsTransparency[part] = part.Transparency
-						end
-
-						part.Transparency = XRayTransparency
-						part.CastShadow = false
-					end
-				end
-			end
-		end
-	end
+	applyXRayToPlots()
 
 	xrayConnection = RunService.Heartbeat:Connect(function()
 		if not xrayEnabled then
@@ -6576,11 +6566,8 @@ local function startXRay()
 			local decorations = plot:FindFirstChild("Decorations")
 
 			if plot:IsA("Model") and decorations then
-				for _, part in ipairs(decorations:GetDescendants()) do
-					if part:IsA("BasePart") then
-						part.Transparency = XRayTransparency
-						part.CastShadow = false
-					end
+				for _, obj in ipairs(decorations:GetDescendants()) do
+					hideInstance(obj)
 				end
 			end
 		end
@@ -6595,24 +6582,144 @@ local function stopXRay()
 		xrayConnection = nil
 	end
 
+	restorePlots()
+	xrayEnabled = false
+end
+
+createToggle("XRAY V2", function(state)
+	if state then
+		startXRay()
+	else
+		stopXRay()
+	end
+end)
+
+-- ================= END =================
+-- ================= XRAY =================
+
+local xrayEnabled = false
+local xrayConnection = nil
+local originalDecorationsTransparency = {}
+
+local XRayTransparency = 0.5
+
+local function startXRay()
+
+	if xrayConnection then
+		xrayConnection:Disconnect()
+		xrayConnection = nil
+	end
+
 	local plots = workspace:FindFirstChild("Plots")
 
 	if plots then
 		for _, plot in ipairs(plots:GetChildren()) do
+
 			local decorations = plot:FindFirstChild("Decorations")
 
 			if plot:IsA("Model") and decorations then
+
 				for _, part in ipairs(decorations:GetDescendants()) do
+
 					if part:IsA("BasePart") then
-						local old = originalDecorationsTransparency[part]
+
+						if originalDecorationsTransparency[part] == nil then
+							originalDecorationsTransparency[part] =
+								part.Transparency
+						end
+
+						part.Transparency =
+							XRayTransparency
+					end
+				end
+			end
+		end
+	end
+
+	xrayConnection =
+		RunService.Heartbeat:Connect(function()
+
+			if not xrayEnabled then
+				return
+			end
+
+			local plots =
+				workspace:FindFirstChild("Plots")
+
+			if not plots then
+				return
+			end
+
+			for _, plot in ipairs(
+				plots:GetChildren()
+			) do
+
+				local decorations =
+					plot:FindFirstChild(
+						"Decorations"
+					)
+
+				if plot:IsA("Model")
+					and decorations then
+
+					for _, part in ipairs(
+						decorations:GetDescendants()
+					) do
+
+						if part:IsA(
+							"BasePart"
+						) then
+
+							part.Transparency =
+								XRayTransparency
+						end
+					end
+				end
+			end
+		end)
+
+	xrayEnabled = true
+end
+
+local function stopXRay()
+
+	if xrayConnection then
+		xrayConnection:Disconnect()
+		xrayConnection = nil
+	end
+
+	local plots = workspace:FindFirstChild("Plots")
+
+	if plots then
+		for _, plot in ipairs(plots:GetChildren()) do
+
+			local decorations =
+				plot:FindFirstChild(
+					"Decorations"
+				)
+
+			if plot:IsA("Model")
+				and decorations then
+
+				for _, part in ipairs(
+					decorations:GetDescendants()
+				) do
+
+					if part:IsA(
+						"BasePart"
+					) then
+
+						local old =
+							originalDecorationsTransparency[
+								part
+							]
 
 						if old ~= nil then
-							part.Transparency = old
+							part.Transparency =
+								old
 						else
 							part.Transparency = 0
 						end
-
-						part.CastShadow = true
 					end
 				end
 			end
@@ -6622,12 +6729,14 @@ local function stopXRay()
 	xrayEnabled = false
 end
 
-createToggle("Xray (Undetectable)", function(state)
+createToggle("Xray (Undetectable) ", function(state)
+
 	if state then
 		startXRay()
 	else
 		stopXRay()
 	end
+
 end)
 
 -- ================= END =================
