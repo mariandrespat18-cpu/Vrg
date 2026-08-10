@@ -6429,120 +6429,13 @@ end)
 
 
 
--- ================= XRAY V2 =================
+-- ================= XRAY =================
 
 local xrayEnabled = false
 local xrayConnection = nil
-local originalStates = {}
+local originalDecorationsTransparency = {}
 
 local XRayTransparency = 1 -- 1 = invisible total
-
-local function saveState(inst, prop, value)
-	if originalStates[inst] == nil then
-		originalStates[inst] = {}
-	end
-
-	if originalStates[inst][prop] == nil then
-		originalStates[inst][prop] = value
-	end
-end
-
-local function hideInstance(inst)
-	if inst:IsA("BasePart") then
-		saveState(inst, "Transparency", inst.Transparency)
-		saveState(inst, "CanCollide", inst.CanCollide)
-		saveState(inst, "CastShadow", inst.CastShadow)
-
-		inst.Transparency = XRayTransparency
-		inst.LocalTransparencyModifier = 1
-		inst.CanCollide = false
-		inst.CastShadow = false
-
-	elseif inst:IsA("Decal") or inst:IsA("Texture") then
-		saveState(inst, "Transparency", inst.Transparency)
-		inst.Transparency = 1
-
-	elseif inst:IsA("ParticleEmitter")
-		or inst:IsA("Trail")
-		or inst:IsA("Beam")
-		or inst:IsA("Smoke")
-		or inst:IsA("Fire")
-		or inst:IsA("Sparkles")
-		or inst:IsA("Explosion") then
-
-		saveState(inst, "Enabled", inst.Enabled)
-		inst.Enabled = false
-
-	elseif inst:IsA("PointLight")
-		or inst:IsA("SpotLight")
-		or inst:IsA("SurfaceLight") then
-
-		saveState(inst, "Enabled", inst.Enabled)
-		inst.Enabled = false
-
-	elseif inst:IsA("Highlight") then
-		saveState(inst, "Enabled", inst.Enabled)
-		inst.Enabled = false
-
-	elseif inst:IsA("BillboardGui") or inst:IsA("SurfaceGui") then
-		saveState(inst, "Enabled", inst.Enabled)
-		inst.Enabled = false
-	end
-end
-
-local function restoreInstance(inst)
-	if not originalStates[inst] then
-		return
-	end
-
-	local state = originalStates[inst]
-
-	for prop, value in pairs(state) do
-		pcall(function()
-			inst[prop] = value
-		end)
-	end
-
-	originalStates[inst] = nil
-end
-
-local function applyXRayToPlots()
-	local plots = workspace:FindFirstChild("Plots")
-	if not plots then
-		return
-	end
-
-	for _, plot in ipairs(plots:GetChildren()) do
-		local decorations = plot:FindFirstChild("Decorations")
-
-		if plot:IsA("Model") and decorations then
-			for _, obj in ipairs(decorations:GetDescendants()) do
-				hideInstance(obj)
-			end
-		end
-	end
-end
-
-local function restorePlots()
-	local plots = workspace:FindFirstChild("Plots")
-	if not plots then
-		return
-	end
-
-	for _, plot in ipairs(plots:GetChildren()) do
-		local decorations = plot:FindFirstChild("Decorations")
-
-		if plot:IsA("Model") and decorations then
-			for _, obj in ipairs(decorations:GetDescendants()) do
-				restoreInstance(obj)
-
-				if obj:IsA("BasePart") then
-					obj.LocalTransparencyModifier = 0
-				end
-			end
-		end
-	end
-end
 
 local function startXRay()
 	if xrayConnection then
@@ -6550,7 +6443,26 @@ local function startXRay()
 		xrayConnection = nil
 	end
 
-	applyXRayToPlots()
+	local plots = workspace:FindFirstChild("Plots")
+
+	if plots then
+		for _, plot in ipairs(plots:GetChildren()) do
+			local decorations = plot:FindFirstChild("Decorations")
+
+			if plot:IsA("Model") and decorations then
+				for _, part in ipairs(decorations:GetDescendants()) do
+					if part:IsA("BasePart") then
+						if originalDecorationsTransparency[part] == nil then
+							originalDecorationsTransparency[part] = part.Transparency
+						end
+
+						part.Transparency = XRayTransparency
+						part.CastShadow = false
+					end
+				end
+			end
+		end
+	end
 
 	xrayConnection = RunService.Heartbeat:Connect(function()
 		if not xrayEnabled then
@@ -6566,8 +6478,11 @@ local function startXRay()
 			local decorations = plot:FindFirstChild("Decorations")
 
 			if plot:IsA("Model") and decorations then
-				for _, obj in ipairs(decorations:GetDescendants()) do
-					hideInstance(obj)
+				for _, part in ipairs(decorations:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Transparency = XRayTransparency
+						part.CastShadow = false
+					end
 				end
 			end
 		end
@@ -6582,11 +6497,34 @@ local function stopXRay()
 		xrayConnection = nil
 	end
 
-	restorePlots()
+	local plots = workspace:FindFirstChild("Plots")
+
+	if plots then
+		for _, plot in ipairs(plots:GetChildren()) do
+			local decorations = plot:FindFirstChild("Decorations")
+
+			if plot:IsA("Model") and decorations then
+				for _, part in ipairs(decorations:GetDescendants()) do
+					if part:IsA("BasePart") then
+						local old = originalDecorationsTransparency[part]
+
+						if old ~= nil then
+							part.Transparency = old
+						else
+							part.Transparency = 0
+						end
+
+						part.CastShadow = true
+					end
+				end
+			end
+		end
+	end
+
 	xrayEnabled = false
 end
 
-createToggle("XRAY V2", function(state)
+createToggle("Xray V2", function(state)
 	if state then
 		startXRay()
 	else
