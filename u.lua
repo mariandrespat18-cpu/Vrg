@@ -150,7 +150,7 @@ local function smoothFlyTo(targetPos, globalStart)
     ao.Attachment0 = at  
     ao.MaxTorque = math.huge  
     ao.MaxAngularVelocity = math.huge  
-    ao.Responsiveness = 200  
+    ao.Responsiveness = 140 
 
     while true do  
         if cancelMovement then break end
