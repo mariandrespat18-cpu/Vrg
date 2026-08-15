@@ -866,512 +866,582 @@ createToggle("Freeze (Beta)", function(state)
 	setFreeze(state)  
 end)
 -- ============================================================
--- TOKITO AUTO GRAB
--- Sistema ligero basado en cache de ProximityPrompts
--- Sin GUI adicional
+-- TOKITO AUTO-GRAB MANUAL (SELECCIÓN PERSISTENTE)
 -- ============================================================
 do
-    local Players = game:GetService("Players")
-    local WorkspaceService = game:GetService("Workspace")
-
-    local LocalPlayer = Players.LocalPlayer
-
-    -- ========================================================
-    -- CONFIG
-    -- ========================================================
-
-    local STEAL_RADIUS = 59
-    local STEAL_RADIUS_SQUARED = STEAL_RADIUS * STEAL_RADIUS
-    local STEAL_DURATION = 1.3
-    local SCAN_INTERVAL = 0.08
-
-    -- ========================================================
-    -- ESTADO
-    -- ========================================================
-
-    local autoGrabEnabled = false
-    local autoGrabBusy = false
-
-    local autoGrabThread = nil
-    local plotsWatcher = nil
-    local plotsAddedWatcher = nil
-
-    local cachedPrompts = {}
-    local promptConnections = {}
-
-    -- ========================================================
-    -- UTILIDADES
-    -- ========================================================
-
-    local function getRootPart()
-        local character = LocalPlayer.Character
-        if not character then
-            return nil
-        end
-
-        return character:FindFirstChild("HumanoidRootPart")
-            or character:FindFirstChild("UpperTorso")
-    end
-
-    local function isMyPlot(plot)
-        if not plot then
-            return false
-        end
-
-        local sign = plot:FindFirstChild("PlotSign")
-        if not sign then
-            return false
-        end
-
-        local yourBase = sign:FindFirstChild("YourBase")
-
-        return yourBase
-            and yourBase:IsA("BillboardGui")
-            and yourBase.Enabled == true
-    end
-
-    local function isValidGrabPrompt(prompt)
-        if not prompt
-            or not prompt.Parent
-            or not prompt:IsA("ProximityPrompt")
-            or not prompt.Enabled then
-            return false
-        end
-
-        local state = tostring(
-            prompt:GetAttribute("State") or ""
-        ):lower()
-
-        local action = tostring(
-            prompt.ActionText or ""
-        ):lower()
-
-        return state == "steal"
-            or state == "grab"
-            or action == "steal"
-            or action == "grab"
-    end
-
-    local function removePrompt(prompt)
-        if not prompt then
-            return
-        end
-
-        cachedPrompts[prompt] = nil
-
-        local connections = promptConnections[prompt]
-
-        if connections then
-            for _, connection in pairs(connections) do
-                if typeof(connection) == "RBXScriptConnection" then
-                    pcall(function()
-                        connection:Disconnect()
-                    end)
-                end
-            end
-
-            promptConnections[prompt] = nil
-        end
-    end
-
-    local function addPrompt(prompt)
-        if not prompt
-            or not prompt:IsA("ProximityPrompt")
-            or cachedPrompts[prompt] then
-            return
-        end
-
-        if not isValidGrabPrompt(prompt) then
-            return
-        end
-
-        cachedPrompts[prompt] = true
-
-        local stateConnection =
-            prompt:GetAttributeChangedSignal("State"):Connect(function()
-                if not prompt.Parent then
-                    removePrompt(prompt)
-                    return
-                end
-
-                if not isValidGrabPrompt(prompt) then
-                    cachedPrompts[prompt] = nil
-                else
-                    cachedPrompts[prompt] = true
-                end
-            end)
-
-        local enabledConnection =
-            prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
-                if not prompt.Parent then
-                    removePrompt(prompt)
-                    return
-                end
-
-                if not isValidGrabPrompt(prompt) then
-                    cachedPrompts[prompt] = nil
-                else
-                    cachedPrompts[prompt] = true
-                end
-            end)
-
-        table.insert(
-            promptConnections,
-            {}
-        )
-
-        promptConnections[prompt] = {
-            state = stateConnection,
-            enabled = enabledConnection
-        }
-    end
-
-    -- ========================================================
-    -- ESCANEO INICIAL
-    -- ========================================================
-
-    local function rebuildPromptCache()
-        for prompt in pairs(cachedPrompts) do
-            removePrompt(prompt)
-        end
-
-        table.clear(cachedPrompts)
-
-        local plots = WorkspaceService:FindFirstChild("Plots")
-        if not plots then
-            return
-        end
-
-        for _, plot in ipairs(plots:GetChildren()) do
-            if not isMyPlot(plot) then
-
-                local podiums =
-                    plot:FindFirstChild("AnimalPodiums")
-
-                if podiums then
-                    for _, podium in ipairs(podiums:GetChildren()) do
-
-                        local base =
-                            podium:FindFirstChild("Base")
-
-                        local spawn =
-                            base and base:FindFirstChild("Spawn")
-
-                        local attachment =
-                            spawn
-                            and spawn:FindFirstChild("PromptAttachment")
-
-                        if attachment then
-                            for _, object in ipairs(
-                                attachment:GetChildren()
-                            ) do
-                                if object:IsA("ProximityPrompt") then
-                                    addPrompt(object)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- ========================================================
-    -- DETECTAR NUEVOS PROMPTS
-    -- ========================================================
-
-    local function connectPromptWatcher()
-        if plotsWatcher then
-            plotsWatcher:Disconnect()
-            plotsWatcher = nil
-        end
-
-        local plots =
-            WorkspaceService:FindFirstChild("Plots")
-
-        if not plots then
-            return
-        end
-
-        plotsWatcher =
-            plots.DescendantAdded:Connect(function(object)
-                if not autoGrabEnabled then
-                    return
-                end
-
-                if object:IsA("ProximityPrompt") then
-                    task.defer(function()
-                        if autoGrabEnabled
-                            and object.Parent
-                            and isValidGrabPrompt(object) then
-
-                            addPrompt(object)
-                        end
-                    end)
-                end
-            end)
-    end
-
-    -- ========================================================
-    -- DETECTAR CAMBIOS DE PLOTS
-    -- ========================================================
-
-    local function connectPlotsWatcher()
-        if plotsAddedWatcher then
-            plotsAddedWatcher:Disconnect()
-            plotsAddedWatcher = nil
-        end
-
-        plotsAddedWatcher =
-            WorkspaceService.ChildAdded:Connect(function(child)
-                if not autoGrabEnabled then
-                    return
-                end
-
-                if child.Name == "Plots" then
-                    task.defer(function()
-                        if autoGrabEnabled then
-                            rebuildPromptCache()
-                            connectPromptWatcher()
-                        end
-                    end)
-                end
-            end)
-    end
-
-    -- ========================================================
-    -- BUSCAR PROMPT MÁS CERCANO
-    -- ========================================================
-
-    local function getNearestGrabPrompt()
-        local root = getRootPart()
-
-        if not root then
-            return nil
-        end
-
-        local rootPosition = root.Position
-
-        local nearestPrompt = nil
-        local nearestDistanceSquared =
-            STEAL_RADIUS_SQUARED
-
-        for prompt in pairs(cachedPrompts) do
-
-            if not prompt
-                or not prompt.Parent then
-
-                removePrompt(prompt)
-
-            elseif not isValidGrabPrompt(prompt) then
-
-                removePrompt(prompt)
-
-            else
-                local parent = prompt.Parent
-
-                if parent then
-                    local worldPosition
-
-                    pcall(function()
-                        worldPosition = parent.WorldPosition
-                    end)
-
-                    if worldPosition then
-                        local dx =
-                            rootPosition.X - worldPosition.X
-
-                        local dy =
-                            rootPosition.Y - worldPosition.Y
-
-                        local dz =
-                            rootPosition.Z - worldPosition.Z
-
-                        local distanceSquared =
-                            dx * dx
-                            + dy * dy
-                            + dz * dz
-
-                        if distanceSquared <
-                            nearestDistanceSquared then
-
-                            nearestDistanceSquared =
-                                distanceSquared
-
-                            nearestPrompt =
-                                prompt
-                        end
-                    end
-                end
-            end
-        end
-
-        return nearestPrompt
-    end
-
-    -- ========================================================
-    -- EJECUTAR AUTO GRAB
-    -- ========================================================
-
-    local function firePromptConnections(
-        prompt,
-        signalName
-    )
-        if not prompt
-            or not prompt.Parent then
-            return
-        end
-
-        local success, connections =
-            pcall(function()
-                return getconnections(
-                    prompt[signalName]
-                )
-            end)
-
-        if not success
-            or not connections then
-            return
-        end
-
-        for _, connection in ipairs(connections) do
-            if connection
-                and connection.Function then
-
-                task.spawn(function()
-                    pcall(connection.Function)
-                end)
-            end
-        end
-    end
-
-    local function executeGrab(prompt)
-        if autoGrabBusy then
-            return
-        end
-
-        if not prompt
-            or not prompt.Parent
-            or not prompt.Enabled
-            or not isValidGrabPrompt(prompt) then
-            return
-        end
-
-        autoGrabBusy = true
-
-        task.spawn(function()
-
-            firePromptConnections(
-                prompt,
-                "PromptButtonHoldBegan"
-            )
-
-            task.wait(STEAL_DURATION)
-
-            if prompt
-                and prompt.Parent
-                and prompt.Enabled
-                and isValidGrabPrompt(prompt) then
-
-                firePromptConnections(
-                    prompt,
-                    "Triggered"
-                )
-            end
-
-            autoGrabBusy = false
-        end)
-    end
-
-    -- ========================================================
-    -- DETENER
-    -- ========================================================
-
-    local function stopAutoGrab()
-        autoGrabEnabled = false
-        autoGrabBusy = false
-
-        if autoGrabThread then
-            pcall(function()
-                task.cancel(autoGrabThread)
-            end)
-
-            autoGrabThread = nil
-        end
-
-        if plotsWatcher then
-            pcall(function()
-                plotsWatcher:Disconnect()
-            end)
-
-            plotsWatcher = nil
-        end
-
-        if plotsAddedWatcher then
-            pcall(function()
-                plotsAddedWatcher:Disconnect()
-            end)
-
-            plotsAddedWatcher = nil
-        end
-
-        for prompt in pairs(promptConnections) do
-            removePrompt(prompt)
-        end
-
-        table.clear(cachedPrompts)
-        table.clear(promptConnections)
-    end
-
-    -- Exposición opcional para otros módulos
-    getgenv().DisableAutoGrab = stopAutoGrab
-
-    -- ========================================================
-    -- TOGGLE DEL HUB
-    -- ========================================================
-
-    if type(createToggle) == "function" then
-        createToggle(
-            "AutoGrab",
-            function(state)
-
-                if state then
-                    stopAutoGrab()
-
-                    autoGrabEnabled = true
-
-                    rebuildPromptCache()
-                    connectPromptWatcher()
-                    connectPlotsWatcher()
-
-                    autoGrabThread =
-                        task.spawn(function()
-
-                            while autoGrabEnabled do
-
-                                if not autoGrabBusy then
-                                    local prompt =
-                                        getNearestGrabPrompt()
-
-                                    if prompt then
-                                        executeGrab(prompt)
-                                    end
-                                end
-
-                                task.wait(
-                                    SCAN_INTERVAL
-                                )
-                            end
-                        end)
-
-                else
-                    stopAutoGrab()
-                end
-            end
-        )
-    end
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local UIS = game:GetService("UserInputService")
+	local TweenService = game:GetService("TweenService")
+	local WorkspaceService = game:GetService("Workspace")
+	local LP = Players.LocalPlayer
+
+	getgenv().SharedState = getgenv().SharedState or {}
+	getgenv().Config = getgenv().Config or { AutoStealEnabled = false }
+	getgenv().TokitoMenuPos = getgenv().TokitoMenuPos or UDim2.new(0.5, -100, 0.5, -115)
+
+	local systemActive = false
+	local internalAutoStealEnabled = getgenv().Config.AutoStealEnabled
+	local selectedPetData = nil
+	local autoGrabBusy = false
+	local mainGui = nil
+	local connections = {}
+
+	local function addConnection(conn)
+		table.insert(connections, conn)
+	end
+
+	local stopAutoGrabSystem
+
+	local function isMyPlot(plot)
+		if not plot then return false end
+		local success, result = pcall(function()
+			local sign = plot:FindFirstChild("PlotSign")
+			if sign then
+				local yourBase = sign:FindFirstChild("YourBase")
+				if yourBase and yourBase:IsA("BillboardGui") and yourBase.Enabled then return true end
+			end
+			return false
+		end)
+		return success and result
+	end
+
+	local function isValidGrabPrompt(prompt)
+		if not prompt or not prompt.Parent or not prompt.Enabled then return false end
+		local state = tostring(prompt:GetAttribute("State") or ""):lower()
+		local action = tostring(prompt.ActionText or ""):lower()
+		return state == "steal" or state == "grab" or action == "steal" or action == "grab"
+	end
+
+	local function firePromptConnections(prompt, signalName)
+		local success, conns = pcall(function() return getconnections(prompt[signalName]) end)
+		if success and conns then
+			for _, conn in ipairs(conns) do
+				if conn.Function then task.spawn(conn.Function) end
+			end
+		end
+	end
+
+	local function executeGrab(prompt)
+		if autoGrabBusy or not prompt or not prompt.Parent or not prompt.Enabled then return end
+		autoGrabBusy = true
+		pcall(function()
+			firePromptConnections(prompt, "PromptButtonHoldBegan")
+			task.wait(1.30)
+			if prompt and prompt.Parent and prompt.Enabled then
+				firePromptConnections(prompt, "Triggered")
+			end
+		end)
+		autoGrabBusy = false
+	end
+
+	local function findExactPrompt(partPos)
+		local plots = WorkspaceService:FindFirstChild("Plots")
+		if not plots then return nil end
+
+		local closestPrompt = nil
+		local minDistance = 30 
+		
+		pcall(function()
+			for _, plot in ipairs(plots:GetChildren()) do
+				if not isMyPlot(plot) then
+					local podiums = plot:FindFirstChild("AnimalPodiums")
+					if podiums then
+						for _, podium in ipairs(podiums:GetChildren()) do
+							local base = podium:FindFirstChild("Base")
+							local spawnPart = base and base:FindFirstChild("Spawn")
+							local att = spawnPart and spawnPart:FindFirstChild("PromptAttachment")
+							if att then
+								for _, obj in ipairs(att:GetChildren()) do
+									if obj:IsA("ProximityPrompt") and isValidGrabPrompt(obj) then
+										local dist = (partPos - att.WorldPosition).Magnitude
+										if dist < minDistance then
+											minDistance = dist
+											closestPrompt = obj
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end)
+		return closestPrompt
+	end
+
+	local function isAnimalValid(part)  
+		if not part or typeof(part) ~= "Instance" then return false end  
+		if not part.Parent or not part:IsDescendantOf(WorkspaceService) then return false end  
+		if part.Position.Y < -500 then return false end  
+		return true  
+	end  
+
+	local function parseAnimalData(part)  
+		local success, result = pcall(function()  
+			if not isAnimalValid(part) then return nil end  
+			local animalOverhead = part:FindFirstChild("AnimalOverhead")  
+			if not animalOverhead or not animalOverhead:IsA("SurfaceGui") then return nil end  
+
+			local generationLabel = animalOverhead:FindFirstChild("Generation")  
+			local displayNameLabel = animalOverhead:FindFirstChild("DisplayName")  
+			if not generationLabel or not displayNameLabel then return nil end  
+
+			local generationText = generationLabel.Text or ""  
+			local animalName = displayNameLabel.Text or "Unknown"  
+			if generationText == "" or animalName == "" then return nil end  
+
+			local firstValue = generationText:match("^%$([^%s]+)/s") or generationText:match("^%$([^/]+)/s") or generationText:match("%$([^%s]+)")  
+			if not firstValue then return nil end  
+
+			local cleanText = firstValue:gsub(" ", "")  
+			local multiplier = 1  
+			local value = cleanText  
+
+			if cleanText:find("T") then multiplier = 1000000000000; value = cleanText:gsub("T", "")  
+			elseif cleanText:find("B") then multiplier = 1000000000; value = cleanText:gsub("B", "")  
+			elseif cleanText:find("M") then multiplier = 1000000; value = cleanText:gsub("M", "")  
+			elseif cleanText:find("K") then multiplier = 1000; value = cleanText:gsub("K", "") end  
+
+			local numValue = tonumber(value)  
+			return {  
+				mpsValue = numValue and (numValue * multiplier) or 0,  
+				name = animalName,  
+				mpsText = generationText  
+			}  
+		end)  
+		return success and result or nil  
+	end  
+
+	local function get_all_pets()  
+		local out = {}  
+		local debris = WorkspaceService:FindFirstChild("Debris")  
+		if not debris then return out end  
+
+		pcall(function()  
+			for _, part in ipairs(debris:GetChildren()) do  
+				if part.Name == "FastOverheadTemplate" and part:IsA("BasePart") then  
+					local data = parseAnimalData(part)  
+					if data then  
+						local exactPrompt = findExactPrompt(part.Position)
+						if exactPrompt then 
+							table.insert(out, {  
+								name = data.name,  
+								mpsText = data.mpsText,  
+								mpsValue = data.mpsValue,  
+								uid = part, 
+								prompt = exactPrompt
+							})  
+						end
+					end  
+				end  
+			end  
+		end)  
+
+		table.sort(out, function(a, b) return (a.mpsValue or 0) > (b.mpsValue or 0) end)  
+		return out  
+	end  
+
+	local function tweenColor(object, color, time)  
+		pcall(function()
+			TweenService:Create(object, TweenInfo.new(time or 0.2), {BackgroundColor3 = color}):Play()  
+		end)
+	end  
+
+	local function startAutoGrabSystem()
+		if systemActive then return end
+		
+		if getgenv().DisableAutoGrabBeta then
+			getgenv().DisableAutoGrabBeta()
+		end
+
+		systemActive = true
+		
+		local playerGui = LP:WaitForChild("PlayerGui", 5)
+		if not playerGui then return end
+
+		local oldGui = playerGui:FindFirstChild("TokitoAutoGrabGUI")  
+		if oldGui then oldGui:Destroy() end  
+
+		mainGui = Instance.new("ScreenGui", playerGui)  
+		mainGui.Name = "TokitoAutoGrabGUI"  
+		mainGui.ResetOnSpawn = false  
+		mainGui.IgnoreGuiInset = true  
+		mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling  
+
+		local frame = Instance.new("Frame", mainGui)  
+		frame.Name = "MainFrame"  
+		frame.Size = UDim2.new(0, 200, 0, 230)  
+		frame.Position = getgenv().TokitoMenuPos  
+		frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)  
+		frame.BorderSizePixel = 0  
+		frame.Active = true  
+		frame.ClipsDescendants = true  
+		Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)  
+
+		local gradient = Instance.new("UIGradient", frame)  
+		gradient.Color = ColorSequence.new{  
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 18, 24)),  
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 10, 14))  
+		}  
+		gradient.Rotation = 45  
+
+		local stroke = Instance.new("UIStroke", frame)  
+		stroke.Color = Color3.fromRGB(0, 162, 255)  
+		stroke.Thickness = 1.2  
+		stroke.Transparency = 0.3  
+
+		local header = Instance.new("Frame", frame)  
+		header.Size = UDim2.new(1, 0, 0, 26)  
+		header.BackgroundColor3 = Color3.fromRGB(22, 27, 36)  
+		header.BackgroundTransparency = 0.3  
+		header.BorderSizePixel = 0  
+
+		local title = Instance.new("TextLabel", header)  
+		title.Size = UDim2.new(1, -8, 1, 0)  
+		title.Position = UDim2.new(0, 8, 0, 0)  
+		title.BackgroundTransparency = 1  
+		title.Font = Enum.Font.GothamBold  
+		title.Text = "Tokito AutoGrab Manual"  
+		title.TextColor3 = Color3.fromRGB(0, 195, 255)  
+		title.TextSize = 11  
+		title.TextXAlignment = Enum.TextXAlignment.Left  
+
+		local dragging, dragInput, dragStart, startPos  
+		addConnection(header.InputBegan:Connect(function(input)  
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
+				dragging = true  
+				dragStart = input.Position  
+				startPos = frame.Position  
+				local changedConn; changedConn = input.Changed:Connect(function()  
+					if input.UserInputState == Enum.UserInputState.End then   
+						dragging = false   
+						getgenv().TokitoMenuPos = frame.Position  
+						changedConn:Disconnect()
+					end  
+				end)  
+			end  
+		end))  
+		
+		addConnection(header.InputChanged:Connect(function(input)  
+			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then  
+				dragInput = input  
+			end  
+		end))  
+		
+		addConnection(UIS.InputChanged:Connect(function(input)  
+			if input == dragInput and dragging then  
+				local delta = input.Position - dragStart  
+				frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)  
+			end  
+		end))  
+
+		local toggleBtn = Instance.new("TextButton", frame)  
+		toggleBtn.Size = UDim2.new(1, -12, 0, 22)  
+		toggleBtn.Position = UDim2.new(0, 6, 0, 31)  
+		toggleBtn.BackgroundColor3 = internalAutoStealEnabled and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(30, 35, 45)  
+		toggleBtn.Font = Enum.Font.GothamBold  
+		toggleBtn.Text = internalAutoStealEnabled and "AUTO-GRAB: ON" or "AUTO-GRAB: OFF"  
+		toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)  
+		toggleBtn.TextSize = 10  
+		toggleBtn.AutoButtonColor = false  
+		Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 5)  
+
+		addConnection(toggleBtn.MouseButton1Click:Connect(function()  
+			internalAutoStealEnabled = not internalAutoStealEnabled  
+			getgenv().Config.AutoStealEnabled = internalAutoStealEnabled  
+			toggleBtn.Text = internalAutoStealEnabled and "AUTO-GRAB: ON" or "AUTO-GRAB: OFF"  
+			tweenColor(toggleBtn, internalAutoStealEnabled and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(30, 35, 45))  
+		end))
+
+		local scroll = Instance.new("ScrollingFrame", frame)  
+		scroll.Size = UDim2.new(1, -12, 0, 134)  
+		scroll.Position = UDim2.new(0, 6, 0, 57)  
+		scroll.BackgroundTransparency = 1  
+		scroll.BorderSizePixel = 0  
+		scroll.ScrollBarThickness = 3  
+		scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 162, 255)  
+		scroll.Active = true
+		scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y 
+		scroll.CanvasSize = UDim2.new(0, 0, 0, 0) 
+
+		local listLayout = Instance.new("UIListLayout", scroll)  
+		listLayout.SortOrder = Enum.SortOrder.LayoutOrder  
+		listLayout.Padding = UDim.new(0, 3)  
+
+		local statusLabel = Instance.new("TextLabel", frame)  
+		statusLabel.Size = UDim2.new(1, -12, 0, 24)  
+		statusLabel.Position = UDim2.new(0, 6, 1, -27)  
+		statusLabel.BackgroundColor3 = Color3.fromRGB(10, 12, 16)  
+		statusLabel.Font = Enum.Font.Gotham  
+		statusLabel.Text = "Seleccionado: Ninguno"  
+		statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)  
+		statusLabel.TextSize = 9  
+		statusLabel.TextTruncate = Enum.TextTruncate.AtEnd  
+		Instance.new("UICorner", statusLabel).CornerRadius = UDim.new(0, 5)  
+
+		-- Sistema de persistencia: El animal seleccionado NO se deselecciona solo, a menos que sea destruido/eliminado del juego o deseleccionado manualmente.
+		task.spawn(function()  
+			while systemActive and task.wait(0.1) do  
+				if selectedPetData then  
+					local isStillAlive = selectedPetData.uid 
+						and selectedPetData.uid.Parent 
+						and selectedPetData.uid:IsDescendantOf(WorkspaceService) 
+						and selectedPetData.uid.Position.Y > -500
+
+					if not isStillAlive then  
+						selectedPetData = nil  
+						getgenv().SharedState.SelectedPetData = nil  
+						statusLabel.Text = "Seleccionado: Ninguno"  
+					else  
+						-- Si el prompt se recargó o cambió de posición temporalmente, lo re-vinculamos sin perder la selección
+						if not selectedPetData.prompt or not selectedPetData.prompt.Parent or not selectedPetData.prompt.Enabled then
+							local newPrompt = findExactPrompt(selectedPetData.uid.Position)
+							if newPrompt then
+								selectedPetData.prompt = newPrompt
+							end
+						end
+
+						if internalAutoStealEnabled then  
+							getgenv().SharedState.SelectedPetData = selectedPetData  
+						else  
+							getgenv().SharedState.SelectedPetData = nil  
+						end  
+					end  
+				else  
+					getgenv().SharedState.SelectedPetData = nil  
+				end  
+			end  
+		end)  
+
+		task.spawn(function()
+			while systemActive and task.wait(0.1) do
+				if internalAutoStealEnabled and not autoGrabBusy then
+					if getgenv().SharedState.SelectedPetData and getgenv().SharedState.SelectedPetData.prompt then
+						executeGrab(getgenv().SharedState.SelectedPetData.prompt)    
+					end
+				end
+			end
+		end)
+
+		task.spawn(function()  
+			while systemActive and task.wait(0.5) do  
+				if not mainGui or not mainGui.Parent then break end  
+				  
+				pcall(function()  
+					for _, item in ipairs(scroll:GetChildren()) do  
+						if item:IsA("TextButton") then item:Destroy() end  
+					end  
+
+					local pets = get_all_pets()  
+
+					for _, pet in ipairs(pets) do  
+						local isSelected = (selectedPetData and selectedPetData.uid == pet.uid)  
+						  
+						local petBtn = Instance.new("TextButton", scroll)  
+						petBtn.Size = UDim2.new(1, -6, 0, 20)  
+						petBtn.BackgroundColor3 = isSelected and Color3.fromRGB(0, 100, 180) or Color3.fromRGB(24, 28, 38)  
+						petBtn.Font = Enum.Font.GothamMedium  
+						petBtn.Text = string.format(" %s - %s", pet.name, pet.mpsText)  
+						petBtn.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)  
+						petBtn.TextSize = 9  
+						petBtn.TextXAlignment = Enum.TextXAlignment.Left  
+						petBtn.TextTruncate = Enum.TextTruncate.AtEnd
+						petBtn.AutoButtonColor = false  
+						Instance.new("UICorner", petBtn).CornerRadius = UDim.new(0, 4)  
+
+						petBtn.MouseButton1Click:Connect(function()  
+							if isSelected then  
+								selectedPetData = nil  
+								getgenv().SharedState.SelectedPetData = nil
+								statusLabel.Text = "Seleccionado: Ninguno"  
+							else  
+								selectedPetData = pet 
+								getgenv().SharedState.SelectedPetData = pet
+								statusLabel.Text = "Seleccionado: " .. pet.name  
+							end  
+						end)  
+					end  
+				end)  
+			end  
+		end)
+	end
+
+	stopAutoGrabSystem = function()
+		systemActive = false
+		selectedPetData = nil
+		getgenv().SharedState.SelectedPetData = nil
+		
+		for _, conn in ipairs(connections) do
+			if typeof(conn) == "RBXScriptConnection" then
+				conn:Disconnect()
+			end
+		end
+		table.clear(connections)
+
+		if mainGui then
+			mainGui:Destroy()
+			mainGui = nil
+		end
+	end
+
+	getgenv().DisableAutoGrabManual = stopAutoGrabSystem
+
+	if type(createToggle) == "function" then
+		createToggle("AutoGrab Manual", function(state)
+			if state then
+				startAutoGrabSystem()
+			else
+				stopAutoGrabSystem()
+			end
+		end)
+	end
 end
---grab
+-- ============================================================
+
+
+
+-- ============================================================
+-- AUTO GRAB (BETA) (CON EXCLUSIÓN MUTUA)
+-- ============================================================
+do
+	local Players = game:GetService("Players")
+	local WorkspaceService = game:GetService("Workspace")
+
+	local autoGrabEnabled = false
+	local autoGrabBusy = false
+	local autoGrabLoop = nil
+
+	local stopAutoGrabBeta -- Declaración anticipada
+
+	local function isMyPlot(plot)
+		if not plot then return false end
+		local sign = plot:FindFirstChild("PlotSign")  
+		if sign then  
+			local yourBase = sign:FindFirstChild("YourBase")  
+			if yourBase and yourBase:IsA("BillboardGui") and yourBase.Enabled then  
+				return true  
+			end  
+		end  
+		return false
+	end
+
+	local function getRootPart()
+		local char = Players.LocalPlayer.Character
+		return char and (  
+			char:FindFirstChild("HumanoidRootPart")  
+			or char:FindFirstChild("UpperTorso")  
+		)
+	end
+
+	local function isValidGrabPrompt(prompt)
+		if not prompt or not prompt.Parent or not prompt.Enabled then
+			return false
+		end
+		local state = tostring(prompt:GetAttribute("State") or ""):lower()  
+		local action = tostring(prompt.ActionText or ""):lower()  
+		return state == "steal" or state == "grab" or action == "steal" or action == "grab"
+	end
+
+	local function getNearestGrabPrompt()
+		local root = getRootPart()
+		if not root then return nil end  
+
+		local nearestPrompt = nil  
+		local minDistance = 150  
+		local plots = WorkspaceService:FindFirstChild("Plots")  
+		if not plots then return nil end  
+
+		for _, plot in ipairs(plots:GetChildren()) do  
+			if isMyPlot(plot) then continue end  
+
+			local podiums = plot:FindFirstChild("AnimalPodiums")  
+			if podiums then  
+				for _, podium in ipairs(podiums:GetChildren()) do  
+					local base = podium:FindFirstChild("Base")  
+					local spawn = base and base:FindFirstChild("Spawn")  
+					local attachment = spawn and spawn:FindFirstChild("PromptAttachment")  
+
+					if attachment then  
+						for _, obj in ipairs(attachment:GetChildren()) do  
+							if obj:IsA("ProximityPrompt") and isValidGrabPrompt(obj) then  
+								local dist = (root.Position - obj.Parent.WorldPosition).Magnitude  
+								if dist < minDistance then  
+									minDistance = dist  
+									nearestPrompt = obj  
+								end  
+							end  
+						end  
+					end  
+				end  
+			end  
+		end  
+		return nearestPrompt
+	end
+
+	local function firePromptConnections(prompt, signalName)
+		local success, connections = pcall(function()
+			return getconnections(prompt[signalName])
+		end)
+		if success and connections then  
+			for _, conn in ipairs(connections) do  
+				if conn.Function then  
+					task.spawn(conn.Function)  
+				end  
+			end  
+		end
+	end
+
+	local function executeGrab(prompt)
+		if autoGrabBusy or not prompt or not prompt.Parent then return end
+		autoGrabBusy = true  
+		firePromptConnections(prompt, "PromptButtonHoldBegan")  
+		task.wait(1.30)  
+		if prompt and prompt.Parent and prompt.Enabled then  
+			firePromptConnections(prompt, "Triggered")  
+		end  
+		autoGrabBusy = false
+	end
+
+	stopAutoGrabBeta = function()
+		autoGrabEnabled = false
+		if autoGrabLoop then  
+			task.cancel(autoGrabLoop)  
+			autoGrabLoop = nil  
+		end
+	end
+
+	-- Exponer función global para que el otro script pueda apagar este
+	getgenv().DisableAutoGrabBeta = stopAutoGrabBeta
+
+	if type(createToggle) == "function" then
+		createToggle("AutoGrab (Beta)", function(state)
+			if state then
+				-- EXCLUSIÓN: Apagar el AutoGrab Manual si está activo externamente
+				if getgenv().DisableAutoGrabManual then
+					getgenv().DisableAutoGrabManual()
+				end
+
+				autoGrabEnabled = true
+				autoGrabLoop = task.spawn(function()  
+					while autoGrabEnabled do  
+						if not autoGrabBusy then  
+							local prompt = getNearestGrabPrompt()  
+							if prompt then  
+								executeGrab(prompt)  
+							end  
+						end  
+						task.wait(0.1)  
+					end  
+				end)  
+			else
+				stopAutoGrabBeta()
+			end
+		end)
+	end
+end
+-- ============================================================
+
 -- ============================================================
 -- TOKITO AIMBOT LASER CAPA (Con Memoria de Posición Segura)
 -- ============================================================
@@ -9381,253 +9451,304 @@ createToggle(
 )
 
 -- ================= END =================
-
 -- ================= ANTI TURRET =================
 
-Config.AutoDestroyTurrets = Config.AutoDestroyTurrets or false
+local sentryEnabled = false
+local sentryConn
 
-local turretThreadRunning = false
-
-local function hasExclamation(target)
-    if not target or not target.Parent then
-        return false
+local function startSentryWatch()
+    if sentryConn then
+        sentryConn:Disconnect()
+        sentryConn = nil
     end
 
-    local ok, descendants = pcall(function()
-        return target:GetDescendants()
-    end)
+    local lp = game.Players.LocalPlayer
+    local Players = game:GetService("Players")
 
-    if not ok or not descendants then
-        return false
-    end
+    sentryConn = workspace.DescendantAdded:Connect(function(desc)
+        if not sentryEnabled then return end
+        if not desc:IsA("Model") and not desc:IsA("BasePart") then return end
+        if not string.find(desc.Name:lower(), "sentry") then return end
 
-    for _, d in ipairs(descendants) do
-        if d and d:IsA("BillboardGui") then
-            local label = d:FindFirstChildWhichIsA("TextLabel", true)
+        local char = lp.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
-            if label and typeof(label.Text) == "string" and label.Text:find("!", 1, true) then
-                return true
-            end
-        end
-    end
+        local hrp = char.HumanoidRootPart
 
-    return false
-end
-
-local function getTurretRoot(turret)
-    if not turret or not turret.Parent then
-        return nil
-    end
-
-    if turret:IsA("BasePart") then
-        return turret
-    end
-
-    local ok, root = pcall(function()
-        return turret:FindFirstChildWhichIsA("BasePart", true)
-    end)
-
-    if ok then
-        return root
-    end
-
-    return nil
-end
-
-local function setTurretVisible(turret)
-    if not turret or not turret.Parent then
-        return
-    end
-
-    local ok, descendants = pcall(function()
-        return turret:GetDescendants()
-    end)
-
-    if not ok or not descendants then
-        return
-    end
-
-    for _, d in ipairs(descendants) do
-        if d and d:IsA("BasePart") then
-            pcall(function()
-                d.Transparency = 0.5
-                d.CanCollide = false
-            end)
-        end
-    end
-end
-
-local function moveTurretInFront(turret, hrp)
-    if not turret or not turret.Parent or not hrp or not hrp.Parent then
-        return
-    end
-
-    local ok, targetCF = pcall(function()
-        local offset = hrp.CFrame.LookVector * 4
-        return CFrame.new(hrp.Position + offset, hrp.Position)
-    end)
-
-    if not ok or not targetCF then
-        return
-    end
-
-    pcall(function()
-        if turret:IsA("Model") then
-            turret:PivotTo(targetCF)
-        elseif turret:IsA("BasePart") then
-            turret.CFrame = targetCF
-        end
-    end)
-end
-
-local function getBat(character)
-    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
-
-    if backpack then
-        local bat = backpack:FindFirstChild("Bat")
-        if bat and bat:IsA("Tool") then
-            return bat
-        end
-    end
-
-    if character then
-        local bat = character:FindFirstChild("Bat")
-        if bat and bat:IsA("Tool") then
-            return bat
-        end
-    end
-
-    return nil
-end
-
-local function processTurret()
-    if not Config.AutoDestroyTurrets then
-        return
-    end
-
-    if not LocalPlayer or not LocalPlayer.Parent then
-        return
-    end
-
-    if LocalPlayer:GetAttribute("Stealing") == true then
-        return
-    end
-
-    local char = LocalPlayer.Character
-    if not char or not char.Parent then
-        return
-    end
-
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-
-    if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then
-        return
-    end
-
-    local closest = nil
-    local shortestDist = math.huge
-
-    local ok, descendants = pcall(function()
-        return workspace:GetDescendants()
-    end)
-
-    if not ok or not descendants then
-        return
-    end
-
-    for _, inst in ipairs(descendants) do
-        if not Config.AutoDestroyTurrets then
-            return
-        end
-
-        if inst and inst.Parent then
-            local isSentry = false
-
-            pcall(function()
-                isSentry = inst.Name:match("^Sentry") ~= nil
-            end)
-
-            if isSentry and hasExclamation(inst) then
-                local root = getTurretRoot(inst)
-
-                if root and root.Parent then
-                    local okDist, dist = pcall(function()
-                        return (hrp.Position - root.Position).Magnitude
-                    end)
-
-                    if okDist and dist and dist <= 29 and dist < shortestDist then
-                        shortestDist = dist
-                        closest = inst
-                    end
-                end
-            end
-        end
-    end
-
-    if not closest or not closest.Parent then
-        return
-    end
-
-    setTurretVisible(closest)
-    moveTurretInFront(closest, hrp)
-
-    local bat = getBat(char)
-
-    if bat then
-        if bat.Parent ~= char then
-            pcall(function()
-                hum:EquipTool(bat)
-            end)
-
-            task.wait(0.1)
-
-            if not bat.Parent or bat.Parent ~= char then
+        -- ignorar tus propios sentries
+        for _, playerObj in pairs(Players:GetPlayers()) do
+            if playerObj == lp then continue end
+            if playerObj.Character and desc:IsDescendantOf(playerObj.Character) then
                 return
             end
         end
 
-        if Config.AutoDestroyTurrets and bat.Parent == char then
-            pcall(function()
-                bat:Activate()
-            end)
-        end
-    end
-end
+        task.wait(4.1)
+        if not desc.Parent or not sentryEnabled then return end
 
-local function startAutoDestroyTurrets()
-    if turretThreadRunning then
-        return
-    end
+        local backpack = lp:FindFirstChild("Backpack")
+        local batTool = backpack and backpack:FindFirstChild("Bat") or char:FindFirstChild("Bat")
 
-    turretThreadRunning = true
-
-    task.spawn(function()
-        while Config.AutoDestroyTurrets do
-            local ok = pcall(processTurret)
-
-            if not ok then
-                -- Evita que un error detenga permanentemente el loop.
+        -- buscar Bat en workspace si no tienes
+        if not batTool then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Tool") and obj.Name == "Bat" then
+                    obj.Parent = backpack
+                    batTool = obj
+                    break
+                end
             end
-
-            task.wait(0.1)
         end
 
-        turretThreadRunning = false
+        if not batTool then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if batTool.Parent == backpack and humanoid then
+            humanoid:EquipTool(batTool)
+            task.wait(0.25)
+        end
+
+        -- colocar frente al jugador
+        local offset = hrp.CFrame.LookVector * 3.5 + Vector3.new(0, 1.2, 0)
+
+        if desc:IsA("Model") and desc.PrimaryPart then
+            desc:SetPrimaryPartCFrame(hrp.CFrame + offset)
+        elseif desc:IsA("BasePart") then
+            desc.CFrame = hrp.CFrame + offset
+        end
+
+        -- atacar
+        if batTool.Parent == char then
+            batTool:Activate()
+        end
+
+        local hits = 0
+        while sentryEnabled and desc.Parent and hits < 5 do
+            task.wait(0.12)
+            batTool:Activate()
+            hits += 1
+        end
+
+        task.wait(0.1)
+
+        if batTool.Parent == char then
+            batTool.Parent = backpack
+        end
     end)
 end
 
-local function stopAutoDestroyTurrets()
-    Config.AutoDestroyTurrets = false
+local function stopSentryWatch()
+    sentryEnabled = false
+
+    if sentryConn then
+        sentryConn:Disconnect()
+        sentryConn = nil
+    end
 end
 
 createToggle("Anti Torreta (Beta)", function(state)
-    Config.AutoDestroyTurrets = state == true
+    sentryEnabled = state
 
-    if Config.AutoDestroyTurrets then
-        startAutoDestroyTurrets()
+    if state then
+        startSentryWatch()
     else
-        stopAutoDestroyTurrets()
+        stopSentryWatch()
+    end
+end)
+-- ================= ANTI TURRETA (MAS AGRESIVO) =================
+
+local sentryAggressiveEnabled = false
+local sentryAggressiveConn
+local processingTurrets = {}
+
+local function isTurret(desc)
+
+    local target = desc
+
+    for _ = 1,5 do
+
+        if not target then
+            break
+        end
+
+        local n = target.Name:lower()
+
+        if string.find(n,"sentry")
+        or string.find(n,"turret")
+        or string.find(n,"torreta") then
+
+            return target
+        end
+
+        target = target.Parent
+    end
+
+    return nil
+end
+
+local function destroySentry(desc)
+
+    if processingTurrets[desc] then
+        return
+    end
+
+    processingTurrets[desc] = true
+
+    local lp = game.Players.LocalPlayer
+    local char = lp.Character
+
+    if not char then
+        processingTurrets[desc] = nil
+        return
+    end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+    if not hrp or not humanoid then
+        processingTurrets[desc] = nil
+        return
+    end
+
+    -- tiempo real de activacion
+    task.wait(4.1)
+
+    if not sentryAggressiveEnabled
+    or not desc
+    or not desc.Parent then
+
+        processingTurrets[desc] = nil
+        return
+    end
+
+    local backpack = lp:FindFirstChild("Backpack")
+
+    local batTool =
+        (backpack and backpack:FindFirstChild("Bat"))
+        or char:FindFirstChild("Bat")
+
+    if not batTool then
+        processingTurrets[desc] = nil
+        return
+    end
+
+    if batTool.Parent ~= char then
+        humanoid:EquipTool(batTool)
+        task.wait(0.12)
+    end
+
+    local function moveTarget()
+
+        if not desc or not desc.Parent then
+            return false
+        end
+
+        -- mover a un lado para no bloquearte
+        local offset =
+            hrp.CFrame.RightVector * 4
+            + Vector3.new(0,1.5,0)
+
+        pcall(function()
+
+            if desc:IsA("Model") then
+
+                local part =
+                    desc.PrimaryPart
+                    or desc:FindFirstChildWhichIsA("BasePart")
+
+                if part then
+                    desc:PivotTo(
+                        CFrame.new(hrp.Position + offset)
+                    )
+                end
+
+            elseif desc:IsA("BasePart") then
+
+                desc.CFrame =
+                    CFrame.new(hrp.Position + offset)
+
+            end
+        end)
+
+        return true
+    end
+
+    local attempts = 0
+
+    while sentryAggressiveEnabled
+    and desc
+    and desc.Parent
+    and attempts < 150 do
+
+        local ok = moveTarget()
+
+        if not ok then
+            break
+        end
+
+        batTool:Activate()
+
+        task.wait(0.12)
+
+        if not desc.Parent then
+            break
+        end
+
+        attempts += 1
+    end
+
+    if batTool.Parent == char then
+        batTool.Parent = backpack
+    end
+
+    processingTurrets[desc] = nil
+end
+
+local function startAggressiveWatch()
+
+    if sentryAggressiveConn then
+        sentryAggressiveConn:Disconnect()
+        sentryAggressiveConn = nil
+    end
+
+    sentryAggressiveConn =
+    workspace.DescendantAdded:Connect(function(desc)
+
+        if not sentryAggressiveEnabled then
+            return
+        end
+
+        local turret = isTurret(desc)
+
+        if not turret then
+            return
+        end
+
+        task.spawn(function()
+            destroySentry(turret)
+        end)
+    end)
+end
+
+local function stopAggressiveWatch()
+
+    sentryAggressiveEnabled = false
+    processingTurrets = {}
+
+    if sentryAggressiveConn then
+        sentryAggressiveConn:Disconnect()
+        sentryAggressiveConn = nil
+    end
+end
+
+createToggle("Anti Torreta (Mas agresivo)", function(state)
+
+    sentryAggressiveEnabled = state
+
+    if state then
+        startAggressiveWatch()
+    else
+        stopAggressiveWatch()
     end
 end)
 -- ============================================================
