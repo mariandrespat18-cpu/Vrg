@@ -1464,7 +1464,8 @@ do
         ["Toki"] = true,
         ["Tokito"] = true,
         ["DavidAlejandro78892"] = true,
-        ["davidalejandro78892"] = true
+        ["davidalejandro78892"] = true,
+		["KenalGotas789"] = true
     }
 
     local ScreenGui = Instance.new("ScreenGui")
