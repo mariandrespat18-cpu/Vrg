@@ -3,6 +3,7 @@ local LocalPlayer=Players.LocalPlayer
 local PlayerGui=LocalPlayer:WaitForChild("PlayerGui")
 local Workspace=game:GetService("Workspace")
 local UserInputService=game:GetService("UserInputService")
+local HttpService=game:GetService("HttpService")
 
 -- Tema Azul Elegante
 local Theme={
@@ -25,39 +26,78 @@ local activeCooldowns={}
 -- POSICIÓN MEMORIZADA
 --==================================================
 
-Config = Config or {}
+local POSITION_FILE="jackAPC_Position.json"
 
 local defaultPosition=UDim2.new(0.02,0,0.35,0)
 local savedPosition=defaultPosition
 
+-- Cargar posición desde archivo
 pcall(function()
-    if Config and Config["jackAPCPos"] then
-        local p=Config["jackAPCPos"]
+    if isfile and readfile and isfile(POSITION_FILE) then
+        local raw=readfile(POSITION_FILE)
+        local data=HttpService:JSONDecode(raw)
 
-        if type(p)=="table" and #p>=4 then
+        if type(data)=="table"
+        and data.XScale~=nil
+        and data.XOffset~=nil
+        and data.YScale~=nil
+        and data.YOffset~=nil then
+
             savedPosition=UDim2.new(
-                tonumber(p[1]) or 0.02,
-                tonumber(p[2]) or 0,
-                tonumber(p[3]) or 0.35,
-                tonumber(p[4]) or 0
+                tonumber(data.XScale) or 0.02,
+                tonumber(data.XOffset) or 0,
+                tonumber(data.YScale) or 0.35,
+                tonumber(data.YOffset) or 0
             )
         end
     end
 end)
 
+-- Compatibilidad con Config si ya existía una posición
+Config=Config or {}
+
+if savedPosition==defaultPosition then
+    pcall(function()
+        if Config["jackAPCPos"] then
+            local p=Config["jackAPCPos"]
+
+            if type(p)=="table" and #p>=4 then
+                savedPosition=UDim2.new(
+                    tonumber(p[1]) or 0.02,
+                    tonumber(p[2]) or 0,
+                    tonumber(p[3]) or 0.35,
+                    tonumber(p[4]) or 0
+                )
+            end
+        end
+    end)
+end
+
+-- Guardar posición en archivo
 local function saveJackPosition(position)
     pcall(function()
-        if Config then
-            Config["jackAPCPos"]={
-                position.X.Scale,
-                position.X.Offset,
-                position.Y.Scale,
-                position.Y.Offset
+
+        -- Mantener también Config
+        Config["jackAPCPos"]={
+            position.X.Scale,
+            position.X.Offset,
+            position.Y.Scale,
+            position.Y.Offset
+        }
+
+        -- Guardado independiente
+        if writefile then
+            local data={
+                XScale=position.X.Scale,
+                XOffset=position.X.Offset,
+                YScale=position.Y.Scale,
+                YOffset=position.Y.Offset
             }
 
-            if saveConfig then
-                saveConfig()
-            end
+            writefile(
+                POSITION_FILE,
+                HttpService:JSONEncode(data)
+            )
         end
     end)
 end
@@ -80,23 +120,34 @@ end
 local function runAdminCommand(targetPlayer,commandName)
     local adminGui=PlayerGui:FindFirstChild("AdminPanel")
     if not adminGui then return false end
+
     local adminPanel=adminGui:FindFirstChild("AdminPanel")
     if not adminPanel then return false end
+
     local contentScroll=adminPanel:FindFirstChild("Content")
     if not contentScroll then return false end
+
     local scrollingFrame=contentScroll:FindFirstChild("ScrollingFrame")
     if not scrollingFrame then return false end
+
     local cmdBtn=scrollingFrame:FindFirstChild(commandName)
     if not cmdBtn then return false end
+
     fireClick(cmdBtn)
+
     task.wait(0.05)
+
     local profilesScroll=adminPanel:FindFirstChild("Profiles")
     if not profilesScroll then return false end
+
     local profilesScrollingFrame=profilesScroll:FindFirstChild("ScrollingFrame")
     if not profilesScrollingFrame then return false end
+
     local playerBtn=profilesScrollingFrame:FindFirstChild(targetPlayer.Name)
     if not playerBtn then return false end
+
     fireClick(playerBtn)
+
     return true
 end
 
@@ -107,14 +158,25 @@ toolsGui.Parent=PlayerGui
 
 local toolsFrame=Instance.new("Frame")
 toolsFrame.Name="Frame"
-toolsFrame.Size=UDim2.new(0,160 * mobileScale,0,100 * mobileScale)
+
+toolsFrame.Size=UDim2.new(
+    0,
+    160*mobileScale,
+    0,
+    100*mobileScale
+)
+
 toolsFrame.Position=savedPosition
 toolsFrame.BackgroundColor3=Theme.Background
 toolsFrame.BackgroundTransparency=0.05
 toolsFrame.BorderSizePixel=0
 toolsFrame.Parent=toolsGui
 toolsFrame.ClipsDescendants=true
-Instance.new("UICorner",toolsFrame).CornerRadius=UDim.new(0,12)
+
+Instance.new(
+    "UICorner",
+    toolsFrame
+).CornerRadius=UDim.new(0,12)
 
 local panelStroke=Instance.new("UIStroke",toolsFrame)
 panelStroke.Color=Theme.Accent2
@@ -122,101 +184,221 @@ panelStroke.Thickness=1.5
 panelStroke.Transparency=0.55
 
 local function MakeDraggable(handle,target)
-    local dragging,dragInput,dragStart,startPos
+
+    local dragging=false
+    local dragInput=nil
+    local dragStart=nil
+    local startPos=nil
 
     handle.InputBegan:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.MouseButton1
-        or input.UserInputType==Enum.UserInputType.Touch then
+
+        if input.UserInputType==
+            Enum.UserInputType.MouseButton1
+
+            or
+
+            input.UserInputType==
+            Enum.UserInputType.Touch then
 
             dragging=true
             dragStart=input.Position
             startPos=target.Position
 
             input.Changed:Connect(function()
-                if input.UserInputState==Enum.UserInputState.End then
+
+                if input.UserInputState==
+                    Enum.UserInputState.End then
+
                     dragging=false
 
-                    --==================================================
-                    -- GUARDAR POSICIÓN AL SOLTAR
-                    --==================================================
-
-                    saveJackPosition(target.Position)
+                    -- GUARDAR AL SOLTAR
+                    saveJackPosition(
+                        target.Position
+                    )
                 end
             end)
         end
     end)
 
     handle.InputChanged:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.MouseMovement
-        or input.UserInputType==Enum.UserInputType.Touch then
+
+        if input.UserInputType==
+            Enum.UserInputType.MouseMovement
+
+            or
+
+            input.UserInputType==
+            Enum.UserInputType.Touch then
+
             dragInput=input
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
+
         if input==dragInput and dragging then
-            local delta=input.Position - dragStart
-            target.Position=UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
+
+            local delta=
+                input.Position-dragStart
+
+            target.Position=
+                UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset+delta.X,
+
+                    startPos.Y.Scale,
+                    startPos.Y.Offset+delta.Y
+                )
         end
     end)
 end
 
-MakeDraggable(toolsFrame,toolsFrame)
+MakeDraggable(
+    toolsFrame,
+    toolsFrame
+)
 
-local layout=Instance.new("UIListLayout",toolsFrame)
+local layout=Instance.new(
+    "UIListLayout",
+    toolsFrame
+)
+
 layout.Padding=UDim.new(0,6)
 layout.SortOrder=Enum.SortOrder.LayoutOrder
 
-local pad=Instance.new("UIPadding",toolsFrame)
+local pad=Instance.new(
+    "UIPadding",
+    toolsFrame
+)
+
 pad.PaddingTop=UDim.new(0,8)
 pad.PaddingBottom=UDim.new(0,8)
 pad.PaddingLeft=UDim.new(0,8)
 pad.PaddingRight=UDim.new(0,8)
 
 local function makeBtn(text)
-    local b=Instance.new("TextButton",toolsFrame)
-    b.Size=UDim2.new(1,0,0,26)
-    b.BackgroundColor3=Theme.SurfaceHighlight
+
+    local b=Instance.new(
+        "TextButton",
+        toolsFrame
+    )
+
+    b.Size=
+        UDim2.new(
+            1,
+            0,
+            0,
+            26
+        )
+
+    b.BackgroundColor3=
+        Theme.SurfaceHighlight
+
     b.BackgroundTransparency=0.55
+
     b.Text=text
     b.Font=Enum.Font.GothamBold
     b.TextSize=11
     b.TextColor3=Theme.TextPrimary
     b.BorderSizePixel=0
-    Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
+
+    Instance.new(
+        "UICorner",
+        b
+    ).CornerRadius=UDim.new(0,6)
+
     return b
 end
 
-local spamBaseBtn=makeBtn("SPAM OWNER")
-local proxBtn=makeBtn("PROX AP: OFF")
-toolsFrame.Size=UDim2.new(0,160 * mobileScale,0,100 * mobileScale)
+local spamBaseBtn=makeBtn(
+    "SPAM OWNER"
+)
+
+local proxBtn=makeBtn(
+    "PROX AP: OFF"
+)
+
+toolsFrame.Size=
+    UDim2.new(
+        0,
+        160*mobileScale,
+        0,
+        100*mobileScale
+    )
 
 spamBaseBtn.MouseButton1Click:Connect(function()
+
     local char=LocalPlayer.Character
-    local hrp=char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    local hrp=
+        char and
+        char:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    if not hrp then
+        return
+    end
+
     local nearestPlot=nil
     local nearestDist=math.huge
-    local Plots=Workspace:FindFirstChild("Plots")
+
+    local Plots=
+        Workspace:FindFirstChild(
+            "Plots"
+        )
+
     if Plots then
-        for _,plot in ipairs(Plots:GetChildren()) do
-            local sign=plot:FindFirstChild("PlotSign")
+
+        for _,plot in ipairs(
+            Plots:GetChildren()
+        ) do
+
+            local sign=
+                plot:FindFirstChild(
+                    "PlotSign"
+                )
+
             if sign then
-                local yourBase=sign:FindFirstChild("YourBase")
-                if not yourBase or not yourBase.Enabled then
-                    local signPos=sign:IsA("BasePart") and sign.Position or (sign.PrimaryPart and sign.PrimaryPart.Position)
+
+                local yourBase=
+                    sign:FindFirstChild(
+                        "YourBase"
+                    )
+
+                if not yourBase
+                    or not yourBase.Enabled then
+
+                    local signPos=
+                        sign:IsA("BasePart")
+                        and sign.Position
+                        or (
+                            sign.PrimaryPart
+                            and sign.PrimaryPart.Position
+                        )
+
                     if not signPos then
-                        local part=sign:FindFirstChildWhichIsA("BasePart",true)
-                        signPos=part and part.Position
+
+                        local part=
+                            sign:FindFirstChildWhichIsA(
+                                "BasePart",
+                                true
+                            )
+
+                        signPos=
+                            part and
+                            part.Position
                     end
+
                     if signPos then
-                        local dist=(hrp.Position - signPos).Magnitude
-                        if dist < nearestDist then
+
+                        local dist=
+                            (
+                                hrp.Position-
+                                signPos
+                            ).Magnitude
+
+                        if dist<nearestDist then
+
                             nearestDist=dist
                             nearestPlot=plot
                         end
@@ -225,58 +407,190 @@ spamBaseBtn.MouseButton1Click:Connect(function()
             end
         end
     end
-    if not nearestPlot then return end
+
+    if not nearestPlot then
+        return
+    end
+
     local targetPlayer=nil
-    local sign=nearestPlot:FindFirstChild("PlotSign")
-    local textLabel=sign and sign:FindFirstChild("SurfaceGui") and sign.SurfaceGui:FindFirstChild("Frame") and sign.SurfaceGui.Frame:FindFirstChild("TextLabel")
+
+    local sign=
+        nearestPlot:FindFirstChild(
+            "PlotSign"
+        )
+
+    local textLabel=
+        sign
+        and sign:FindFirstChild(
+            "SurfaceGui"
+        )
+        and sign.SurfaceGui:FindFirstChild(
+            "Frame"
+        )
+        and sign.SurfaceGui.Frame:FindFirstChild(
+            "TextLabel"
+        )
+
     if textLabel then
-        local baseText=textLabel.Text
-        local nickname=baseText and baseText:match("^(.-)'") or baseText
+
+        local baseText=
+            textLabel.Text
+
+        local nickname=
+            baseText
+            and baseText:match(
+                "^(.-)'"
+            )
+            or baseText
+
         if nickname then
-            for _,p in ipairs(Players:GetPlayers()) do
-                if p.DisplayName==nickname or p.Name==nickname then
+
+            for _,p in ipairs(
+                Players:GetPlayers()
+            ) do
+
+                if p.DisplayName==
+                    nickname
+
+                    or
+
+                    p.Name==
+                    nickname then
+
                     targetPlayer=p
                     break
                 end
             end
         end
     end
+
     if not targetPlayer then
-        local plots=Workspace:FindFirstChild("Plots")
-        if not plots then return end
+
+        local plots=
+            Workspace:FindFirstChild(
+                "Plots"
+            )
+
+        if not plots then
+            return
+        end
+
         local myPlot
-        local lpName,lpDisplay=LocalPlayer.Name:lower(),LocalPlayer.DisplayName:lower()
-        for _,p in pairs(plots:GetChildren()) do
-            local sign=p:FindFirstChild("PlotSign")
-            local lbl=sign and sign:FindFirstChild("TextLabel",true)
-            if lbl and (lbl.Text:lower():find(lpName) or lbl.Text:lower():find(lpDisplay)) then
+
+        local lpName=
+            LocalPlayer.Name:lower()
+
+        local lpDisplay=
+            LocalPlayer.DisplayName:lower()
+
+        for _,p in pairs(
+            plots:GetChildren()
+        ) do
+
+            local sign=
+                p:FindFirstChild(
+                    "PlotSign"
+                )
+
+            local lbl=
+                sign
+                and sign:FindFirstChild(
+                    "TextLabel",
+                    true
+                )
+
+            if lbl
+                and (
+                    lbl.Text:lower():find(
+                        lpName
+                    )
+
+                    or
+
+                    lbl.Text:lower():find(
+                        lpDisplay
+                    )
+                ) then
+
                 myPlot=p
                 break
             end
         end
+
         local nearestOwnerPlot
         local nearestOwnerDist=math.huge
-        for _,p in pairs(plots:GetChildren()) do
-            if p ~=myPlot then
-                local sign=p:FindFirstChild("PlotSign")
-                local part=sign and sign:FindFirstChildWhichIsA("BasePart",true)
+
+        for _,p in pairs(
+            plots:GetChildren()
+        ) do
+
+            if p~=myPlot then
+
+                local sign=
+                    p:FindFirstChild(
+                        "PlotSign"
+                    )
+
+                local part=
+                    sign
+                    and sign:FindFirstChildWhichIsA(
+                        "BasePart",
+                        true
+                    )
+
                 if part then
-                    local dist=(hrp.Position - part.Position).Magnitude
-                    if dist < nearestOwnerDist then
+
+                    local dist=
+                        (
+                            hrp.Position-
+                            part.Position
+                        ).Magnitude
+
+                    if dist<
+                        nearestOwnerDist then
+
                         nearestOwnerDist=dist
                         nearestOwnerPlot=p
                     end
                 end
             end
         end
+
         if nearestOwnerPlot then
-            local sign=nearestOwnerPlot:FindFirstChild("PlotSign")
-            local lbl=sign and sign:FindFirstChild("TextLabel",true)
+
+            local sign=
+                nearestOwnerPlot:FindFirstChild(
+                    "PlotSign"
+                )
+
+            local lbl=
+                sign
+                and sign:FindFirstChild(
+                    "TextLabel",
+                    true
+                )
+
             if lbl then
-                local txt=lbl.Text:lower()
-                for _,p in ipairs(Players:GetPlayers()) do
-                    if p ~=LocalPlayer then
-                        if txt:find(p.Name:lower()) or txt:find(p.DisplayName:lower()) then
+
+                local txt=
+                    lbl.Text:lower()
+
+                for _,p in ipairs(
+                    Players:GetPlayers()
+                ) do
+
+                    if p~=LocalPlayer then
+
+                        if txt:find(
+                            p.Name:lower()
+                        )
+
+                        or
+
+                        txt:find(
+                            p.DisplayName:lower()
+                        ) then
+
                             targetPlayer=p
                             break
                         end
@@ -285,79 +599,202 @@ spamBaseBtn.MouseButton1Click:Connect(function()
             end
         end
     end
-    if not targetPlayer or targetPlayer==LocalPlayer then return end
-    spamBaseBtn.BackgroundColor3=Theme.Accent1
-    spamBaseBtn.TextColor3=Color3.new(0,0,0)
+
+    if not targetPlayer
+        or targetPlayer==LocalPlayer then
+
+        return
+    end
+
+    spamBaseBtn.BackgroundColor3=
+        Theme.Accent1
+
+    spamBaseBtn.TextColor3=
+        Color3.new(0,0,0)
+
     task.spawn(function()
-        for _,cmd in ipairs(ALL_COMMANDS) do
+
+        for _,cmd in ipairs(
+            ALL_COMMANDS
+        ) do
+
             if not isOnCooldown(cmd) then
-                pcall(runAdminCommand,targetPlayer,cmd)
-                activeCooldowns[cmd]=tick()
+
+                pcall(
+                    runAdminCommand,
+                    targetPlayer,
+                    cmd
+                )
+
+                activeCooldowns[cmd]=
+                    tick()
             end
+
             task.wait(0.15)
         end
+
         task.wait(0.2)
-        spamBaseBtn.BackgroundColor3=Theme.SurfaceHighlight
-        spamBaseBtn.TextColor3=Theme.TextPrimary
+
+        spamBaseBtn.BackgroundColor3=
+            Theme.SurfaceHighlight
+
+        spamBaseBtn.TextColor3=
+            Theme.TextPrimary
     end)
 end)
 
 local ProximityAPActive=false
 local proximityRange=25
 
--- Círculo visual para el rango (Azul)
-local circleAdornment = Instance.new("CylinderHandleAdornment")
-circleAdornment.Name = "ProxRadius"
-circleAdornment.Radius = proximityRange
-circleAdornment.Height = 0.05
-circleAdornment.Color3 = Theme.Accent1
-circleAdornment.Transparency = 0.6
-circleAdornment.CFrame = CFrame.new(0, -2.9, 0) * CFrame.Angles(math.rad(90), 0, 0)
-circleAdornment.AlwaysOnTop = false
-circleAdornment.Visible = false
-circleAdornment.Parent = toolsGui
+-- Círculo visual para el rango
+local circleAdornment=
+    Instance.new(
+        "CylinderHandleAdornment"
+    )
+
+circleAdornment.Name=
+    "ProxRadius"
+
+circleAdornment.Radius=
+    proximityRange
+
+circleAdornment.Height=
+    0.05
+
+circleAdornment.Color3=
+    Theme.Accent1
+
+circleAdornment.Transparency=
+    0.6
+
+circleAdornment.CFrame=
+    CFrame.new(
+        0,
+        -2.9,
+        0
+    )
+    *
+    CFrame.Angles(
+        math.rad(90),
+        0,
+        0
+    )
+
+circleAdornment.AlwaysOnTop=false
+circleAdornment.Visible=false
+circleAdornment.Parent=toolsGui
 
 task.spawn(function()
-    while true do
-        task.wait(0.2)
-        if ProximityAPActive then
-            local myChar=LocalPlayer.Character
-            if myChar and myChar:FindFirstChild("HumanoidRootPart") then
-                circleAdornment.Adornee = myChar.HumanoidRootPart
-                circleAdornment.Visible = true
 
-                for _,p in ipairs(Players:GetPlayers()) do
-                    if p ~=LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local dist=(p.Character.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
-                        if dist <=proximityRange then
-                            for _,cmd in ipairs(ALL_COMMANDS) do
-                                if not isOnCooldown(cmd) then
-                                    pcall(runAdminCommand,p,cmd)
-                                    activeCooldowns[cmd]=tick()
+    while true do
+
+        task.wait(0.2)
+
+        if ProximityAPActive then
+
+            local myChar=
+                LocalPlayer.Character
+
+            if myChar
+                and myChar:FindFirstChild(
+                    "HumanoidRootPart"
+                ) then
+
+                circleAdornment.Adornee=
+                    myChar.HumanoidRootPart
+
+                circleAdornment.Visible=
+                    true
+
+                for _,p in ipairs(
+                    Players:GetPlayers()
+                ) do
+
+                    if p~=LocalPlayer
+                        and p.Character
+                        and p.Character:FindFirstChild(
+                            "HumanoidRootPart"
+                        ) then
+
+                        local dist=
+                            (
+                                p.Character.HumanoidRootPart.Position
+                                -
+                                myChar.HumanoidRootPart.Position
+                            ).Magnitude
+
+                        if dist<=proximityRange then
+
+                            for _,cmd in ipairs(
+                                ALL_COMMANDS
+                            ) do
+
+                                if not isOnCooldown(
+                                    cmd
+                                ) then
+
+                                    pcall(
+                                        runAdminCommand,
+                                        p,
+                                        cmd
+                                    )
+
+                                    activeCooldowns[cmd]=
+                                        tick()
                                 end
+
                                 task.wait(0.05)
                             end
                         end
                     end
                 end
+
             else
-                circleAdornment.Visible = false
+
+                circleAdornment.Visible=
+                    false
             end
+
         else
-            circleAdornment.Visible = false
+
+            circleAdornment.Visible=
+                false
         end
     end
 end)
 
 local function jack()
-    proxBtn.Text="PROX AP: " .. (ProximityAPActive and "ON" or "OFF")
-    proxBtn.BackgroundColor3=ProximityAPActive and Theme.Accent1 or Theme.SurfaceHighlight
-    proxBtn.BackgroundTransparency=ProximityAPActive and 0 or 0.55
-    proxBtn.TextColor3=ProximityAPActive and Color3.new(0,0,0) or Theme.TextPrimary
+
+    proxBtn.Text=
+        "PROX AP: "
+        ..
+        (
+            ProximityAPActive
+            and "ON"
+            or "OFF"
+        )
+
+    proxBtn.BackgroundColor3=
+        ProximityAPActive
+        and Theme.Accent1
+        or Theme.SurfaceHighlight
+
+    proxBtn.BackgroundTransparency=
+        ProximityAPActive
+        and 0
+        or 0.55
+
+    proxBtn.TextColor3=
+        ProximityAPActive
+        and Color3.new(0,0,0)
+        or Theme.TextPrimary
 end
 
 proxBtn.MouseButton1Click:Connect(function()
-    ProximityAPActive=not ProximityAPActive
+
+    ProximityAPActive=
+        not ProximityAPActive
+
     jack()
 end)
 
