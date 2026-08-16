@@ -1459,37 +1459,75 @@ do
     local AimbotEnabled = false
     local Minimized = false
     local CurrentTarget = nil
+    local SettingsOpen = false
+
+    -- ============================================================
+    -- CONFIGURACIÓN DE ESCALA
+    -- ============================================================
+
+    local DefaultScale = 1
+    local MinScale = 0.70
+    local MaxScale = 1.50
+
+    local SavedScale = DefaultScale
+
+    pcall(function()
+        if Config and tonumber(Config["CapaAimbotScale"]) then
+            SavedScale = tonumber(Config["CapaAimbotScale"])
+        end
+    end)
+
+    SavedScale = math.clamp(SavedScale, MinScale, MaxScale)
 
     local WhitelistedUsers = {
         ["Toki"] = true,
         ["Tokito"] = true,
         ["DavidAlejandro78892"] = true,
         ["davidalejandro78892"] = true,
-		["KenalGotas789"] = true
+        ["KenalGotas789"] = true
     }
+
+    -- ============================================================
+    -- SCREEN GUI
+    -- ============================================================
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "TokitoLaserGui"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.IgnoreGuiInset = true
 
-    local success, result = pcall(function() return gethui() or game:GetService("CoreGui") end)
+    local success, result = pcall(function()
+        return gethui() or game:GetService("CoreGui")
+    end)
+
     ScreenGui.Parent = success and result or game:GetService("CoreGui")
 
-    -- ================= CARGAR POSICIÓN GUARDADA =================
+    -- ============================================================
+    -- CARGAR POSICIÓN
+    -- ============================================================
+
     local defaultPos = UDim2.new(0.5, -80, 0.15, 0)
     local framePos = defaultPos
 
     pcall(function()
         if Config and Config["CapaAimbotPos"] then
             local p = Config["CapaAimbotPos"]
+
             if type(p) == "table" and #p >= 4 then
-                framePos = UDim2.new(p[1], p[2], p[3], p[4])
+                framePos = UDim2.new(
+                    p[1],
+                    p[2],
+                    p[3],
+                    p[4]
+                )
             end
         end
     end)
 
-    -- Marco Principal más compacto (Ancho: 160, Alto: 75)
+    -- ============================================================
+    -- MARCO PRINCIPAL
+    -- ============================================================
+
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 160, 0, 75)
@@ -1497,10 +1535,28 @@ do
     MainFrame.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
     MainFrame.BackgroundTransparency = 0.15
     MainFrame.BorderSizePixel = 0
-    MainFrame.Visible = false -- Oculto por defecto hasta activar el Toggle
+
+    -- IMPORTANTE:
+    -- Ahora puede mostrar el panel de configuración fuera de su
+    -- tamaño normal sin cortarlo.
+    MainFrame.ClipsDescendants = false
+
+    MainFrame.Visible = false
     MainFrame.Active = true
-    MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
+
+    -- ============================================================
+    -- UISCALE
+    -- ============================================================
+
+    local UIScale = Instance.new("UIScale")
+    UIScale.Name = "ResponsiveScale"
+    UIScale.Scale = SavedScale
+    UIScale.Parent = MainFrame
+
+    -- ============================================================
+    -- CORNER / STROKE
+    -- ============================================================
 
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
@@ -1512,10 +1568,13 @@ do
     MainStroke.Color = Color3.fromRGB(0, 170, 255)
     MainStroke.Transparency = 0.2
 
-    -- Título
+    -- ============================================================
+    -- TÍTULO
+    -- ============================================================
+
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
-    Title.Size = UDim2.new(0, 125, 0, 25)
+    Title.Size = UDim2.new(0, 102, 0, 25)
     Title.Position = UDim2.new(0, 8, 0, 4)
     Title.Text = "Capa laser aim"
     Title.TextColor3 = Color3.fromRGB(0, 220, 255)
@@ -1525,7 +1584,37 @@ do
     Title.BackgroundTransparency = 1
     Title.Parent = MainFrame
 
-    -- Botón de Minimizar (—)
+    -- ============================================================
+    -- BOTÓN CONFIGURACIÓN ⚙
+    -- ============================================================
+
+    local SettingsBtn = Instance.new("TextButton")
+    SettingsBtn.Name = "SettingsBtn"
+    SettingsBtn.Size = UDim2.new(0, 20, 0, 20)
+    SettingsBtn.Position = UDim2.new(1, -48, 0, 4)
+
+    -- Símbolo típico de configuración
+    SettingsBtn.Text = "⚙"
+    SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
+    SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    SettingsBtn.Font = Enum.Font.GothamBold
+    SettingsBtn.TextSize = 13
+    SettingsBtn.AutoButtonColor = false
+    SettingsBtn.Parent = MainFrame
+
+    local SettingsCorner = Instance.new("UICorner")
+    SettingsCorner.CornerRadius = UDim.new(0, 5)
+    SettingsCorner.Parent = SettingsBtn
+
+    local SettingsStroke = Instance.new("UIStroke")
+    SettingsStroke.Parent = SettingsBtn
+    SettingsStroke.Color = Color3.fromRGB(0, 170, 255)
+    SettingsStroke.Thickness = 1
+
+    -- ============================================================
+    -- BOTÓN MINIMIZAR
+    -- ============================================================
+
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Name = "MinimizeBtn"
     MinimizeBtn.Size = UDim2.new(0, 20, 0, 20)
@@ -1546,7 +1635,10 @@ do
     MinStroke.Color = Color3.fromRGB(0, 170, 255)
     MinStroke.Thickness = 1
 
-    -- Botón Toggle (Aimbot OFF/ON)
+    -- ============================================================
+    -- BOTÓN TOGGLE
+    -- ============================================================
+
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Name = "ToggleBtn"
     ToggleBtn.Size = UDim2.new(0, 144, 0, 32)
@@ -1567,73 +1659,419 @@ do
     ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
     ToggleStroke.Thickness = 1.5
 
-    -- Animación RGB Azul
+    -- ============================================================
+    -- PANEL DE CONFIGURACIÓN
+    -- ============================================================
+
+    local SettingsFrame = Instance.new("Frame")
+    SettingsFrame.Name = "SettingsFrame"
+    SettingsFrame.Size = UDim2.new(0, 190, 0, 128)
+    SettingsFrame.Position = UDim2.new(0, -15, 0, 82)
+
+    SettingsFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
+    SettingsFrame.BackgroundTransparency = 0.05
+    SettingsFrame.BorderSizePixel = 0
+    SettingsFrame.Visible = false
+    SettingsFrame.ZIndex = 20
+    SettingsFrame.Parent = MainFrame
+
+    local SettingsCorner2 = Instance.new("UICorner")
+    SettingsCorner2.CornerRadius = UDim.new(0, 8)
+    SettingsCorner2.Parent = SettingsFrame
+
+    local SettingsStroke2 = Instance.new("UIStroke")
+    SettingsStroke2.Parent = SettingsFrame
+    SettingsStroke2.Color = Color3.fromRGB(0, 170, 255)
+    SettingsStroke2.Thickness = 1.5
+
+    -- Título del panel
+    local SettingsTitle = Instance.new("TextLabel")
+    SettingsTitle.Name = "SettingsTitle"
+    SettingsTitle.Size = UDim2.new(1, -20, 0, 24)
+    SettingsTitle.Position = UDim2.new(0, 10, 0, 8)
+    SettingsTitle.BackgroundTransparency = 1
+    SettingsTitle.Text = "⚙ CONFIGURACIÓN"
+    SettingsTitle.TextColor3 = Color3.fromRGB(0, 220, 255)
+    SettingsTitle.Font = Enum.Font.GothamBold
+    SettingsTitle.TextSize = 12
+    SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SettingsTitle.ZIndex = 21
+    SettingsTitle.Parent = SettingsFrame
+
+    -- Texto escala
+    local ScaleLabel = Instance.new("TextLabel")
+    ScaleLabel.Name = "ScaleLabel"
+    ScaleLabel.Size = UDim2.new(1, -20, 0, 22)
+    ScaleLabel.Position = UDim2.new(0, 10, 0, 36)
+    ScaleLabel.BackgroundTransparency = 1
+    ScaleLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+    ScaleLabel.Font = Enum.Font.GothamBold
+    ScaleLabel.TextSize = 11
+    ScaleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ScaleLabel.ZIndex = 21
+    ScaleLabel.Parent = SettingsFrame
+
+    -- Barra
+    local SliderBar = Instance.new("Frame")
+    SliderBar.Name = "SliderBar"
+    SliderBar.Size = UDim2.new(1, -40, 0, 7)
+    SliderBar.Position = UDim2.new(0, 20, 0, 69)
+    SliderBar.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
+    SliderBar.BorderSizePixel = 0
+    SliderBar.ZIndex = 21
+    SliderBar.Parent = SettingsFrame
+
+    local SliderCorner = Instance.new("UICorner")
+    SliderCorner.CornerRadius = UDim.new(1, 0)
+    SliderCorner.Parent = SliderBar
+
+    -- Fill
+    local SliderFill = Instance.new("Frame")
+    SliderFill.Name = "SliderFill"
+    SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+    SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    SliderFill.BorderSizePixel = 0
+    SliderFill.ZIndex = 22
+    SliderFill.Parent = SliderBar
+
+    local SliderFillCorner = Instance.new("UICorner")
+    SliderFillCorner.CornerRadius = UDim.new(1, 0)
+    SliderFillCorner.Parent = SliderFill
+
+    -- Knob
+    local SliderKnob = Instance.new("TextButton")
+    SliderKnob.Name = "SliderKnob"
+    SliderKnob.Size = UDim2.new(0, 16, 0, 16)
+    SliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
+    SliderKnob.Position = UDim2.new(0.5, 0, 0.5, 0)
+    SliderKnob.Text = ""
+    SliderKnob.AutoButtonColor = false
+    SliderKnob.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
+    SliderKnob.ZIndex = 23
+    SliderKnob.Parent = SliderBar
+
+    local KnobCorner = Instance.new("UICorner")
+    KnobCorner.CornerRadius = UDim.new(1, 0)
+    KnobCorner.Parent = SliderKnob
+
+    local KnobStroke = Instance.new("UIStroke")
+    KnobStroke.Color = Color3.fromRGB(255, 255, 255)
+    KnobStroke.Thickness = 1
+    KnobStroke.Transparency = 0.4
+    KnobStroke.Parent = SliderKnob
+
+    -- ============================================================
+    -- BOTONES - / +
+    -- ============================================================
+
+    local MinusBtn = Instance.new("TextButton")
+    MinusBtn.Name = "MinusBtn"
+    MinusBtn.Size = UDim2.new(0, 34, 0, 24)
+    MinusBtn.Position = UDim2.new(0, 20, 0, 88)
+    MinusBtn.Text = "−"
+    MinusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    MinusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
+    MinusBtn.Font = Enum.Font.GothamBold
+    MinusBtn.TextSize = 15
+    MinusBtn.ZIndex = 21
+    MinusBtn.Parent = SettingsFrame
+
+    local MinusCorner = Instance.new("UICorner")
+    MinusCorner.CornerRadius = UDim.new(0, 5)
+    MinusCorner.Parent = MinusBtn
+
+    local MinusStroke = Instance.new("UIStroke")
+    MinusStroke.Color = Color3.fromRGB(0, 120, 180)
+    MinusStroke.Thickness = 1
+    MinusStroke.Parent = MinusBtn
+
+    local PlusBtn = Instance.new("TextButton")
+    PlusBtn.Name = "PlusBtn"
+    PlusBtn.Size = UDim2.new(0, 34, 0, 24)
+    PlusBtn.Position = UDim2.new(1, -54, 0, 88)
+    PlusBtn.Text = "+"
+    PlusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    PlusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
+    PlusBtn.Font = Enum.Font.GothamBold
+    PlusBtn.TextSize = 15
+    PlusBtn.ZIndex = 21
+    PlusBtn.Parent = SettingsFrame
+
+    local PlusCorner = Instance.new("UICorner")
+    PlusCorner.CornerRadius = UDim.new(0, 5)
+    PlusCorner.Parent = PlusBtn
+
+    local PlusStroke = Instance.new("UIStroke")
+    PlusStroke.Color = Color3.fromRGB(0, 120, 180)
+    PlusStroke.Thickness = 1
+    PlusStroke.Parent = PlusBtn
+
+    -- ============================================================
+    -- FUNCIÓN PARA ACTUALIZAR LA ESCALA
+    -- ============================================================
+
+    local function UpdateScale(newScale, shouldSave)
+        newScale = tonumber(newScale)
+
+        if not newScale then
+            return
+        end
+
+        newScale = math.clamp(newScale, MinScale, MaxScale)
+
+        SavedScale = newScale
+        UIScale.Scale = newScale
+
+        -- Porcentaje
+        local percent = math.floor(newScale * 100 + 0.5)
+        ScaleLabel.Text = "Tamaño de interfaz: " .. percent .. "%"
+
+        -- Convertir a 0-1
+        local alpha = (newScale - MinScale) / (MaxScale - MinScale)
+
+        SliderFill.Size = UDim2.new(alpha, 0, 1, 0)
+        SliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+
+        if shouldSave ~= false then
+            pcall(function()
+                if Config then
+                    Config["CapaAimbotScale"] = SavedScale
+
+                    if saveConfig then
+                        saveConfig()
+                    end
+                end
+            end)
+        end
+    end
+
+    UpdateScale(SavedScale, false)
+
+    -- ============================================================
+    -- SLIDER
+    -- ============================================================
+
+    local SliderDragging = false
+
+    local function UpdateSliderFromInput(inputPositionX)
+        local barAbsolutePosition = SliderBar.AbsolutePosition.X
+        local barAbsoluteSize = SliderBar.AbsoluteSize.X
+
+        if barAbsoluteSize <= 0 then
+            return
+        end
+
+        local alpha = (inputPositionX - barAbsolutePosition) / barAbsoluteSize
+        alpha = math.clamp(alpha, 0, 1)
+
+        local newScale = MinScale + ((MaxScale - MinScale) * alpha)
+
+        UpdateScale(newScale, true)
+    end
+
+    SliderKnob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            SliderDragging = true
+        end
+    end)
+
+    SliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            SliderDragging = true
+            UpdateSliderFromInput(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if SliderDragging then
+            if input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch then
+
+                UpdateSliderFromInput(input.Position.X)
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            SliderDragging = false
+        end
+    end)
+
+    -- ============================================================
+    -- BOTONES DE TAMAÑO
+    -- ============================================================
+
+    MinusBtn.MouseButton1Click:Connect(function()
+        UpdateScale(SavedScale - 0.05, true)
+    end)
+
+    PlusBtn.MouseButton1Click:Connect(function()
+        UpdateScale(SavedScale + 0.05, true)
+    end)
+
+    -- ============================================================
+    -- ABRIR / CERRAR CONFIGURACIÓN
+    -- ============================================================
+
+    SettingsBtn.MouseButton1Click:Connect(function()
+        SettingsOpen = not SettingsOpen
+        SettingsFrame.Visible = SettingsOpen
+
+        if SettingsOpen then
+            SettingsBtn.BackgroundColor3 = Color3.fromRGB(0, 70, 110)
+            SettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+            SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
+        end
+    end)
+
+    -- ============================================================
+    -- ANIMACIÓN RGB AZUL
+    -- ============================================================
+
     RunService.RenderStepped:Connect(function()
         pcall(function()
             if AimbotEnabled then
                 local timePos = tick() * 3
                 local glow = math.abs(math.sin(timePos)) * 0.5 + 0.5
-                MainStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
-                ToggleStroke.Color = Color3.fromRGB(0, math.floor(150 * glow) + 100, 255)
+
+                MainStroke.Color = Color3.fromRGB(
+                    0,
+                    math.floor(150 * glow) + 100,
+                    255
+                )
+
+                ToggleStroke.Color = Color3.fromRGB(
+                    0,
+                    math.floor(150 * glow) + 100,
+                    255
+                )
             else
                 MainStroke.Color = Color3.fromRGB(0, 120, 200)
             end
         end)
     end)
 
-    -- Sistema de Arrastre Táctil (Android) con Guardado de Posición
-    local dragging, dragInput, dragStart, startPos
+    -- ============================================================
+    -- SISTEMA DE ARRASTRE TÁCTIL / MOUSE
+    -- ============================================================
+
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
 
     MainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        -- Evita arrastrar cuando se esté usando el slider
+        if SliderDragging then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
 
-            input.Changed:Connect(function()  
-                if input.UserInputState == Enum.UserInputState.End then  
-                    dragging = false  
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+
                     pcall(function()
                         if Config then
-                            Config["CapaAimbotPos"] = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset, MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
-                            if saveConfig then saveConfig() end
+                            Config["CapaAimbotPos"] = {
+                                MainFrame.Position.X.Scale,
+                                MainFrame.Position.X.Offset,
+                                MainFrame.Position.Y.Scale,
+                                MainFrame.Position.Y.Offset
+                            }
+
+                            if saveConfig then
+                                saveConfig()
+                            end
                         end
                     end)
-                end  
-            end)  
+                end
+            end)
         end
     end)
 
     MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
             dragInput = input
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
+        if input == dragInput and dragging and not SliderDragging then
             local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
         end
     end)
 
-    -- Lógica de Minimizar
+    -- ============================================================
+    -- MINIMIZAR
+    -- ============================================================
+
     MinimizeBtn.MouseButton1Click:Connect(function()
         Minimized = not Minimized
+
+        -- Cerrar settings al minimizar
         if Minimized then
-            MainFrame:TweenSize(UDim2.new(0, 160, 0, 30), "Out", "Quad", 0.2, true)
+            SettingsOpen = false
+            SettingsFrame.Visible = false
+
+            SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+            SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
+
+            MainFrame:TweenSize(
+                UDim2.new(0, 160, 0, 30),
+                "Out",
+                "Quad",
+                0.2,
+                true
+            )
+
             ToggleBtn.Visible = false
             MinimizeBtn.Text = "+"
         else
-            MainFrame:TweenSize(UDim2.new(0, 160, 0, 75), "Out", "Quad", 0.2, true)
+            MainFrame:TweenSize(
+                UDim2.new(0, 160, 0, 75),
+                "Out",
+                "Quad",
+                0.2,
+                true
+            )
+
             ToggleBtn.Visible = true
             MinimizeBtn.Text = "—"
         end
     end)
 
-    -- Lógica del Botón Interno
+    -- ============================================================
+    -- BOTÓN AIMBOT
+    -- ============================================================
+
     ToggleBtn.MouseButton1Click:Connect(function()
         AimbotEnabled = not AimbotEnabled
+
         if AimbotEnabled then
             ToggleBtn.Text = "AIMBOT: ON"
             ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1644,106 +2082,178 @@ do
             ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
             ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
             ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
+
             CurrentTarget = nil
         end
     end)
 
-    -- Búsqueda del Objetivo (360 Grados)
+    -- ============================================================
+    -- BÚSQUEDA DEL OBJETIVO
+    -- ============================================================
+
     RunService.RenderStepped:Connect(function()
         pcall(function()
-            if not AimbotEnabled then return end
+            if not AimbotEnabled then
+                return
+            end
 
-            local Target = nil  
-            local ShortestDistance = math.huge  
-              
-            local MyCharacter = LocalPlayer.Character  
-            local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")  
+            local Target = nil
+            local ShortestDistance = math.huge
 
-            for _, v in pairs(Players:GetPlayers()) do  
-                if v ~= LocalPlayer and not WhitelistedUsers[v.Name] and not WhitelistedUsers[v.DisplayName] and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
-                    local Hitbox = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")  
-                    if Hitbox and (v.Team ~= LocalPlayer.Team or v.Team == nil) then  
-                        if MyRoot then  
-                            local Distance = (Hitbox.Position - MyRoot.Position).Magnitude  
-                            if Distance < ShortestDistance then  
-                                Target = Hitbox  
-                                ShortestDistance = Distance  
-                            end  
-                        end  
-                    end  
-                end  
-            end  
-              
-            CurrentTarget = Target
-        end)
-    end)
+            local MyCharacter = LocalPlayer.Character
+            local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")
 
-    -- Intercepción del Disparo (Wallbang) protegido
-    pcall(function()
-        local OldNamecall
-        OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            local Args = {...}
-            local Method = getnamecallmethod()
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer
+                    and not WhitelistedUsers[v.Name]
+                    and not WhitelistedUsers[v.DisplayName]
+                    and v.Character
+                    and v.Character:FindFirstChild("Humanoid")
+                    and v.Character.Humanoid.Health > 0 then
 
-            if AimbotEnabled and CurrentTarget and not checkcaller() then  
-                if string.find(Method, "FindPartOnRay") then  
-                    return CurrentTarget, CurrentTarget.Position, Vector3.new(0, 1, 0), Enum.Material.Plastic  
-                elseif Method == "Raycast" then  
-                    local Origin = Args[1]  
-                    local Direction = (CurrentTarget.Position - Origin).Unit * 10000  
-                      
-                    local WallbangParams = RaycastParams.new()  
-                    WallbangParams.FilterType = Enum.RaycastFilterType.Include  
-                    WallbangParams.FilterDescendantsInstances = {CurrentTarget.Parent}  
-                    WallbangParams.IgnoreWater = true  
-                      
-                    Args[2] = Direction  
-                    Args[3] = WallbangParams  
-                      
-                    return OldNamecall(self, unpack(Args))  
-                end  
-            end  
+                    local Hitbox =
+                        v.Character:FindFirstChild("Head")
+                        or v.Character:FindFirstChild("HumanoidRootPart")
 
-            return OldNamecall(self, ...)
-        end))
+                    if Hitbox
+                        and (v.Team ~= LocalPlayer.Team or v.Team == nil) then
 
-        local OldIndex
-        OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
-            if AimbotEnabled and CurrentTarget and not checkcaller() then
-                if self == Mouse then
-                    if Index == "Hit" or Index == "hit" then
-                        return CurrentTarget.CFrame
-                    elseif Index == "Target" or Index == "target" then
-                        return CurrentTarget
+                        if MyRoot then
+                            local Distance =
+                                (Hitbox.Position - MyRoot.Position).Magnitude
+
+                            if Distance < ShortestDistance then
+                                Target = Hitbox
+                                ShortestDistance = Distance
+                            end
+                        end
                     end
                 end
             end
 
-            return OldIndex(self, Index)
-        end))
+            CurrentTarget = Target
+        end)
     end)
 
-    -- Integración con tu función global `createToggle`
+    -- ============================================================
+    -- INTERCEPCIÓN DEL DISPARO
+    -- ============================================================
+
+    pcall(function()
+        local OldNamecall
+
+        OldNamecall = hookmetamethod(
+            game,
+            "__namecall",
+            newcclosure(function(self, ...)
+                local Args = {...}
+                local Method = getnamecallmethod()
+
+                if AimbotEnabled
+                    and CurrentTarget
+                    and not checkcaller() then
+
+                    if string.find(Method, "FindPartOnRay") then
+                        return
+                            CurrentTarget,
+                            CurrentTarget.Position,
+                            Vector3.new(0, 1, 0),
+                            Enum.Material.Plastic
+
+                    elseif Method == "Raycast" then
+                        local Origin = Args[1]
+
+                        local Direction =
+                            (CurrentTarget.Position - Origin).Unit * 10000
+
+                        local WallbangParams = RaycastParams.new()
+
+                        WallbangParams.FilterType =
+                            Enum.RaycastFilterType.Include
+
+                        WallbangParams.FilterDescendantsInstances = {
+                            CurrentTarget.Parent
+                        }
+
+                        WallbangParams.IgnoreWater = true
+
+                        Args[2] = Direction
+                        Args[3] = WallbangParams
+
+                        return OldNamecall(
+                            self,
+                            unpack(Args)
+                        )
+                    end
+                end
+
+                return OldNamecall(self, ...)
+            end)
+        )
+
+        local OldIndex
+
+        OldIndex = hookmetamethod(
+            game,
+            "__index",
+            newcclosure(function(self, Index)
+                if AimbotEnabled
+                    and CurrentTarget
+                    and not checkcaller() then
+
+                    if self == Mouse then
+                        if Index == "Hit" or Index == "hit" then
+                            return CurrentTarget.CFrame
+
+                        elseif Index == "Target" or Index == "target" then
+                            return CurrentTarget
+                        end
+                    end
+                end
+
+                return OldIndex(self, Index)
+            end)
+        )
+    end)
+
+    -- ============================================================
+    -- INTEGRACIÓN CON createToggle
+    -- ============================================================
+
     createToggle("Capa laser aim", function(state)
         MainFrame.Visible = state
-        
+
         if not state then
             AimbotEnabled = false
+
             ToggleBtn.Text = "AIMBOT: OFF"
             ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
             ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
             ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
+
             CurrentTarget = nil
+
+            SettingsOpen = false
+            SettingsFrame.Visible = false
+
+            SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+            SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
         end
     end)
 end
 
 
 -- ========================================================
--- TOKITO PVP SCRIPT V3 (SOLO LASER) - CON MEMORIA Y ESTABLE
+-- TOKITO PVP SCRIPT V4
+-- AUTO LASER + INTERFAZ RESPONSIVA + ARRASTRE REAL
+-- ESCALA + POSICIÓN PERSISTENTE + MINIMIZAR
 -- ========================================================
 
 do
+    -- ====================================================
+    -- SERVICIOS
+    -- ====================================================
+
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
@@ -1751,20 +2261,33 @@ do
     local Lighting = game:GetService("Lighting")
 
     local LocalPlayer = Players.LocalPlayer
+
     Config = Config or {}
 
-    -- ================= ANTI BEE (POR DEFECTO) =================
+    -- ====================================================
+    -- ANTI BEE
+    -- ====================================================
+
     local antiBeeEnabled = false
     local antiBeeConnections = {}
+
     local antiBeeData = {
         originalMoveFunction = nil,
         controlsProtected = false,
-        badLightingNames = { Blue = true, DiscoEffect = true, BeeBlur = true, ColorCorrection = true }
+        badLightingNames = {
+            Blue = true,
+            DiscoEffect = true,
+            BeeBlur = true,
+            ColorCorrection = true
+        }
     }
 
     local function destroyBeeEffect(obj)
         pcall(function()
-            if not obj or not obj.Parent then return end
+            if not obj or not obj.Parent then
+                return
+            end
+
             if antiBeeData.badLightingNames[obj.Name] then
                 obj:Destroy()
             end
@@ -1772,279 +2295,2385 @@ do
     end
 
     local function protectControls()
-        if antiBeeData.controlsProtected then return end
+        if antiBeeData.controlsProtected then
+            return
+        end
+
         pcall(function()
-            local PlayerModule = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-            if not PlayerModule then return end
-            local Controls = require(PlayerModule):GetControls()
-            if not Controls then return end
-            if not antiBeeData.originalMoveFunction then
-                antiBeeData.originalMoveFunction = Controls.moveFunction
+
+            local PlayerModule =
+                LocalPlayer.PlayerScripts:FindFirstChild(
+                    "PlayerModule"
+                )
+
+            if not PlayerModule then
+                return
             end
-            local function protectedMove(self, moveVector, relativeToCamera)
+
+            local Controls =
+                require(PlayerModule):GetControls()
+
+            if not Controls then
+                return
+            end
+
+            if not antiBeeData.originalMoveFunction then
+                antiBeeData.originalMoveFunction =
+                    Controls.moveFunction
+            end
+
+            local function protectedMove(
+                self,
+                moveVector,
+                relativeToCamera
+            )
                 pcall(function()
                     if antiBeeData.originalMoveFunction then
-                        antiBeeData.originalMoveFunction(self, moveVector, relativeToCamera)
+                        antiBeeData.originalMoveFunction(
+                            self,
+                            moveVector,
+                            relativeToCamera
+                        )
                     end
                 end)
             end
+
             Controls.moveFunction = protectedMove
-            table.insert(antiBeeConnections, RunService.Heartbeat:Connect(function()
-                pcall(function()
-                    if not antiBeeEnabled then return end
-                    if Controls.moveFunction ~= protectedMove then
-                        Controls.moveFunction = protectedMove
+
+            table.insert(
+                antiBeeConnections,
+                RunService.Heartbeat:Connect(
+                    function()
+
+                        pcall(function()
+
+                            if not antiBeeEnabled then
+                                return
+                            end
+
+                            if Controls.moveFunction ~= protectedMove then
+                                Controls.moveFunction = protectedMove
+                            end
+                        end)
                     end
-                end)
-            end))
+                )
+            )
+
             antiBeeData.controlsProtected = true
         end)
     end
 
     local function blockBuzzing()
+
         pcall(function()
-            local beeScript = LocalPlayer.PlayerScripts:FindFirstChild("Bee", true)
-            if beeScript then
-                local buzzing = beeScript:FindFirstChild("Buzzing")
-                if buzzing and buzzing:IsA("Sound") then
-                    buzzing:Stop()
-                    buzzing.Volume = 0
-                end
+
+            local beeScript =
+                LocalPlayer.PlayerScripts:FindFirstChild(
+                    "Bee",
+                    true
+                )
+
+            if not beeScript then
+                return
+            end
+
+            local buzzing =
+                beeScript:FindFirstChild("Buzzing")
+
+            if buzzing and buzzing:IsA("Sound") then
+                buzzing:Stop()
+                buzzing.Volume = 0
             end
         end)
     end
 
     local function lockFOV()
+
         pcall(function()
-            local cam = Workspace.CurrentCamera
-            if cam then cam.FieldOfView = 70 end
+
+            local cam =
+                Workspace.CurrentCamera
+
+            if cam then
+                cam.FieldOfView = 70
+            end
         end)
     end
 
     local function enableAntiBee()
-        if antiBeeEnabled then return end
+
+        if antiBeeEnabled then
+            return
+        end
+
         antiBeeEnabled = true
+
         pcall(function()
-            for _, obj in ipairs(Lighting:GetDescendants()) do destroyBeeEffect(obj) end
+
+            for _, obj in ipairs(
+                Lighting:GetDescendants()
+            ) do
+
+                destroyBeeEffect(obj)
+            end
         end)
-        table.insert(antiBeeConnections, Lighting.DescendantAdded:Connect(function(obj)
-            pcall(function()
-                if antiBeeEnabled then destroyBeeEffect(obj) end
-            end)
-        end))
+
+        table.insert(
+            antiBeeConnections,
+            Lighting.DescendantAdded:Connect(
+                function(obj)
+
+                    pcall(function()
+
+                        if antiBeeEnabled then
+                            destroyBeeEffect(obj)
+                        end
+                    end)
+                end
+            )
+        )
+
         protectControls()
-        table.insert(antiBeeConnections, RunService.Heartbeat:Connect(function()
-            pcall(function()
-                if not antiBeeEnabled then return end
-                blockBuzzing()
-                lockFOV()
-            end)
-        end))
+
+        table.insert(
+            antiBeeConnections,
+            RunService.Heartbeat:Connect(
+                function()
+
+                    pcall(function()
+
+                        if not antiBeeEnabled then
+                            return
+                        end
+
+                        blockBuzzing()
+                        lockFOV()
+                    end)
+                end
+            )
+        )
     end
 
     pcall(enableAntiBee)
 
-    -- ================= HERRAMIENTA LASER =================
+    -- ====================================================
+    -- OBTENER HERRAMIENTA LASER
+    -- ====================================================
+
     local function getLaserTool()
-        local success, result = pcall(function()
-            local char = LocalPlayer.Character
-            local backpack = LocalPlayer.Backpack
-            if not char or not backpack then return nil end
-            
-            local function searchFolder(folder)
-                for _, item in ipairs(folder:GetChildren()) do
-                    if item:IsA("Tool") and string.find(string.lower(item.Name), "laser") then
-                        return item
-                    end
+
+        local success, result =
+            pcall(function()
+
+                local character =
+                    LocalPlayer.Character
+
+                local backpack =
+                    LocalPlayer.Backpack
+
+                if not character or not backpack then
+                    return nil
                 end
-                return nil
-            end
-            return searchFolder(char) or searchFolder(backpack)
-        end)
-        if success then return result end
+
+                local function searchFolder(folder)
+
+                    for _, item in ipairs(
+                        folder:GetChildren()
+                    ) do
+
+                        if item:IsA("Tool")
+                            and string.find(
+                                string.lower(item.Name),
+                                "laser",
+                                1,
+                                true
+                            ) then
+
+                            return item
+                        end
+                    end
+
+                    return nil
+                end
+
+                return
+                    searchFolder(character)
+                    or searchFolder(backpack)
+            end)
+
+        if success then
+            return result
+        end
+
         return nil
     end
 
-    -- ================= INTERFAZ GRÁFICA CON TOGGLE Y POSICIÓN =================
+    -- ====================================================
+    -- GUI
+    -- ====================================================
+
     local tokitoGui = nil
     local tokitoConnections = {}
 
-    local function createTokitoGui()
+    -- ====================================================
+    -- CONFIGURACIÓN DE GUI
+    -- ====================================================
+
+    local GUI_WIDTH = 165
+    local GUI_HEIGHT = 88
+
+    local DEFAULT_SCALE = 1
+    local MIN_SCALE = 0.70
+    local MAX_SCALE = 1.50
+
+    local currentScale = DEFAULT_SCALE
+
+    -- ====================================================
+    -- CARGAR ESCALA
+    -- ====================================================
+
+    pcall(function()
+
+        if Config
+            and tonumber(Config["TokitoScale"]) then
+
+            currentScale =
+                math.clamp(
+                    tonumber(Config["TokitoScale"]),
+                    MIN_SCALE,
+                    MAX_SCALE
+                )
+        end
+    end)
+
+    -- ====================================================
+    -- CARGAR POSICIÓN
+    -- ====================================================
+
+    local defaultPos =
+        UDim2.new(
+            0.5,
+            -(GUI_WIDTH / 2),
+            0.5,
+            -(GUI_HEIGHT / 2)
+        )
+
+    local savedPos = defaultPos
+
+    pcall(function()
+
+        if Config and Config["TokitoPos"] then
+
+            local p =
+                Config["TokitoPos"]
+
+            if type(p) == "table"
+                and #p >= 4 then
+
+                savedPos =
+                    UDim2.new(
+                        p[1],
+                        p[2],
+                        p[3],
+                        p[4]
+                    )
+            end
+        end
+    end)
+
+    -- ====================================================
+    -- GUARDAR POSICIÓN
+    -- ====================================================
+
+    local function saveTokitoPosition(position)
+
         pcall(function()
-            if tokitoGui then tokitoGui:Destroy() end
-        end)
 
-        local ScreenGui = Instance.new("ScreenGui")
-        ScreenGui.Name = "TokitoPvPGUI"
-        ScreenGui.ResetOnSpawn = false
-        
-        -- Asignación segura de UI (Evita el WaitForChild que rompía todo)
-        local parentSuccess, coreGuiResult = pcall(function() return gethui() or game:GetService("CoreGui") end)
-        ScreenGui.Parent = parentSuccess and coreGuiResult or game:GetService("CoreGui")
-        
-        tokitoGui = ScreenGui
+            if Config then
 
-        local uiWidth = 140
-        local uiHeight = 85 
+                Config["TokitoPos"] = {
+                    position.X.Scale,
+                    position.X.Offset,
+                    position.Y.Scale,
+                    position.Y.Offset
+                }
 
-        -- Posición por defecto
-        local defaultPos = UDim2.new(0.5, -(uiWidth/2), 0.5, -(uiHeight/2))
-        local framePos = defaultPos
-        
-        pcall(function()
-            if Config and Config["TokitoPos"] then
-                local p = Config["TokitoPos"]
-                if type(p) == "table" and #p >= 4 then
-                    framePos = UDim2.new(p[1], p[2], p[3], p[4])
+                if saveConfig then
+                    saveConfig()
                 end
             end
-        end)
-
-        local MainFrame = Instance.new("Frame")
-        MainFrame.Name = "MainFrame"
-        MainFrame.Size = UDim2.new(0, uiWidth, 0, uiHeight)
-        MainFrame.Position = framePos
-        MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-        MainFrame.BorderSizePixel = 0
-        MainFrame.Parent = ScreenGui
-
-        local UIStroke = Instance.new("UIStroke")
-        UIStroke.Parent = MainFrame
-        UIStroke.Thickness = 2
-        UIStroke.Color = Color3.fromRGB(0, 170, 255)
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 8)
-        Corner.Parent = MainFrame
-
-        local Title = Instance.new("TextLabel")
-        Title.Size = UDim2.new(1, 0, 0, 30)
-        Title.BackgroundTransparency = 1
-        Title.Text = "Auto Laser"
-        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Title.Font = Enum.Font.GothamBold
-        Title.TextSize = 14
-        Title.Parent = MainFrame
-
-        local Line = Instance.new("Frame")
-        Line.Size = UDim2.new(1, -20, 0, 1)
-        Line.Position = UDim2.new(0, 10, 0, 30)
-        Line.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-        Line.BorderSizePixel = 0
-        Line.Parent = MainFrame
-
-        -- ================= LÓGICA DE ARRASTRE (Igual al Aimbot) =================
-        local dragging, dragInput, dragStart, startPos
-        MainFrame.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                startPos = MainFrame.Position
-
-                input.Changed:Connect(function()  
-                    if input.UserInputState == Enum.UserInputState.End then  
-                        if dragging then
-                            dragging = false  
-                            pcall(function()
-                                if Config then
-                                    Config["TokitoPos"] = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset, MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
-                                    if saveConfig then saveConfig() end
-                                end
-                            end)
-                        end
-                    end  
-                end)  
-            end
-        end)
-
-        MainFrame.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-            end
-        end)
-
-        table.insert(tokitoConnections, UserInputService.InputChanged:Connect(function(input)
-            if input == dragInput and dragging then
-                local delta = input.Position - dragStart
-                MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
-        end))
-        -- ========================================================================
-
-        table.insert(tokitoConnections, RunService.RenderStepped:Connect(function()
-            pcall(function()
-                if not ScreenGui.Parent then return end
-                local t = tick() * 2
-                local blueShade = Color3.fromHSV(0.55 + (math.sin(t) * 0.05), 1, 1)
-                UIStroke.Color = blueShade
-                Line.BackgroundColor3 = blueShade
-                Title.TextColor3 = blueShade
-            end)
-        end))
-
-        -- Botón de Laser
-        local laserBtn = Instance.new("TextButton")
-        laserBtn.Size = UDim2.new(0.8, 0, 0, 35)
-        laserBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
-        laserBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-        laserBtn.TextColor3 = Color3.new(1, 1, 1)
-        laserBtn.Font = Enum.Font.GothamSemibold
-        laserBtn.TextSize = 13
-        laserBtn.Text = "Activar Laser"
-        laserBtn.Parent = MainFrame
-        Instance.new("UICorner", laserBtn).CornerRadius = UDim.new(0, 6)
-
-        -- LÓGICA DEL LÁSER
-        local laserActive = false
-        laserBtn.MouseButton1Click:Connect(function()
-            pcall(function()
-                laserActive = not laserActive
-                
-                if laserActive then
-                    local tool = getLaserTool()
-                    if not tool then
-                        laserActive = false
-                        return
-                    end
-                    
-                    laserBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-                    laserBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-                    laserBtn.Text = "Laser Activo"
-                    
-                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-                    if hum then hum:EquipTool(tool) end
-                    
-                    task.spawn(function()
-                        while laserActive do
-                            local success = pcall(function()
-                                if not tool or tool.Parent ~= LocalPlayer.Character then
-                                    laserActive = false
-                                    laserBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-                                    laserBtn.TextColor3 = Color3.new(1, 1, 1)
-                                    laserBtn.Text = "Activar Laser"
-                                    return
-                                end
-                                tool:Activate()
-                            end)
-                            if not success or not laserActive then break end
-                            task.wait(0.02)
-                        end
-                    end)
-                else
-                    laserBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-                    laserBtn.TextColor3 = Color3.new(1, 1, 1)
-                    laserBtn.Text = "Activar Laser"
-                end
-            end)
         end)
     end
 
-    local function destroyTokitoGui()
+    -- ====================================================
+    -- GUARDAR ESCALA
+    -- ====================================================
+
+    local function saveTokitoScale(scale)
+
         pcall(function()
-            for _, conn in ipairs(tokitoConnections) do
-                if conn then conn:Disconnect() end
+
+            if Config then
+
+                Config["TokitoScale"] =
+                    math.clamp(
+                        scale,
+                        MIN_SCALE,
+                        MAX_SCALE
+                    )
+
+                if saveConfig then
+                    saveConfig()
+                end
             end
+        end)
+    end
+
+    -- ====================================================
+    -- CREAR GUI
+    -- ====================================================
+
+    local function createTokitoGui()
+
+        -- ==================================================
+        -- LIMPIAR ANTERIOR
+        -- ==================================================
+
+        pcall(function()
+
+            if tokitoGui then
+                tokitoGui:Destroy()
+                tokitoGui = nil
+            end
+
+            for _, conn in ipairs(
+                tokitoConnections
+            ) do
+
+                if conn then
+                    conn:Disconnect()
+                end
+            end
+
             tokitoConnections = {}
+        end)
+
+        -- ==================================================
+        -- SCREEN GUI
+        -- ==================================================
+
+        local ScreenGui =
+            Instance.new("ScreenGui")
+
+        ScreenGui.Name =
+            "TokitoPvPGUI"
+
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.IgnoreGuiInset = true
+        ScreenGui.ZIndexBehavior =
+            Enum.ZIndexBehavior.Sibling
+
+        local parentSuccess, coreGuiResult =
+            pcall(function()
+
+                return
+                    gethui()
+                    or game:GetService("CoreGui")
+            end)
+
+        ScreenGui.Parent =
+            parentSuccess
+            and coreGuiResult
+            or game:GetService("CoreGui")
+
+        tokitoGui = ScreenGui
+
+        -- ==================================================
+        -- MAIN FRAME
+        -- ==================================================
+
+        local MainFrame =
+            Instance.new("Frame")
+
+        MainFrame.Name =
+            "MainFrame"
+
+        MainFrame.Size =
+            UDim2.new(
+                0,
+                GUI_WIDTH,
+                0,
+                GUI_HEIGHT
+            )
+
+        MainFrame.Position =
+            savedPos
+
+        MainFrame.BackgroundColor3 =
+            Color3.fromRGB(
+                9,
+                13,
+                20
+            )
+
+        MainFrame.BackgroundTransparency =
+            0.03
+
+        MainFrame.BorderSizePixel = 0
+        MainFrame.ClipsDescendants = false
+        MainFrame.Active = true
+
+        MainFrame.Parent =
+            ScreenGui
+
+        -- ==================================================
+        -- ESCALA
+        -- ==================================================
+
+        local UIScale =
+            Instance.new("UIScale")
+
+        UIScale.Name =
+            "ResponsiveScale"
+
+        UIScale.Scale =
+            currentScale
+
+        UIScale.Parent =
+            MainFrame
+
+        -- ==================================================
+        -- SOMBRA
+        -- ==================================================
+
+        local Shadow =
+            Instance.new("ImageLabel")
+
+        Shadow.Name =
+            "Shadow"
+
+        Shadow.AnchorPoint =
+            Vector2.new(0.5, 0.5)
+
+        Shadow.Position =
+            UDim2.new(
+                0.5,
+                0,
+                0.5,
+                4
+            )
+
+        Shadow.Size =
+            UDim2.new(
+                0,
+                GUI_WIDTH + 30,
+                0,
+                GUI_HEIGHT + 30
+            )
+
+        Shadow.BackgroundTransparency = 1
+
+        Shadow.Image =
+            "rbxassetid://1316045217"
+
+        Shadow.ImageColor3 =
+            Color3.fromRGB(
+                0,
+                0,
+                0
+            )
+
+        Shadow.ImageTransparency = 0.35
+
+        Shadow.ScaleType =
+            Enum.ScaleType.Slice
+
+        Shadow.SliceCenter =
+            Rect.new(
+                10,
+                10,
+                118,
+                118
+            )
+
+        Shadow.ZIndex = 0
+
+        Shadow.Parent =
+            MainFrame
+
+        -- ==================================================
+        -- CORNER
+        -- ==================================================
+
+        local MainCorner =
+            Instance.new("UICorner")
+
+        MainCorner.CornerRadius =
+            UDim.new(
+                0,
+                12
+            )
+
+        MainCorner.Parent =
+            MainFrame
+
+        -- ==================================================
+        -- GRADIENT
+        -- ==================================================
+
+        local MainGradient =
+            Instance.new("UIGradient")
+
+        MainGradient.Color =
+            ColorSequence.new({
+
+                ColorSequenceKeypoint.new(
+                    0,
+                    Color3.fromRGB(
+                        16,
+                        23,
+                        34
+                    )
+                ),
+
+                ColorSequenceKeypoint.new(
+                    0.5,
+                    Color3.fromRGB(
+                        9,
+                        14,
+                        22
+                    )
+                ),
+
+                ColorSequenceKeypoint.new(
+                    1,
+                    Color3.fromRGB(
+                        6,
+                        9,
+                        15
+                    )
+                )
+            })
+
+        MainGradient.Rotation = 90
+        MainGradient.Parent = MainFrame
+
+        -- ==================================================
+        -- BORDE
+        -- ==================================================
+
+        local UIStroke =
+            Instance.new("UIStroke")
+
+        UIStroke.Thickness = 1.5
+        UIStroke.Transparency = 0.15
+
+        UIStroke.Color =
+            Color3.fromRGB(
+                0,
+                170,
+                255
+            )
+
+        UIStroke.Parent =
+            MainFrame
+
+        -- ==================================================
+        -- CABECERA
+        -- ==================================================
+
+        local Header =
+            Instance.new("Frame")
+
+        Header.Name =
+            "Header"
+
+        Header.Size =
+            UDim2.new(
+                1,
+                -10,
+                0,
+                30
+            )
+
+        Header.Position =
+            UDim2.new(
+                0,
+                5,
+                0,
+                4
+            )
+
+        Header.BackgroundTransparency = 1
+        Header.Parent =
+            MainFrame
+
+        -- ==================================================
+        -- ZONA DE ARRASTRE
+        -- ==================================================
+
+        local DragHandle =
+            Instance.new("TextButton")
+
+        DragHandle.Name =
+            "DragHandle"
+
+        DragHandle.Size =
+            UDim2.new(
+                1,
+                -50,
+                1,
+                0
+            )
+
+        DragHandle.Position =
+            UDim2.new(
+                0,
+                0,
+                0,
+                0
+            )
+
+        DragHandle.BackgroundTransparency = 1
+        DragHandle.BorderSizePixel = 0
+
+        DragHandle.Text = ""
+        DragHandle.AutoButtonColor = false
+
+        DragHandle.Active = true
+        DragHandle.Selectable = false
+        DragHandle.ZIndex = 40
+
+        DragHandle.Parent =
+            Header
+
+        -- ==================================================
+        -- ICONO
+        -- ==================================================
+
+        local Icon =
+            Instance.new("TextLabel")
+
+        Icon.Size =
+            UDim2.new(
+                0,
+                25,
+                0,
+                25
+            )
+
+        Icon.Position =
+            UDim2.new(
+                0,
+                0,
+                0,
+                0
+            )
+
+        Icon.BackgroundColor3 =
+            Color3.fromRGB(
+                0,
+                95,
+                160
+            )
+
+        Icon.BackgroundTransparency =
+            0.15
+
+        Icon.Text = "⚡"
+
+        Icon.TextColor3 =
+            Color3.fromRGB(
+                255,
+                255,
+                255
+            )
+
+        Icon.Font =
+            Enum.Font.GothamBold
+
+        Icon.TextSize = 13
+        Icon.ZIndex = 41
+
+        Icon.Parent =
+            Header
+
+        local IconCorner =
+            Instance.new("UICorner")
+
+        IconCorner.CornerRadius =
+            UDim.new(
+                0,
+                7
+            )
+
+        IconCorner.Parent =
+            Icon
+
+        -- ==================================================
+        -- TÍTULO
+        -- ==================================================
+
+        local Title =
+            Instance.new("TextLabel")
+
+        Title.Size =
+            UDim2.new(
+                1,
+                -90,
+                0,
+                16
+            )
+
+        Title.Position =
+            UDim2.new(
+                0,
+                32,
+                0,
+                1
+            )
+
+        Title.BackgroundTransparency = 1
+
+        Title.Text =
+            "AUTO LASER"
+
+        Title.TextColor3 =
+            Color3.fromRGB(
+                235,
+                245,
+                255
+            )
+
+        Title.Font =
+            Enum.Font.GothamBold
+
+        Title.TextSize = 11
+        Title.TextXAlignment =
+            Enum.TextXAlignment.Left
+
+        Title.ZIndex = 41
+
+        Title.Parent =
+            Header
+
+        -- ==================================================
+        -- SUBTÍTULO
+        -- ==================================================
+
+        local Subtitle =
+            Instance.new("TextLabel")
+
+        Subtitle.Size =
+            UDim2.new(
+                1,
+                -90,
+                0,
+                12
+            )
+
+        Subtitle.Position =
+            UDim2.new(
+                0,
+                32,
+                0,
+                16
+            )
+
+        Subtitle.BackgroundTransparency = 1
+
+        Subtitle.Text =
+            "CONTROL DEL LASER"
+
+        Subtitle.TextColor3 =
+            Color3.fromRGB(
+                105,
+                125,
+                145
+            )
+
+        Subtitle.Font =
+            Enum.Font.GothamMedium
+
+        Subtitle.TextSize = 7
+
+        Subtitle.TextXAlignment =
+            Enum.TextXAlignment.Left
+
+        Subtitle.ZIndex = 41
+
+        Subtitle.Parent =
+            Header
+
+        -- ==================================================
+        -- CONFIGURACIÓN
+        -- ==================================================
+
+        local SettingsBtn =
+            Instance.new("TextButton")
+
+        SettingsBtn.Name =
+            "Settings"
+
+        SettingsBtn.Size =
+            UDim2.new(
+                0,
+                22,
+                0,
+                22
+            )
+
+        SettingsBtn.Position =
+            UDim2.new(
+                1,
+                -48,
+                0,
+                1
+            )
+
+        SettingsBtn.BackgroundColor3 =
+            Color3.fromRGB(
+                18,
+                28,
+                40
+            )
+
+        SettingsBtn.Text = "⚙"
+
+        SettingsBtn.TextColor3 =
+            Color3.fromRGB(
+                0,
+                190,
+                255
+            )
+
+        SettingsBtn.Font =
+            Enum.Font.GothamBold
+
+        SettingsBtn.TextSize = 13
+        SettingsBtn.AutoButtonColor = false
+        SettingsBtn.ZIndex = 60
+        SettingsBtn.Parent = Header
+
+        local SettingsCorner =
+            Instance.new("UICorner")
+
+        SettingsCorner.CornerRadius =
+            UDim.new(
+                0,
+                7
+            )
+
+        SettingsCorner.Parent =
+            SettingsBtn
+
+        -- ==================================================
+        -- MINIMIZAR
+        -- ==================================================
+
+        local MinimizeBtn =
+            Instance.new("TextButton")
+
+        MinimizeBtn.Name =
+            "Minimize"
+
+        MinimizeBtn.Size =
+            UDim2.new(
+                0,
+                22,
+                0,
+                22
+            )
+
+        MinimizeBtn.Position =
+            UDim2.new(
+                1,
+                -23,
+                0,
+                1
+            )
+
+        MinimizeBtn.BackgroundColor3 =
+            Color3.fromRGB(
+                18,
+                28,
+                40
+            )
+
+        MinimizeBtn.Text = "—"
+
+        MinimizeBtn.TextColor3 =
+            Color3.fromRGB(
+                150,
+                180,
+                200
+            )
+
+        MinimizeBtn.Font =
+            Enum.Font.GothamBold
+
+        MinimizeBtn.TextSize = 11
+        MinimizeBtn.AutoButtonColor = false
+        MinimizeBtn.ZIndex = 60
+        MinimizeBtn.Parent = Header
+
+        local MinCorner =
+            Instance.new("UICorner")
+
+        MinCorner.CornerRadius =
+            UDim.new(
+                0,
+                7
+            )
+
+        MinCorner.Parent =
+            MinimizeBtn
+
+        -- ==================================================
+        -- ESTADO
+        -- ==================================================
+
+        local Status =
+            Instance.new("TextLabel")
+
+        Status.Size =
+            UDim2.new(
+                1,
+                -20,
+                0,
+                14
+            )
+
+        Status.Position =
+            UDim2.new(
+                0,
+                10,
+                0,
+                34
+            )
+
+        Status.BackgroundTransparency = 1
+
+        Status.Text =
+            "● LASER DESACTIVADO"
+
+        Status.TextColor3 =
+            Color3.fromRGB(
+                120,
+                145,
+                165
+            )
+
+        Status.Font =
+            Enum.Font.GothamMedium
+
+        Status.TextSize = 8
+        Status.TextXAlignment =
+            Enum.TextXAlignment.Left
+
+        Status.Parent =
+            MainFrame
+
+        -- ==================================================
+        -- BOTÓN LASER
+        -- ==================================================
+
+        local LaserButton =
+            Instance.new("TextButton")
+
+        LaserButton.Name =
+            "LaserButton"
+
+        LaserButton.Size =
+            UDim2.new(
+                1,
+                -20,
+                0,
+                31
+            )
+
+        LaserButton.Position =
+            UDim2.new(
+                0,
+                10,
+                0,
+                51
+            )
+
+        LaserButton.BackgroundColor3 =
+            Color3.fromRGB(
+                18,
+                28,
+                43
+            )
+
+        LaserButton.BorderSizePixel = 0
+
+        LaserButton.Text =
+            "ACTIVAR LASER"
+
+        LaserButton.TextColor3 =
+            Color3.fromRGB(
+                220,
+                230,
+                240
+            )
+
+        LaserButton.Font =
+            Enum.Font.GothamBold
+
+        LaserButton.TextSize = 10
+        LaserButton.AutoButtonColor = false
+
+        LaserButton.Parent =
+            MainFrame
+
+        local LaserCorner =
+            Instance.new("UICorner")
+
+        LaserCorner.CornerRadius =
+            UDim.new(
+                0,
+                8
+            )
+
+        LaserCorner.Parent =
+            LaserButton
+
+        local LaserStroke =
+            Instance.new("UIStroke")
+
+        LaserStroke.Thickness = 1
+        LaserStroke.Transparency = 0.25
+
+        LaserStroke.Color =
+            Color3.fromRGB(
+                0,
+                110,
+                180
+            )
+
+        LaserStroke.Parent =
+            LaserButton
+
+        -- ==================================================
+        -- PANEL DE CONFIGURACIÓN
+        -- ==================================================
+
+        local SettingsFrame =
+            Instance.new("Frame")
+
+        SettingsFrame.Name =
+            "SettingsFrame"
+
+        SettingsFrame.Size =
+            UDim2.new(
+                0,
+                210,
+                0,
+                145
+            )
+
+        SettingsFrame.Position =
+            UDim2.new(
+                0,
+                -20,
+                0,
+                95
+            )
+
+        SettingsFrame.BackgroundColor3 =
+            Color3.fromRGB(
+                8,
+                13,
+                20
+            )
+
+        SettingsFrame.BorderSizePixel = 0
+        SettingsFrame.Visible = false
+        SettingsFrame.ZIndex = 20
+
+        SettingsFrame.Parent =
+            MainFrame
+
+        local SettingsFrameCorner =
+            Instance.new("UICorner")
+
+        SettingsFrameCorner.CornerRadius =
+            UDim.new(
+                0,
+                11
+            )
+
+        SettingsFrameCorner.Parent =
+            SettingsFrame
+
+        local SettingsFrameStroke =
+            Instance.new("UIStroke")
+
+        SettingsFrameStroke.Color =
+            Color3.fromRGB(
+                0,
+                150,
+                220
+            )
+
+        SettingsFrameStroke.Thickness = 1.2
+        SettingsFrameStroke.Parent =
+            SettingsFrame
+
+        -- ==================================================
+        -- TÍTULO CONFIG
+        -- ==================================================
+
+        local SettingsTitle =
+            Instance.new("TextLabel")
+
+        SettingsTitle.Size =
+            UDim2.new(
+                1,
+                -20,
+                0,
+                20
+            )
+
+        SettingsTitle.Position =
+            UDim2.new(
+                0,
+                10,
+                0,
+                8
+            )
+
+        SettingsTitle.BackgroundTransparency = 1
+
+        SettingsTitle.Text =
+            "⚙  CONFIGURACIÓN"
+
+        SettingsTitle.TextColor3 =
+            Color3.fromRGB(
+                0,
+                210,
+                255
+            )
+
+        SettingsTitle.Font =
+            Enum.Font.GothamBold
+
+        SettingsTitle.TextSize = 10
+        SettingsTitle.TextXAlignment =
+            Enum.TextXAlignment.Left
+
+        SettingsTitle.ZIndex = 21
+        SettingsTitle.Parent =
+            SettingsFrame
+
+        -- ==================================================
+        -- TEXTO DE ESCALA
+        -- ==================================================
+
+        local ScaleLabel =
+            Instance.new("TextLabel")
+
+        ScaleLabel.Size =
+            UDim2.new(
+                1,
+                -20,
+                0,
+                20
+            )
+
+        ScaleLabel.Position =
+            UDim2.new(
+                0,
+                10,
+                0,
+                34
+            )
+
+        ScaleLabel.BackgroundTransparency = 1
+
+        ScaleLabel.TextColor3 =
+            Color3.fromRGB(
+                200,
+                215,
+                230
+            )
+
+        ScaleLabel.Font =
+            Enum.Font.GothamMedium
+
+        ScaleLabel.TextSize = 9
+        ScaleLabel.TextXAlignment =
+            Enum.TextXAlignment.Left
+
+        ScaleLabel.ZIndex = 21
+        ScaleLabel.Parent =
+            SettingsFrame
+
+        -- ==================================================
+        -- SLIDER
+        -- ==================================================
+
+        local Slider =
+            Instance.new("Frame")
+
+        Slider.Name =
+            "ScaleSlider"
+
+        Slider.Size =
+            UDim2.new(
+                1,
+                -40,
+                0,
+                7
+            )
+
+        Slider.Position =
+            UDim2.new(
+                0,
+                20,
+                0,
+                61
+            )
+
+        Slider.BackgroundColor3 =
+            Color3.fromRGB(
+                27,
+                39,
+                52
+            )
+
+        Slider.BorderSizePixel = 0
+        Slider.ZIndex = 21
+
+        Slider.Parent =
+            SettingsFrame
+
+        local SliderCorner =
+            Instance.new("UICorner")
+
+        SliderCorner.CornerRadius =
+            UDim.new(
+                1,
+                0
+            )
+
+        SliderCorner.Parent =
+            Slider
+
+        local SliderFill =
+            Instance.new("Frame")
+
+        SliderFill.Size =
+            UDim2.new(
+                0.5,
+                0,
+                1,
+                0
+            )
+
+        SliderFill.BackgroundColor3 =
+            Color3.fromRGB(
+                0,
+                175,
+                255
+            )
+
+        SliderFill.BorderSizePixel = 0
+        SliderFill.ZIndex = 22
+
+        SliderFill.Parent =
+            Slider
+
+        local SliderFillCorner =
+            Instance.new("UICorner")
+
+        SliderFillCorner.CornerRadius =
+            UDim.new(
+                1,
+                0
+            )
+
+        SliderFillCorner.Parent =
+            SliderFill
+
+        local SliderKnob =
+            Instance.new("TextButton")
+
+        SliderKnob.Size =
+            UDim2.new(
+                0,
+                17,
+                0,
+                17
+            )
+
+        SliderKnob.AnchorPoint =
+            Vector2.new(
+                0.5,
+                0.5
+            )
+
+        SliderKnob.Position =
+            UDim2.new(
+                0.5,
+                0,
+                0.5,
+                0
+            )
+
+        SliderKnob.BackgroundColor3 =
+            Color3.fromRGB(
+                0,
+                215,
+                255
+            )
+
+        SliderKnob.Text = ""
+        SliderKnob.AutoButtonColor = false
+        SliderKnob.ZIndex = 23
+        SliderKnob.Parent =
+            Slider
+
+        local SliderKnobCorner =
+            Instance.new("UICorner")
+
+        SliderKnobCorner.CornerRadius =
+            UDim.new(
+                1,
+                0
+            )
+
+        SliderKnobCorner.Parent =
+            SliderKnob
+
+        -- ==================================================
+        -- BOTONES DE ESCALA
+        -- ==================================================
+
+        local MinusButton =
+            Instance.new("TextButton")
+
+        MinusButton.Size =
+            UDim2.new(
+                0,
+                40,
+                0,
+                27
+            )
+
+        MinusButton.Position =
+            UDim2.new(
+                0,
+                15,
+                0,
+                91
+            )
+
+        MinusButton.BackgroundColor3 =
+            Color3.fromRGB(
+                17,
+                27,
+                38
+            )
+
+        MinusButton.Text = "−"
+
+        MinusButton.TextColor3 =
+            Color3.fromRGB(
+                220,
+                230,
+                240
+            )
+
+        MinusButton.Font =
+            Enum.Font.GothamBold
+
+        MinusButton.TextSize = 16
+        MinusButton.ZIndex = 21
+
+        MinusButton.Parent =
+            SettingsFrame
+
+        local MinusCorner =
+            Instance.new("UICorner")
+
+        MinusCorner.CornerRadius =
+            UDim.new(
+                0,
+                7
+            )
+
+        MinusCorner.Parent =
+            MinusButton
+
+        local ResetButton =
+            Instance.new("TextButton")
+
+        ResetButton.Size =
+            UDim2.new(
+                0,
+                70,
+                0,
+                27
+            )
+
+        ResetButton.Position =
+            UDim2.new(
+                0.5,
+                -35,
+                0,
+                91
+            )
+
+        ResetButton.BackgroundColor3 =
+            Color3.fromRGB(
+                17,
+                27,
+                38
+            )
+
+        ResetButton.Text =
+            "REINICIAR"
+
+        ResetButton.TextColor3 =
+            Color3.fromRGB(
+                120,
+                190,
+                220
+            )
+
+        ResetButton.Font =
+            Enum.Font.GothamBold
+
+        ResetButton.TextSize = 8
+        ResetButton.ZIndex = 21
+
+        ResetButton.Parent =
+            SettingsFrame
+
+        local ResetCorner =
+            Instance.new("UICorner")
+
+        ResetCorner.CornerRadius =
+            UDim.new(
+                0,
+                7
+            )
+
+        ResetCorner.Parent =
+            ResetButton
+
+        local PlusButton =
+            Instance.new("TextButton")
+
+        PlusButton.Size =
+            UDim2.new(
+                0,
+                40,
+                0,
+                27
+            )
+
+        PlusButton.Position =
+            UDim2.new(
+                1,
+                -55,
+                0,
+                91
+            )
+
+        PlusButton.BackgroundColor3 =
+            Color3.fromRGB(
+                17,
+                27,
+                38
+            )
+
+        PlusButton.Text = "+"
+
+        PlusButton.TextColor3 =
+            Color3.fromRGB(
+                220,
+                230,
+                240
+            )
+
+        PlusButton.Font =
+            Enum.Font.GothamBold
+
+        PlusButton.TextSize = 16
+        PlusButton.ZIndex = 21
+
+        PlusButton.Parent =
+            SettingsFrame
+
+        local PlusCorner =
+            Instance.new("UICorner")
+
+        PlusCorner.CornerRadius =
+            UDim.new(
+                0,
+                7
+            )
+
+        PlusCorner.Parent =
+            PlusButton
+
+        -- ==================================================
+        -- ESCALA
+        -- ==================================================
+
+        local function updateScale(
+            value,
+            shouldSave
+        )
+
+            value = tonumber(value)
+
+            if not value then
+                return
+            end
+
+            value = math.clamp(
+                value,
+                MIN_SCALE,
+                MAX_SCALE
+            )
+
+            currentScale = value
+
+            UIScale.Scale =
+                currentScale
+
+            local percentage =
+                math.floor(
+                    currentScale * 100 + 0.5
+                )
+
+            ScaleLabel.Text =
+                "Tamaño de interfaz: "
+                .. percentage
+                .. "%"
+
+            local alpha =
+                (
+                    currentScale
+                    - MIN_SCALE
+                )
+                /
+                (
+                    MAX_SCALE
+                    - MIN_SCALE
+                )
+
+            SliderFill.Size =
+                UDim2.new(
+                    alpha,
+                    0,
+                    1,
+                    0
+                )
+
+            SliderKnob.Position =
+                UDim2.new(
+                    alpha,
+                    0,
+                    0.5,
+                    0
+                )
+
+            if shouldSave then
+                saveTokitoScale(
+                    currentScale
+                )
+            end
+        end
+
+        updateScale(
+            currentScale,
+            false
+        )
+
+        -- ==================================================
+        -- SLIDER
+        -- ==================================================
+
+        local function updateSlider(x)
+
+            local left =
+                Slider.AbsolutePosition.X
+
+            local width =
+                Slider.AbsoluteSize.X
+
+            if width <= 0 then
+                return
+            end
+
+            local alpha =
+                math.clamp(
+                    (x - left) / width,
+                    0,
+                    1
+                )
+
+            local newScale =
+                MIN_SCALE
+                +
+                (
+                    MAX_SCALE - MIN_SCALE
+                )
+                * alpha
+
+            updateScale(
+                newScale,
+                true
+            )
+        end
+
+        SliderKnob.InputBegan:Connect(
+            function(input)
+
+                if input.UserInputType ==
+                    Enum.UserInputType.MouseButton1
+                    or input.UserInputType ==
+                    Enum.UserInputType.Touch then
+
+                    sliderDragging = true
+                end
+            end
+        )
+
+        Slider.InputBegan:Connect(
+            function(input)
+
+                if input.UserInputType ==
+                    Enum.UserInputType.MouseButton1
+                    or input.UserInputType ==
+                    Enum.UserInputType.Touch then
+
+                    sliderDragging = true
+
+                    updateSlider(
+                        input.Position.X
+                    )
+                end
+            end
+        )
+
+        table.insert(
+            tokitoConnections,
+            UserInputService.InputChanged:Connect(
+                function(input)
+
+                    if not sliderDragging then
+                        return
+                    end
+
+                    if input.UserInputType ==
+                        Enum.UserInputType.MouseMovement
+                        or input.UserInputType ==
+                        Enum.UserInputType.Touch then
+
+                        updateSlider(
+                            input.Position.X
+                        )
+                    end
+                end
+            )
+        )
+
+        table.insert(
+            tokitoConnections,
+            UserInputService.InputEnded:Connect(
+                function(input)
+
+                    if input.UserInputType ==
+                        Enum.UserInputType.MouseButton1
+                        or input.UserInputType ==
+                        Enum.UserInputType.Touch then
+
+                        sliderDragging = false
+                    end
+                end
+            )
+        )
+
+        MinusButton.MouseButton1Click:Connect(
+            function()
+
+                updateScale(
+                    currentScale - 0.05,
+                    true
+                )
+            end
+        )
+
+        PlusButton.MouseButton1Click:Connect(
+            function()
+
+                updateScale(
+                    currentScale + 0.05,
+                    true
+                )
+            end
+        )
+
+        ResetButton.MouseButton1Click:Connect(
+            function()
+
+                updateScale(
+                    DEFAULT_SCALE,
+                    true
+                )
+            end
+        )
+
+        -- ==================================================
+        -- ABRIR CONFIGURACIÓN
+        -- ==================================================
+
+        local settingsOpen = false
+
+        SettingsBtn.MouseButton1Click:Connect(
+            function()
+
+                settingsOpen =
+                    not settingsOpen
+
+                SettingsFrame.Visible =
+                    settingsOpen
+
+                if settingsOpen then
+
+                    SettingsBtn.BackgroundColor3 =
+                        Color3.fromRGB(
+                            0,
+                            75,
+                            115
+                        )
+
+                    SettingsBtn.TextColor3 =
+                        Color3.fromRGB(
+                            255,
+                            255,
+                            255
+                        )
+
+                else
+
+                    SettingsBtn.BackgroundColor3 =
+                        Color3.fromRGB(
+                            18,
+                            28,
+                            40
+                        )
+
+                    SettingsBtn.TextColor3 =
+                        Color3.fromRGB(
+                            0,
+                            190,
+                            255
+                        )
+                end
+            end
+        )
+
+        -- ==================================================
+        -- MINIMIZAR
+        -- ==================================================
+
+        local minimized = false
+
+        MinimizeBtn.MouseButton1Click:Connect(
+            function()
+
+                minimized =
+                    not minimized
+
+                settingsOpen = false
+                SettingsFrame.Visible = false
+
+                if minimized then
+
+                    MainFrame:TweenSize(
+                        UDim2.new(
+                            0,
+                            GUI_WIDTH,
+                            0,
+                            42
+                        ),
+                        "Out",
+                        "Quad",
+                        0.2,
+                        true
+                    )
+
+                    Status.Visible = false
+                    LaserButton.Visible = false
+
+                    MinimizeBtn.Text = "+"
+
+                else
+
+                    MainFrame:TweenSize(
+                        UDim2.new(
+                            0,
+                            GUI_WIDTH,
+                            0,
+                            GUI_HEIGHT
+                        ),
+                        "Out",
+                        "Quad",
+                        0.2,
+                        true
+                    )
+
+                    task.delay(
+                        0.06,
+                        function()
+
+                            if tokitoGui
+                                and not minimized then
+
+                                Status.Visible = true
+                                LaserButton.Visible = true
+                            end
+                        end
+                    )
+
+                    MinimizeBtn.Text = "—"
+                end
+            end
+        )
+
+        -- ==================================================
+        -- ARRASTRE REAL
+        -- ==================================================
+
+        local dragging = false
+        local dragStart = nil
+        local startPosition = nil
+        local activeDragInput = nil
+
+        DragHandle.InputBegan:Connect(
+            function(input)
+
+                if sliderDragging then
+                    return
+                end
+
+                if input.UserInputType ==
+                    Enum.UserInputType.MouseButton1
+                    or input.UserInputType ==
+                    Enum.UserInputType.Touch then
+
+                    dragging = true
+
+                    dragStart =
+                        input.Position
+
+                    startPosition =
+                        MainFrame.Position
+
+                    activeDragInput =
+                        input
+                end
+            end
+        )
+
+        table.insert(
+            tokitoConnections,
+            UserInputService.InputChanged:Connect(
+                function(input)
+
+                    if not dragging then
+                        return
+                    end
+
+                    if input.UserInputType ==
+                        Enum.UserInputType.MouseMovement then
+
+                        local delta =
+                            input.Position
+                            -
+                            dragStart
+
+                        MainFrame.Position =
+                            UDim2.new(
+                                startPosition.X.Scale,
+                                startPosition.X.Offset + delta.X,
+
+                                startPosition.Y.Scale,
+                                startPosition.Y.Offset + delta.Y
+                            )
+                    end
+                end
+            )
+        )
+
+        table.insert(
+            tokitoConnections,
+            UserInputService.TouchMoved:Connect(
+                function(
+                    touch,
+                    gameProcessed
+                )
+
+                    if not dragging then
+                        return
+                    end
+
+                    if touch ~= activeDragInput then
+                        return
+                    end
+
+                    local delta =
+                        touch.Position
+                        -
+                        dragStart
+
+                    MainFrame.Position =
+                        UDim2.new(
+                            startPosition.X.Scale,
+                            startPosition.X.Offset + delta.X,
+
+                            startPosition.Y.Scale,
+                            startPosition.Y.Offset + delta.Y
+                        )
+                end
+            )
+        )
+
+        table.insert(
+            tokitoConnections,
+            UserInputService.InputEnded:Connect(
+                function(input)
+
+                    if input.UserInputType ==
+                        Enum.UserInputType.MouseButton1
+                        or input.UserInputType ==
+                        Enum.UserInputType.Touch then
+
+                        if input.UserInputType ==
+                            Enum.UserInputType.Touch
+                            and activeDragInput
+                            and input ~= activeDragInput then
+
+                            return
+                        end
+
+                        if dragging then
+
+                            dragging = false
+                            activeDragInput = nil
+
+                            saveTokitoPosition(
+                                MainFrame.Position
+                            )
+                        end
+                    end
+                end
+            )
+        )
+
+        -- ==================================================
+        -- LASER
+        -- ==================================================
+
+        local laserActive = false
+        local laserThread = nil
+
+        local function setLaserVisual(active)
+
+            if active then
+
+                LaserButton.BackgroundColor3 =
+                    Color3.fromRGB(
+                        0,
+                        170,
+                        255
+                    )
+
+                LaserButton.TextColor3 =
+                    Color3.fromRGB(
+                        0,
+                        0,
+                        0
+                    )
+
+                LaserButton.Text =
+                    "LASER ACTIVO"
+
+                LaserStroke.Color =
+                    Color3.fromRGB(
+                        0,
+                        220,
+                        255
+                    )
+
+                Status.Text =
+                    "● LASER ACTIVO"
+
+                Status.TextColor3 =
+                    Color3.fromRGB(
+                        0,
+                        220,
+                        255
+                    )
+
+            else
+
+                LaserButton.BackgroundColor3 =
+                    Color3.fromRGB(
+                        18,
+                        28,
+                        43
+                    )
+
+                LaserButton.TextColor3 =
+                    Color3.fromRGB(
+                        220,
+                        230,
+                        240
+                    )
+
+                LaserButton.Text =
+                    "ACTIVAR LASER"
+
+                LaserStroke.Color =
+                    Color3.fromRGB(
+                        0,
+                        110,
+                        180
+                    )
+
+                Status.Text =
+                    "● LASER DESACTIVADO"
+
+                Status.TextColor3 =
+                    Color3.fromRGB(
+                        120,
+                        145,
+                        165
+                    )
+            end
+        end
+
+        LaserButton.MouseButton1Click:Connect(
+            function()
+
+                pcall(function()
+
+                    laserActive =
+                        not laserActive
+
+                    if laserActive then
+
+                        local tool =
+                            getLaserTool()
+
+                        if not tool then
+
+                            laserActive = false
+                            setLaserVisual(false)
+
+                            Status.Text =
+                                "● LASER NO ENCONTRADO"
+
+                            Status.TextColor3 =
+                                Color3.fromRGB(
+                                    255,
+                                    90,
+                                    90
+                                )
+
+                            task.delay(
+                                1.5,
+                                function()
+
+                                    if tokitoGui
+                                        and not laserActive then
+
+                                        setLaserVisual(false)
+                                    end
+                                end
+                            )
+
+                            return
+                        end
+
+                        setLaserVisual(true)
+
+                        local character =
+                            LocalPlayer.Character
+
+                        local humanoid =
+                            character
+                            and character:FindFirstChild(
+                                "Humanoid"
+                            )
+
+                        if humanoid then
+                            humanoid:EquipTool(tool)
+                        end
+
+                        if laserThread then
+                            return
+                        end
+
+                        laserThread =
+                            task.spawn(
+                                function()
+
+                                    while laserActive do
+
+                                        local ok =
+                                            pcall(
+                                                function()
+
+                                                    if not tool
+                                                        or tool.Parent
+                                                        ~= LocalPlayer.Character then
+
+                                                        laserActive = false
+                                                        return
+                                                    end
+
+                                                    tool:Activate()
+                                                end
+                                            )
+
+                                        if not ok
+                                            or not laserActive then
+
+                                            break
+                                        end
+
+                                        task.wait(0.02)
+                                    end
+
+                                    laserThread = nil
+
+                                    if tokitoGui
+                                        and not laserActive then
+
+                                        setLaserVisual(false)
+                                    end
+                                end
+                            )
+
+                    else
+
+                        laserActive = false
+
+                        setLaserVisual(false)
+                    end
+                end)
+            end
+        )
+
+        -- ==================================================
+        -- ANIMACIONES
+        -- ==================================================
+
+        MainFrame.Size =
+            UDim2.new(
+                0,
+                0,
+                0,
+                0
+            )
+
+        MainFrame.BackgroundTransparency =
+            1
+
+        Title.TextTransparency = 1
+        Subtitle.TextTransparency = 1
+        Status.TextTransparency = 1
+        Icon.TextTransparency = 1
+
+        LaserButton.TextTransparency = 1
+        LaserButton.BackgroundTransparency = 1
+
+        Shadow.ImageTransparency = 1
+        UIStroke.Transparency = 1
+
+        MainFrame:TweenSize(
+            UDim2.new(
+                0,
+                GUI_WIDTH,
+                0,
+                GUI_HEIGHT
+            ),
+            "Out",
+            "Back",
+            0.35,
+            true
+        )
+
+        TweenService:Create(
+            MainFrame,
+            TweenInfo.new(
+                0.3,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            ),
+            {
+                BackgroundTransparency = 0.03
+            }
+        ):Play()
+
+        task.delay(
+            0.06,
+            function()
+
+                if not tokitoGui then
+                    return
+                end
+
+                local fade =
+                    TweenInfo.new(
+                        0.2,
+                        Enum.EasingStyle.Quad,
+                        Enum.EasingDirection.Out
+                    )
+
+                TweenService:Create(
+                    Shadow,
+                    fade,
+                    {
+                        ImageTransparency = 0.35
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    UIStroke,
+                    fade,
+                    {
+                        Transparency = 0.15
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    Icon,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    Title,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    Subtitle,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    Status,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    LaserButton,
+                    fade,
+                    {
+                        BackgroundTransparency = 0,
+                        TextTransparency = 0
+                    }
+                ):Play()
+            end
+        )
+
+        -- ==================================================
+        -- ANIMACIÓN RGB
+        -- ==================================================
+
+        table.insert(
+            tokitoConnections,
+            RunService.RenderStepped:Connect(
+                function()
+
+                    pcall(function()
+
+                        if not ScreenGui.Parent then
+                            return
+                        end
+
+                        local t =
+                            tick() * 2
+
+                        local blueShade =
+                            Color3.fromHSV(
+                                0.55
+                                    + (
+                                        math.sin(t)
+                                        * 0.05
+                                    ),
+                                1,
+                                1
+                            )
+
+                        UIStroke.Color =
+                            blueShade
+
+                        if laserActive then
+
+                            LaserStroke.Color =
+                                blueShade
+
+                        else
+
+                            LaserStroke.Color =
+                                Color3.fromRGB(
+                                    0,
+                                    110,
+                                    180
+                                )
+                        end
+
+                        Title.TextColor3 =
+                            blueShade
+                    end)
+                end
+            )
+        )
+    end
+
+    -- ====================================================
+    -- DESTRUIR GUI
+    -- ====================================================
+
+    local function destroyTokitoGui()
+
+        pcall(function()
+
+            for _, conn in ipairs(
+                tokitoConnections
+            ) do
+
+                if conn then
+                    conn:Disconnect()
+                end
+            end
+
+            tokitoConnections = {}
+
             if tokitoGui then
                 tokitoGui:Destroy()
                 tokitoGui = nil
@@ -2052,15 +4681,23 @@ do
         end)
     end
 
-    -- Integración con el sistema de Toggles
+    -- ====================================================
+    -- TOGGLE
+    -- ====================================================
+
     if createToggle then
-        createToggle("Auto Spam Laser (Se ocupa tener activo aimbot)", function(state)
-            if state then
-                createTokitoGui()
-            else
-                destroyTokitoGui()
+
+        createToggle(
+            "Auto Spam Laser (Se ocupa tener activo aimbot)",
+            function(state)
+
+                if state then
+                    createTokitoGui()
+                else
+                    destroyTokitoGui()
+                end
             end
-        end)
+        )
     end
 end
 
@@ -8911,297 +11548,1762 @@ do
 	end
 end
 -- ================= END FPS BOOSTER ULTRA V2 =================
--- ================= PREMIUM KICK PANEL =================
+-- ============================================================
+-- ============================================================
+-- PREMIUM KICK PANEL V4
+-- ESPAÑOL + KICK INSTANTÁNEO + ARRASTRE REAL + ESCALA
+-- ============================================================
 
-local kickButtonEnabled = false
-local kickGui = nil
+do
+    -- ========================================================
+    -- SERVICIOS
+    -- ========================================================
 
--- Calculamos el centro exacto basado en el tamaño del panel (140x65)
-local defaultPosition = UDim2.new(0.5, -70, 0.5, -32.5) 
-local lastPosition = defaultPosition 
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local TweenService = game:GetService("TweenService")
+    local HttpService = game:GetService("HttpService")
 
--- Sistema de guardado persistente entre sesiones (si el ejecutor soporta writefile/readfile)
-local saveFileName = "KickButton_LastPos.json"
-local HttpService = game:GetService("HttpService")
+    local player = Players.LocalPlayer
 
-pcall(function()
-	if readfile and isfile and isfile(saveFileName) then
-		local data = HttpService:JSONDecode(readfile(saveFileName))
-		if data and data.XScale and data.XOffset and data.YScale and data.YOffset then
-			lastPosition = UDim2.new(data.XScale, data.XOffset, data.YScale, data.YOffset)
-		end
-	end
-end)
+    -- ========================================================
+    -- ESTADO
+    -- ========================================================
 
-local function savePosition(pos)
-	lastPosition = pos
-	pcall(function()
-		if writefile then
-			local data = {
-				XScale = pos.X.Scale,
-				XOffset = pos.X.Offset,
-				YScale = pos.Y.Scale,
-				YOffset = pos.Y.Offset
-			}
-			writefile(saveFileName, HttpService:JSONEncode(data))
-		end
-	end)
+    local kickButtonEnabled = false
+    local kickGui = nil
+
+    local settingsOpen = false
+    local minimized = false
+
+    local dragging = false
+    local dragStart = nil
+    local startPosition = nil
+    local activeDragInput = nil
+
+    local sliderDragging = false
+
+    -- ========================================================
+    -- CONFIGURACIÓN
+    -- ========================================================
+
+    local SAVE_FILE = "KickPanel_Config.json"
+
+    local DEFAULT_WIDTH = 175
+    local DEFAULT_HEIGHT = 88
+
+    local DEFAULT_SCALE = 1
+    local MIN_SCALE = 0.70
+    local MAX_SCALE = 1.50
+
+    local currentScale = DEFAULT_SCALE
+
+    local defaultPosition = UDim2.new(
+        0.5,
+        -DEFAULT_WIDTH / 2,
+        0.5,
+        -DEFAULT_HEIGHT / 2
+    )
+
+    local lastPosition = defaultPosition
+
+    -- ========================================================
+    -- CARGAR CONFIGURACIÓN
+    -- ========================================================
+
+    pcall(function()
+        if isfile and isfile(SAVE_FILE) and readfile then
+            local raw = readfile(SAVE_FILE)
+            local data = HttpService:JSONDecode(raw)
+
+            if type(data) == "table" then
+                if data.XScale ~= nil
+                    and data.XOffset ~= nil
+                    and data.YScale ~= nil
+                    and data.YOffset ~= nil then
+
+                    lastPosition = UDim2.new(
+                        tonumber(data.XScale) or 0.5,
+                        tonumber(data.XOffset) or -DEFAULT_WIDTH / 2,
+                        tonumber(data.YScale) or 0.5,
+                        tonumber(data.YOffset) or -DEFAULT_HEIGHT / 2
+                    )
+                end
+
+                if tonumber(data.Scale) then
+                    currentScale = math.clamp(
+                        tonumber(data.Scale),
+                        MIN_SCALE,
+                        MAX_SCALE
+                    )
+                end
+            end
+        end
+    end)
+
+    -- ========================================================
+    -- GUARDAR CONFIGURACIÓN
+    -- ========================================================
+
+    local function saveConfig(position, scale)
+        if position then
+            lastPosition = position
+        end
+
+        if scale ~= nil then
+            currentScale = math.clamp(
+                tonumber(scale) or DEFAULT_SCALE,
+                MIN_SCALE,
+                MAX_SCALE
+            )
+        end
+
+        pcall(function()
+            if writefile then
+                local data = {
+                    XScale = lastPosition.X.Scale,
+                    XOffset = lastPosition.X.Offset,
+
+                    YScale = lastPosition.Y.Scale,
+                    YOffset = lastPosition.Y.Offset,
+
+                    Scale = currentScale
+                }
+
+                writefile(
+                    SAVE_FILE,
+                    HttpService:JSONEncode(data)
+                )
+            end
+        end)
+    end
+
+    -- ========================================================
+    -- FUNCIÓN PARA CREAR EL PANEL
+    -- ========================================================
+
+    local function createKickButton()
+
+        -- ====================================================
+        -- LIMPIAR ANTERIOR
+        -- ====================================================
+
+        if kickGui then
+            pcall(function()
+                kickGui:Destroy()
+            end)
+            kickGui = nil
+        end
+
+        -- ====================================================
+        -- SCREEN GUI
+        -- ====================================================
+
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "PremiumKickPanel"
+        gui.ResetOnSpawn = false
+        gui.IgnoreGuiInset = true
+        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        gui.Parent = player:WaitForChild("PlayerGui")
+
+        kickGui = gui
+
+        -- ====================================================
+        -- MARCO PRINCIPAL
+        -- ====================================================
+
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Name = "MainFrame"
+
+        mainFrame.Size = UDim2.new(
+            0,
+            DEFAULT_WIDTH,
+            0,
+            DEFAULT_HEIGHT
+        )
+
+        mainFrame.Position = lastPosition
+
+        mainFrame.BackgroundColor3 = Color3.fromRGB(
+            9,
+            13,
+            19
+        )
+
+        mainFrame.BackgroundTransparency = 0.03
+        mainFrame.BorderSizePixel = 0
+        mainFrame.Active = true
+        mainFrame.ClipsDescendants = false
+        mainFrame.Parent = gui
+
+        -- ====================================================
+        -- ESCALA
+        -- ====================================================
+
+        local uiScale = Instance.new("UIScale")
+        uiScale.Name = "ResponsiveScale"
+        uiScale.Scale = currentScale
+        uiScale.Parent = mainFrame
+
+        -- ====================================================
+        -- SOMBRA
+        -- ====================================================
+
+        local shadow = Instance.new("ImageLabel")
+        shadow.Name = "Shadow"
+
+        shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+
+        shadow.Position = UDim2.new(
+            0.5,
+            0,
+            0.5,
+            4
+        )
+
+        shadow.Size = UDim2.new(
+            0,
+            DEFAULT_WIDTH + 34,
+            0,
+            DEFAULT_HEIGHT + 34
+        )
+
+        shadow.BackgroundTransparency = 1
+
+        shadow.Image = "rbxassetid://1316045217"
+
+        shadow.ImageColor3 = Color3.fromRGB(
+            0,
+            0,
+            0
+        )
+
+        shadow.ImageTransparency = 0.35
+
+        shadow.ScaleType = Enum.ScaleType.Slice
+
+        shadow.SliceCenter = Rect.new(
+            10,
+            10,
+            118,
+            118
+        )
+
+        shadow.ZIndex = 0
+        shadow.Parent = mainFrame
+
+        -- ====================================================
+        -- BORDE REDONDEADO
+        -- ====================================================
+
+        local frameCorner = Instance.new("UICorner")
+        frameCorner.CornerRadius = UDim.new(0, 13)
+        frameCorner.Parent = mainFrame
+
+        -- ====================================================
+        -- DEGRADADO DEL PANEL
+        -- ====================================================
+
+        local frameGradient = Instance.new("UIGradient")
+
+        frameGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(
+                0,
+                Color3.fromRGB(14, 20, 29)
+            ),
+
+            ColorSequenceKeypoint.new(
+                0.55,
+                Color3.fromRGB(9, 14, 21)
+            ),
+
+            ColorSequenceKeypoint.new(
+                1,
+                Color3.fromRGB(6, 9, 14)
+            )
+        })
+
+        frameGradient.Rotation = 90
+        frameGradient.Parent = mainFrame
+
+        -- ====================================================
+        -- BORDE
+        -- ====================================================
+
+        local frameStroke = Instance.new("UIStroke")
+
+        frameStroke.Color = Color3.fromRGB(
+            0,
+            170,
+            255
+        )
+
+        frameStroke.Thickness = 1.5
+        frameStroke.Transparency = 0.15
+        frameStroke.Parent = mainFrame
+
+        -- ====================================================
+        -- CABECERA
+        -- ====================================================
+
+        local header = Instance.new("Frame")
+        header.Name = "Header"
+
+        header.Size = UDim2.new(
+            1,
+            -12,
+            0,
+            30
+        )
+
+        header.Position = UDim2.new(
+            0,
+            6,
+            0,
+            5
+        )
+
+        header.BackgroundTransparency = 1
+        header.BorderSizePixel = 0
+        header.Parent = mainFrame
+
+        -- ====================================================
+        -- ZONA DEDICADA PARA ARRASTRAR
+        -- ESTA ES LA PARTE IMPORTANTE
+        -- ====================================================
+
+        local dragHandle = Instance.new("TextButton")
+
+        dragHandle.Name = "DragHandle"
+
+        -- Deja libres los dos botones de la derecha
+        dragHandle.Size = UDim2.new(
+            1,
+            -54,
+            1,
+            0
+        )
+
+        dragHandle.Position = UDim2.new(
+            0,
+            0,
+            0,
+            0
+        )
+
+        dragHandle.BackgroundTransparency = 1
+        dragHandle.BorderSizePixel = 0
+
+        dragHandle.Text = ""
+        dragHandle.AutoButtonColor = false
+
+        dragHandle.Active = true
+        dragHandle.Selectable = false
+
+        dragHandle.ZIndex = 45
+
+        dragHandle.Parent = header
+
+        -- ====================================================
+        -- ICONO
+        -- ====================================================
+
+        local icon = Instance.new("TextLabel")
+
+        icon.Size = UDim2.new(
+            0,
+            25,
+            0,
+            25
+        )
+
+        icon.Position = UDim2.new(
+            0,
+            0,
+            0,
+            0
+        )
+
+        icon.BackgroundColor3 = Color3.fromRGB(
+            0,
+            95,
+            160
+        )
+
+        icon.BackgroundTransparency = 0.15
+
+        icon.Text = "⚡"
+
+        icon.TextColor3 = Color3.fromRGB(
+            255,
+            255,
+            255
+        )
+
+        icon.Font = Enum.Font.GothamBold
+        icon.TextSize = 13
+        icon.ZIndex = 46
+        icon.Parent = header
+
+        local iconCorner = Instance.new("UICorner")
+        iconCorner.CornerRadius = UDim.new(0, 7)
+        iconCorner.Parent = icon
+
+        -- ====================================================
+        -- TÍTULO
+        -- ====================================================
+
+        local title = Instance.new("TextLabel")
+
+        title.Size = UDim2.new(
+            1,
+            -100,
+            0,
+            16
+        )
+
+        title.Position = UDim2.new(
+            0,
+            32,
+            0,
+            1
+        )
+
+        title.BackgroundTransparency = 1
+
+        title.Text = "KICK BOTON"
+
+        title.TextColor3 = Color3.fromRGB(
+            235,
+            245,
+            255
+        )
+
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 11
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.ZIndex = 46
+        title.Parent = header
+
+        -- ====================================================
+        -- SUBTÍTULO
+        -- ====================================================
+
+        local subtitle = Instance.new("TextLabel")
+
+        subtitle.Size = UDim2.new(
+            1,
+            -100,
+            0,
+            12
+        )
+
+        subtitle.Position = UDim2.new(
+            0,
+            32,
+            0,
+            16
+        )
+
+        subtitle.BackgroundTransparency = 1
+
+        subtitle.Text = "PANEL DE CONTROL"
+
+        subtitle.TextColor3 = Color3.fromRGB(
+            105,
+            125,
+            145
+        )
+
+        subtitle.Font = Enum.Font.GothamMedium
+        subtitle.TextSize = 7
+        subtitle.TextXAlignment = Enum.TextXAlignment.Left
+        subtitle.ZIndex = 46
+        subtitle.Parent = header
+
+        -- ====================================================
+        -- BOTÓN DE CONFIGURACIÓN
+        -- ====================================================
+
+        local settingsBtn = Instance.new("TextButton")
+
+        settingsBtn.Name = "Settings"
+
+        settingsBtn.Size = UDim2.new(
+            0,
+            22,
+            0,
+            22
+        )
+
+        settingsBtn.Position = UDim2.new(
+            1,
+            -52,
+            0,
+            1
+        )
+
+        settingsBtn.BackgroundColor3 = Color3.fromRGB(
+            18,
+            28,
+            40
+        )
+
+        settingsBtn.Text = "⚙"
+
+        settingsBtn.TextColor3 = Color3.fromRGB(
+            0,
+            190,
+            255
+        )
+
+        settingsBtn.Font = Enum.Font.GothamBold
+        settingsBtn.TextSize = 13
+        settingsBtn.AutoButtonColor = false
+        settingsBtn.ZIndex = 70
+        settingsBtn.Parent = header
+
+        local settingsCorner = Instance.new("UICorner")
+        settingsCorner.CornerRadius = UDim.new(0, 7)
+        settingsCorner.Parent = settingsBtn
+
+        local settingsStroke = Instance.new("UIStroke")
+
+        settingsStroke.Color = Color3.fromRGB(
+            0,
+            110,
+            180
+        )
+
+        settingsStroke.Thickness = 1
+        settingsStroke.Parent = settingsBtn
+
+        -- ====================================================
+        -- BOTÓN MINIMIZAR
+        -- ====================================================
+
+        local minimizeBtn = Instance.new("TextButton")
+
+        minimizeBtn.Name = "Minimize"
+
+        minimizeBtn.Size = UDim2.new(
+            0,
+            22,
+            0,
+            22
+        )
+
+        minimizeBtn.Position = UDim2.new(
+            1,
+            -27,
+            0,
+            1
+        )
+
+        minimizeBtn.BackgroundColor3 = Color3.fromRGB(
+            18,
+            28,
+            40
+        )
+
+        minimizeBtn.Text = "—"
+
+        minimizeBtn.TextColor3 = Color3.fromRGB(
+            150,
+            180,
+            200
+        )
+
+        minimizeBtn.Font = Enum.Font.GothamBold
+        minimizeBtn.TextSize = 11
+        minimizeBtn.AutoButtonColor = false
+        minimizeBtn.ZIndex = 70
+        minimizeBtn.Parent = header
+
+        local minimizeCorner = Instance.new("UICorner")
+        minimizeCorner.CornerRadius = UDim.new(0, 7)
+        minimizeCorner.Parent = minimizeBtn
+
+        -- ====================================================
+        -- ESTADO
+        -- ====================================================
+
+        local status = Instance.new("TextLabel")
+
+        status.Name = "Status"
+
+        status.Size = UDim2.new(
+            1,
+            -24,
+            0,
+            14
+        )
+
+        status.Position = UDim2.new(
+            0,
+            12,
+            0,
+            33
+        )
+
+        status.BackgroundTransparency = 1
+
+        status.Text = "● LISTO"
+
+        status.TextColor3 = Color3.fromRGB(
+            0,
+            200,
+            255
+        )
+
+        status.Font = Enum.Font.GothamMedium
+        status.TextSize = 8
+        status.TextXAlignment = Enum.TextXAlignment.Left
+        status.ZIndex = 10
+        status.Parent = mainFrame
+
+        -- ====================================================
+        -- BOTÓN KICK
+        -- ====================================================
+
+        local kickBtn = Instance.new("TextButton")
+
+        kickBtn.Name = "KickButton"
+
+        kickBtn.Size = UDim2.new(
+            1,
+            -24,
+            0,
+            32
+        )
+
+        kickBtn.Position = UDim2.new(
+            0,
+            12,
+            0,
+            51
+        )
+
+        kickBtn.BackgroundColor3 = Color3.fromRGB(
+            0,
+            125,
+            220
+        )
+
+        kickBtn.BorderSizePixel = 0
+
+        kickBtn.Text = "⚡  KICK"
+
+        kickBtn.TextColor3 = Color3.fromRGB(
+            255,
+            255,
+            255
+        )
+
+        kickBtn.Font = Enum.Font.GothamBold
+        kickBtn.TextSize = 11
+        kickBtn.AutoButtonColor = false
+        kickBtn.ZIndex = 15
+        kickBtn.Parent = mainFrame
+
+        local kickCorner = Instance.new("UICorner")
+        kickCorner.CornerRadius = UDim.new(0, 9)
+        kickCorner.Parent = kickBtn
+
+        local kickGradient = Instance.new("UIGradient")
+
+        kickGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(
+                0,
+                Color3.fromRGB(
+                    0,
+                    190,
+                    255
+                )
+            ),
+
+            ColorSequenceKeypoint.new(
+                1,
+                Color3.fromRGB(
+                    0,
+                    95,
+                    205
+                )
+            )
+        })
+
+        kickGradient.Rotation = 90
+        kickGradient.Parent = kickBtn
+
+        local kickStroke = Instance.new("UIStroke")
+
+        kickStroke.Color = Color3.fromRGB(
+            0,
+            215,
+            255
+        )
+
+        kickStroke.Transparency = 0.35
+        kickStroke.Thickness = 1
+        kickStroke.Parent = kickBtn
+
+        -- ====================================================
+        -- PANEL DE CONFIGURACIÓN
+        -- ====================================================
+
+        local settingsFrame = Instance.new("Frame")
+
+        settingsFrame.Name = "SettingsFrame"
+
+        settingsFrame.Size = UDim2.new(
+            0,
+            215,
+            0,
+            150
+        )
+
+        settingsFrame.Position = UDim2.new(
+            0,
+            -20,
+            0,
+            96
+        )
+
+        settingsFrame.BackgroundColor3 = Color3.fromRGB(
+            8,
+            13,
+            20
+        )
+
+        settingsFrame.BorderSizePixel = 0
+        settingsFrame.Visible = false
+        settingsFrame.ZIndex = 20
+        settingsFrame.Parent = mainFrame
+
+        local settingsCorner2 = Instance.new("UICorner")
+        settingsCorner2.CornerRadius = UDim.new(0, 12)
+        settingsCorner2.Parent = settingsFrame
+
+        local settingsStroke2 = Instance.new("UIStroke")
+
+        settingsStroke2.Color = Color3.fromRGB(
+            0,
+            150,
+            220
+        )
+
+        settingsStroke2.Thickness = 1.2
+        settingsStroke2.Parent = settingsFrame
+
+        -- ====================================================
+        -- TÍTULO DE CONFIGURACIÓN
+        -- ====================================================
+
+        local settingsTitle = Instance.new("TextLabel")
+
+        settingsTitle.Size = UDim2.new(
+            1,
+            -20,
+            0,
+            20
+        )
+
+        settingsTitle.Position = UDim2.new(
+            0,
+            10,
+            0,
+            9
+        )
+
+        settingsTitle.BackgroundTransparency = 1
+
+        settingsTitle.Text = "⚙  CONFIGURACIÓN"
+
+        settingsTitle.TextColor3 = Color3.fromRGB(
+            0,
+            210,
+            255
+        )
+
+        settingsTitle.Font = Enum.Font.GothamBold
+        settingsTitle.TextSize = 10
+        settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+        settingsTitle.ZIndex = 21
+        settingsTitle.Parent = settingsFrame
+
+        -- ====================================================
+        -- ETIQUETA DEL TAMAÑO
+        -- ====================================================
+
+        local scaleLabel = Instance.new("TextLabel")
+
+        scaleLabel.Size = UDim2.new(
+            1,
+            -20,
+            0,
+            20
+        )
+
+        scaleLabel.Position = UDim2.new(
+            0,
+            10,
+            0,
+            35
+        )
+
+        scaleLabel.BackgroundTransparency = 1
+
+        scaleLabel.TextColor3 = Color3.fromRGB(
+            200,
+            215,
+            230
+        )
+
+        scaleLabel.Font = Enum.Font.GothamMedium
+        scaleLabel.TextSize = 9
+        scaleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        scaleLabel.ZIndex = 21
+        scaleLabel.Parent = settingsFrame
+
+        -- ====================================================
+        -- BARRA DE ESCALA
+        -- ====================================================
+
+        local slider = Instance.new("Frame")
+
+        slider.Name = "ScaleSlider"
+
+        slider.Size = UDim2.new(
+            1,
+            -40,
+            0,
+            7
+        )
+
+        slider.Position = UDim2.new(
+            0,
+            20,
+            0,
+            62
+        )
+
+        slider.BackgroundColor3 = Color3.fromRGB(
+            26,
+            39,
+            52
+        )
+
+        slider.BorderSizePixel = 0
+        slider.ZIndex = 21
+        slider.Parent = settingsFrame
+
+        local sliderCorner = Instance.new("UICorner")
+        sliderCorner.CornerRadius = UDim.new(1, 0)
+        sliderCorner.Parent = slider
+
+        local sliderFill = Instance.new("Frame")
+
+        sliderFill.Size = UDim2.new(
+            0.5,
+            0,
+            1,
+            0
+        )
+
+        sliderFill.BackgroundColor3 = Color3.fromRGB(
+            0,
+            175,
+            255
+        )
+
+        sliderFill.BorderSizePixel = 0
+        sliderFill.ZIndex = 22
+        sliderFill.Parent = slider
+
+        local sliderFillCorner = Instance.new("UICorner")
+        sliderFillCorner.CornerRadius = UDim.new(1, 0)
+        sliderFillCorner.Parent = sliderFill
+
+        local knob = Instance.new("TextButton")
+
+        knob.Name = "ScaleKnob"
+
+        knob.Size = UDim2.new(
+            0,
+            17,
+            0,
+            17
+        )
+
+        knob.AnchorPoint = Vector2.new(
+            0.5,
+            0.5
+        )
+
+        knob.Position = UDim2.new(
+            0.5,
+            0,
+            0.5,
+            0
+        )
+
+        knob.BackgroundColor3 = Color3.fromRGB(
+            0,
+            215,
+            255
+        )
+
+        knob.Text = ""
+        knob.AutoButtonColor = false
+        knob.ZIndex = 23
+        knob.Parent = slider
+
+        local knobCorner = Instance.new("UICorner")
+        knobCorner.CornerRadius = UDim.new(1, 0)
+        knobCorner.Parent = knob
+
+        -- ====================================================
+        -- BOTÓN MENOS
+        -- ====================================================
+
+        local minus = Instance.new("TextButton")
+
+        minus.Size = UDim2.new(
+            0,
+            42,
+            0,
+            27
+        )
+
+        minus.Position = UDim2.new(
+            0,
+            15,
+            0,
+            94
+        )
+
+        minus.BackgroundColor3 = Color3.fromRGB(
+            17,
+            27,
+            38
+        )
+
+        minus.Text = "−"
+
+        minus.TextColor3 = Color3.fromRGB(
+            220,
+            230,
+            240
+        )
+
+        minus.Font = Enum.Font.GothamBold
+        minus.TextSize = 16
+        minus.ZIndex = 21
+        minus.Parent = settingsFrame
+
+        local minusCorner = Instance.new("UICorner")
+        minusCorner.CornerRadius = UDim.new(0, 7)
+        minusCorner.Parent = minus
+
+        -- ====================================================
+        -- BOTÓN REINICIAR
+        -- ====================================================
+
+        local reset = Instance.new("TextButton")
+
+        reset.Size = UDim2.new(
+            0,
+            70,
+            0,
+            27
+        )
+
+        reset.Position = UDim2.new(
+            0.5,
+            -35,
+            0,
+            94
+        )
+
+        reset.BackgroundColor3 = Color3.fromRGB(
+            17,
+            27,
+            38
+        )
+
+        reset.Text = "REINICIAR"
+
+        reset.TextColor3 = Color3.fromRGB(
+            120,
+            190,
+            220
+        )
+
+        reset.Font = Enum.Font.GothamBold
+        reset.TextSize = 8
+        reset.ZIndex = 21
+        reset.Parent = settingsFrame
+
+        local resetCorner = Instance.new("UICorner")
+        resetCorner.CornerRadius = UDim.new(0, 7)
+        resetCorner.Parent = reset
+
+        -- ====================================================
+        -- BOTÓN MÁS
+        -- ====================================================
+
+        local plus = Instance.new("TextButton")
+
+        plus.Size = UDim2.new(
+            0,
+            42,
+            0,
+            27
+        )
+
+        plus.Position = UDim2.new(
+            1,
+            -57,
+            0,
+            94
+        )
+
+        plus.BackgroundColor3 = Color3.fromRGB(
+            17,
+            27,
+            38
+        )
+
+        plus.Text = "+"
+
+        plus.TextColor3 = Color3.fromRGB(
+            220,
+            230,
+            240
+        )
+
+        plus.Font = Enum.Font.GothamBold
+        plus.TextSize = 16
+        plus.ZIndex = 21
+        plus.Parent = settingsFrame
+
+        local plusCorner = Instance.new("UICorner")
+        plusCorner.CornerRadius = UDim.new(0, 7)
+        plusCorner.Parent = plus
+
+        -- ====================================================
+        -- ACTUALIZAR ESCALA
+        -- ====================================================
+
+        local function updateScale(value, shouldSave)
+
+            value = tonumber(value)
+
+            if not value then
+                return
+            end
+
+            value = math.clamp(
+                value,
+                MIN_SCALE,
+                MAX_SCALE
+            )
+
+            currentScale = value
+
+            uiScale.Scale = currentScale
+
+            local percentage = math.floor(
+                currentScale * 100 + 0.5
+            )
+
+            scaleLabel.Text =
+                "Tamaño de interfaz: "
+                .. percentage
+                .. "%"
+
+            local alpha =
+                (currentScale - MIN_SCALE)
+                / (MAX_SCALE - MIN_SCALE)
+
+            sliderFill.Size = UDim2.new(
+                alpha,
+                0,
+                1,
+                0
+            )
+
+            knob.Position = UDim2.new(
+                alpha,
+                0,
+                0.5,
+                0
+            )
+
+            if shouldSave then
+                saveConfig(
+                    nil,
+                    currentScale
+                )
+            end
+        end
+
+        updateScale(
+            currentScale,
+            false
+        )
+
+        -- ====================================================
+        -- ACTUALIZAR SLIDER
+        -- ====================================================
+
+        local function setSliderFromX(x)
+
+            local left =
+                slider.AbsolutePosition.X
+
+            local width =
+                slider.AbsoluteSize.X
+
+            if width <= 0 then
+                return
+            end
+
+            local alpha = math.clamp(
+                (x - left) / width,
+                0,
+                1
+            )
+
+            local newScale =
+                MIN_SCALE
+                +
+                (
+                    (MAX_SCALE - MIN_SCALE)
+                    * alpha
+                )
+
+            updateScale(
+                newScale,
+                true
+            )
+        end
+
+        knob.InputBegan:Connect(function(input)
+
+            if input.UserInputType ==
+                Enum.UserInputType.MouseButton1
+                or input.UserInputType ==
+                Enum.UserInputType.Touch then
+
+                sliderDragging = true
+            end
+        end)
+
+        slider.InputBegan:Connect(function(input)
+
+            if input.UserInputType ==
+                Enum.UserInputType.MouseButton1
+                or input.UserInputType ==
+                Enum.UserInputType.Touch then
+
+                sliderDragging = true
+
+                setSliderFromX(
+                    input.Position.X
+                )
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+
+            if not sliderDragging then
+                return
+            end
+
+            if input.UserInputType ==
+                Enum.UserInputType.MouseMovement
+                or input.UserInputType ==
+                Enum.UserInputType.Touch then
+
+                setSliderFromX(
+                    input.Position.X
+                )
+            end
+        end)
+
+        UserInputService.InputEnded:Connect(function(input)
+
+            if input.UserInputType ==
+                Enum.UserInputType.MouseButton1
+                or input.UserInputType ==
+                Enum.UserInputType.Touch then
+
+                sliderDragging = false
+            end
+        end)
+
+        -- ====================================================
+        -- BOTONES DE ESCALA
+        -- ====================================================
+
+        minus.MouseButton1Click:Connect(function()
+
+            updateScale(
+                currentScale - 0.05,
+                true
+            )
+        end)
+
+        plus.MouseButton1Click:Connect(function()
+
+            updateScale(
+                currentScale + 0.05,
+                true
+            )
+        end)
+
+        reset.MouseButton1Click:Connect(function()
+
+            updateScale(
+                DEFAULT_SCALE,
+                true
+            )
+        end)
+
+        -- ====================================================
+        -- ABRIR CONFIGURACIÓN
+        -- ====================================================
+
+        settingsBtn.MouseButton1Click:Connect(function()
+
+            settingsOpen = not settingsOpen
+
+            settingsFrame.Visible = settingsOpen
+
+            if settingsOpen then
+
+                settingsBtn.BackgroundColor3 =
+                    Color3.fromRGB(
+                        0,
+                        75,
+                        115
+                    )
+
+                settingsBtn.TextColor3 =
+                    Color3.fromRGB(
+                        255,
+                        255,
+                        255
+                    )
+
+            else
+
+                settingsBtn.BackgroundColor3 =
+                    Color3.fromRGB(
+                        18,
+                        28,
+                        40
+                    )
+
+                settingsBtn.TextColor3 =
+                    Color3.fromRGB(
+                        0,
+                        190,
+                        255
+                    )
+            end
+        end)
+
+        -- ====================================================
+        -- MINIMIZAR
+        -- ====================================================
+
+        minimizeBtn.MouseButton1Click:Connect(function()
+
+            minimized = not minimized
+
+            settingsOpen = false
+            settingsFrame.Visible = false
+
+            if minimized then
+
+                TweenService:Create(
+                    mainFrame,
+                    TweenInfo.new(
+                        0.20,
+                        Enum.EasingStyle.Quint,
+                        Enum.EasingDirection.Out
+                    ),
+                    {
+                        Size = UDim2.new(
+                            0,
+                            DEFAULT_WIDTH,
+                            0,
+                            43
+                        )
+                    }
+                ):Play()
+
+                status.Visible = false
+                kickBtn.Visible = false
+
+                minimizeBtn.Text = "+"
+
+            else
+
+                TweenService:Create(
+                    mainFrame,
+                    TweenInfo.new(
+                        0.20,
+                        Enum.EasingStyle.Quint,
+                        Enum.EasingDirection.Out
+                    ),
+                    {
+                        Size = UDim2.new(
+                            0,
+                            DEFAULT_WIDTH,
+                            0,
+                            DEFAULT_HEIGHT
+                        )
+                    }
+                ):Play()
+
+                task.delay(
+                    0.08,
+                    function()
+
+                        if kickGui
+                            and not minimized then
+
+                            status.Visible = true
+                            kickBtn.Visible = true
+                        end
+                    end
+                )
+
+                minimizeBtn.Text = "—"
+            end
+        end)
+
+        -- ====================================================
+        -- ARRASTRE REAL
+        -- ====================================================
+        -- El DragHandle es el único objeto responsable de
+        -- iniciar el movimiento.
+        -- ====================================================
+
+        dragHandle.InputBegan:Connect(function(input)
+
+            if sliderDragging then
+                return
+            end
+
+            local validInput =
+                input.UserInputType ==
+                    Enum.UserInputType.MouseButton1
+                or input.UserInputType ==
+                    Enum.UserInputType.Touch
+
+            if not validInput then
+                return
+            end
+
+            dragging = true
+
+            dragStart = input.Position
+
+            startPosition =
+                mainFrame.Position
+
+            activeDragInput = input
+        end)
+
+        -- ====================================================
+        -- MOVIMIENTO DEL MOUSE
+        -- ====================================================
+
+        UserInputService.InputChanged:Connect(function(input)
+
+            if not dragging then
+                return
+            end
+
+            if input.UserInputType ==
+                Enum.UserInputType.MouseMovement then
+
+                local delta =
+                    input.Position -
+                    dragStart
+
+                mainFrame.Position =
+                    UDim2.new(
+                        startPosition.X.Scale,
+                        startPosition.X.Offset + delta.X,
+
+                        startPosition.Y.Scale,
+                        startPosition.Y.Offset + delta.Y
+                    )
+            end
+        end)
+
+        -- ====================================================
+        -- MOVIMIENTO TÁCTIL
+        -- ====================================================
+
+        UserInputService.TouchMoved:Connect(function(
+            touch,
+            gameProcessed
+        )
+
+            if not dragging then
+                return
+            end
+
+            if touch ~= activeDragInput then
+                return
+            end
+
+            local delta =
+                touch.Position -
+                dragStart
+
+            mainFrame.Position =
+                UDim2.new(
+                    startPosition.X.Scale,
+                    startPosition.X.Offset + delta.X,
+
+                    startPosition.Y.Scale,
+                    startPosition.Y.Offset + delta.Y
+                )
+        end)
+
+        -- ====================================================
+        -- FINALIZAR ARRASTRE
+        -- ====================================================
+
+        UserInputService.InputEnded:Connect(function(input)
+
+            local isMouse =
+                input.UserInputType ==
+                Enum.UserInputType.MouseButton1
+
+            local isTouch =
+                input.UserInputType ==
+                Enum.UserInputType.Touch
+
+            if not isMouse and not isTouch then
+                return
+            end
+
+            if isTouch
+                and activeDragInput
+                and input ~= activeDragInput then
+
+                return
+            end
+
+            if dragging then
+
+                dragging = false
+                activeDragInput = nil
+
+                saveConfig(
+                    mainFrame.Position,
+                    currentScale
+                )
+            end
+        end)
+
+        -- ====================================================
+        -- ANIMACIÓN DEL BOTÓN KICK
+        -- ====================================================
+
+        kickBtn.MouseEnter:Connect(function()
+
+            TweenService:Create(
+                kickBtn,
+                TweenInfo.new(
+                    0.14,
+                    Enum.EasingStyle.Quad,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    BackgroundColor3 =
+                        Color3.fromRGB(
+                            0,
+                            150,
+                            235
+                        )
+                }
+            ):Play()
+
+            TweenService:Create(
+                kickStroke,
+                TweenInfo.new(0.14),
+                {
+                    Transparency = 0
+                }
+            ):Play()
+        end)
+
+        kickBtn.MouseLeave:Connect(function()
+
+            TweenService:Create(
+                kickBtn,
+                TweenInfo.new(
+                    0.14,
+                    Enum.EasingStyle.Quad,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    BackgroundColor3 =
+                        Color3.fromRGB(
+                            0,
+                            125,
+                            220
+                        )
+                }
+            ):Play()
+
+            TweenService:Create(
+                kickStroke,
+                TweenInfo.new(0.14),
+                {
+                    Transparency = 0.35
+                }
+            ):Play()
+        end)
+
+        -- ====================================================
+        -- KICK INSTANTÁNEO
+        -- ====================================================
+
+        kickBtn.MouseButton1Click:Connect(function()
+
+            -- Se ejecuta inmediatamente
+            player:Kick(
+                "Has sido kickeado por el botón Kick."
+            )
+        end)
+
+        -- ====================================================
+        -- ANIMACIÓN DE APERTURA
+        -- ====================================================
+
+        mainFrame.Size = UDim2.new(
+            0,
+            0,
+            0,
+            0
+        )
+
+        mainFrame.BackgroundTransparency = 1
+
+        title.TextTransparency = 1
+        subtitle.TextTransparency = 1
+        status.TextTransparency = 1
+        icon.TextTransparency = 1
+
+        kickBtn.TextTransparency = 1
+        kickBtn.BackgroundTransparency = 1
+
+        shadow.ImageTransparency = 1
+        frameStroke.Transparency = 1
+
+        TweenService:Create(
+            mainFrame,
+            TweenInfo.new(
+                0.35,
+                Enum.EasingStyle.Back,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Size = UDim2.new(
+                    0,
+                    DEFAULT_WIDTH,
+                    0,
+                    DEFAULT_HEIGHT
+                ),
+
+                BackgroundTransparency = 0.03
+            }
+        ):Play()
+
+        task.delay(
+            0.07,
+            function()
+
+                if not kickGui then
+                    return
+                end
+
+                local fade =
+                    TweenInfo.new(
+                        0.20,
+                        Enum.EasingStyle.Quad,
+                        Enum.EasingDirection.Out
+                    )
+
+                TweenService:Create(
+                    shadow,
+                    fade,
+                    {
+                        ImageTransparency = 0.35
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    frameStroke,
+                    fade,
+                    {
+                        Transparency = 0.15
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    icon,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    title,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    subtitle,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    status,
+                    fade,
+                    {
+                        TextTransparency = 0
+                    }
+                ):Play()
+
+                TweenService:Create(
+                    kickBtn,
+                    fade,
+                    {
+                        BackgroundTransparency = 0,
+                        TextTransparency = 0
+                    }
+                ):Play()
+            end
+        )
+
+        return gui
+    end
+
+    -- ========================================================
+    -- ACTIVAR
+    -- ========================================================
+
+    local function enableKickButton()
+
+        if kickButtonEnabled then
+            return
+        end
+
+        kickButtonEnabled = true
+
+        kickGui = createKickButton()
+    end
+
+    -- ========================================================
+    -- DESACTIVAR
+    -- ========================================================
+
+    local function disableKickButton()
+
+        if not kickButtonEnabled then
+            return
+        end
+
+        kickButtonEnabled = false
+
+        if kickGui then
+
+            local oldGui = kickGui
+            kickGui = nil
+
+            local frame =
+                oldGui:FindFirstChild("MainFrame")
+
+            if frame then
+
+                TweenService:Create(
+                    frame,
+                    TweenInfo.new(
+                        0.17,
+                        Enum.EasingStyle.Quad,
+                        Enum.EasingDirection.In
+                    ),
+                    {
+                        Size = UDim2.new(
+                            0,
+                            0,
+                            0,
+                            0
+                        ),
+
+                        BackgroundTransparency = 1
+                    }
+                ):Play()
+
+                task.delay(
+                    0.18,
+                    function()
+
+                        pcall(function()
+                            oldGui:Destroy()
+                        end)
+                    end
+                )
+
+            else
+
+                pcall(function()
+                    oldGui:Destroy()
+                end)
+            end
+        end
+
+        -- Conservar posición y tamaño
+        saveConfig(
+            lastPosition,
+            currentScale
+        )
+    end
+
+    -- ========================================================
+    -- TOGGLE
+    -- ========================================================
+
+    createToggle(
+        "Kick Boton",
+        function(state)
+
+            if state then
+                enableKickButton()
+            else
+                disableKickButton()
+            end
+        end
+    )
 end
-
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local player = Players.LocalPlayer
-
--- Variable global interna para limpiar la conexión de arrastre
-local inputChangedConnection = nil
-
-local function createKickButton()
-	-- 1. GUI Principal
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "KickGui"
-	gui.ResetOnSpawn = false
-	gui.Parent = player:WaitForChild("PlayerGui")
-
-	-- 2. Marco Principal (Fondo Base)
-	local mainFrame = Instance.new("Frame")
-	mainFrame.Size = UDim2.new(0, 140, 0, 65)
-	mainFrame.Position = lastPosition -- Carga el estado de la última posición (persistente o reseteada)
-	mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	mainFrame.Active = true
-	mainFrame.ClipsDescendants = false
-	mainFrame.Parent = gui
-
-	local frameCorner = Instance.new("UICorner")
-	frameCorner.CornerRadius = UDim.new(0, 10)
-	frameCorner.Parent = mainFrame
-
-	-- Fondo Degradado Premium
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 25)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 45, 45))
-	}
-	gradient.Rotation = 90
-	gradient.Parent = mainFrame
-
-	-- UIStroke con Efecto de Brillo Cian
-	local frameStroke = Instance.new("UIStroke")
-	frameStroke.Color = Color3.fromRGB(0, 170, 255)
-	frameStroke.Thickness = 1.5
-	frameStroke.Transparency = 0.2
-	frameStroke.Parent = mainFrame
-
-	-- Sombra Difuminada (Glow) usando ImageLabel
-	local shadow = Instance.new("ImageLabel")
-	shadow.Name = "Shadow"
-	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
-	shadow.Size = UDim2.new(1, 30, 1, 30)
-	shadow.BackgroundTransparency = 1
-	shadow.Image = "rbxassetid://1316045217"
-	shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-	shadow.ImageTransparency = 0.4
-	shadow.ScaleType = Enum.ScaleType.Slice
-	shadow.SliceCenter = Rect.new(10, 10, 118, 118)
-	shadow.ZIndex = mainFrame.ZIndex - 1
-	shadow.Parent = mainFrame
-
-	-- 3. Título con Icono Integrado
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -35, 0, 30)
-	title.Position = UDim2.new(0, 12, 0, 2)
-	title.BackgroundTransparency = 1
-	title.Text = "⚡ KICK BOTON"
-	title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 11
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = mainFrame
-
-	-- 4. Botón X (Cerrar)
-	local closeBtn = Instance.new("TextButton")
-	closeBtn.Size = UDim2.new(0, 22, 0, 22)
-	closeBtn.Position = UDim2.new(1, -26, 0, 6)
-	closeBtn.BackgroundTransparency = 1
-	closeBtn.Text = "✕"
-	closeBtn.TextColor3 = Color3.fromRGB(140, 140, 140)
-	closeBtn.Font = Enum.Font.GothamBold
-	closeBtn.TextSize = 13
-	closeBtn.Parent = mainFrame
-
-	-- 5. Botón de Acción (Expulsar)
-	local kickBtn = Instance.new("TextButton")
-	kickBtn.Size = UDim2.new(1, -24, 0, 26)
-	kickBtn.Position = UDim2.new(0, 12, 0, 28)
-	kickBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	kickBtn.Text = "⚡ Kick"
-	kickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	kickBtn.TextStrokeTransparency = 0
-	kickBtn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	kickBtn.Font = Enum.Font.GothamBold
-	kickBtn.TextSize = 13
-	kickBtn.Parent = mainFrame
-
-	local btnCorner = Instance.new("UICorner")
-	btnCorner.CornerRadius = UDim.new(0, 6)
-	btnCorner.Parent = kickBtn
-
-	local btnGradient = Instance.new("UIGradient")
-	btnGradient.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 170, 255)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 110, 220))
-	}
-	btnGradient.Rotation = 90
-	btnGradient.Parent = kickBtn
-
-	-- ==========================================
-	-- ANIMACIONES Y EFECTOS VISUALES (TWEEN)
-	-- ==========================================
-	
-	mainFrame.Size = UDim2.new(0, 0, 0, 0)
-	mainFrame.BackgroundTransparency = 1
-	shadow.ImageTransparency = 1
-	frameStroke.Enabled = false
-	title.TextTransparency = 1
-	closeBtn.TextTransparency = 1
-	kickBtn.BackgroundTransparency = 1
-	kickBtn.TextTransparency = 1
-
-	local openTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	TweenService:Create(mainFrame, openTweenInfo, {Size = UDim2.new(0, 140, 0, 65), BackgroundTransparency = 0}):Play()
-	
-	task.spawn(function()
-		task.wait(0.15)
-		frameStroke.Enabled = true
-		local fadeInInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		TweenService:Create(shadow, fadeInInfo, {ImageTransparency = 0.4}):Play()
-		TweenService:Create(title, fadeInInfo, {TextTransparency = 0}):Play()
-		TweenService:Create(closeBtn, fadeInInfo, {TextTransparency = 0}):Play()
-		TweenService:Create(kickBtn, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0}):Play()
-	end)
-
-	local function closeGui()
-		if inputChangedConnection then
-			inputChangedConnection:Disconnect()
-			inputChangedConnection = nil
-		end
-		
-		local closeTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		TweenService:Create(mainFrame, closeTweenInfo, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
-		TweenService:Create(shadow, closeTweenInfo, {ImageTransparency = 1}):Play()
-		TweenService:Create(title, closeTweenInfo, {TextTransparency = 1}):Play()
-		TweenService:Create(closeBtn, closeTweenInfo, {TextTransparency = 1}):Play()
-		TweenService:Create(kickBtn, closeTweenInfo, {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-		
-		task.wait(0.2)
-		gui:Destroy()
-		kickGui = nil
-		kickButtonEnabled = false
-	end
-
-	closeBtn.MouseButton1Click:Connect(closeGui)
-
-	kickBtn.MouseEnter:Connect(function()
-		TweenService:Create(btnGradient, TweenInfo.new(0.2), {Offset = Vector2.new(0, -0.15)}):Play()
-		TweenService:Create(kickBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 37)}):Play()
-	end)
-	kickBtn.MouseLeave:Connect(function()
-		TweenService:Create(btnGradient, TweenInfo.new(0.2), {Offset = Vector2.new(0, 0)}):Play()
-		TweenService:Create(kickBtn, TweenInfo.new(0.2), {Size = UDim2.new(1, -24, 0, 32), Position = UDim2.new(0, 12, 0, 38)}):Play()
-	end)
-
-	closeBtn.MouseEnter:Connect(function()
-		TweenService:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255, 75, 75)}):Play()
-	end)
-	closeBtn.MouseLeave:Connect(function()
-		TweenService:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(140, 140, 140)}):Play()
-	end)
-
-	kickBtn.MouseButton1Click:Connect(function()
-		player:Kick("Has sido kickeado por el botón de Kick.")
-	end)
-
-	-- ==========================================
-	-- SISTEMA DE ARRASTRE OPTIMIZADO SIN FUGAS
-	-- ==========================================
-	local dragging = false
-	local dragInput
-	local dragStart
-	local startPos
-
-	mainFrame.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
-
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-					savePosition(mainFrame.Position) -- Guarda la posición de forma persistente al soltar
-				end
-			end)
-		end
-	end)
-
-	mainFrame.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-
-	if inputChangedConnection then
-		inputChangedConnection:Disconnect()
-	end
-
-	inputChangedConnection = UserInputService.InputChanged:Connect(function(input)
-		if dragging and input == dragInput then
-			local delta = input.Position - dragStart
-			mainFrame.Position = UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset + delta.X,
-				startPos.Y.Scale,
-				startPos.Y.Offset + delta.Y
-			)
-		end
-	end)
-
-	return gui
-end
-
-local function enableKickButton()
-	if kickButtonEnabled then return end
-	kickButtonEnabled = true
-	kickGui = createKickButton()
-end
-
-local function disableKickButton()
-	if not kickButtonEnabled then return end
-	kickButtonEnabled = false
-
-	if inputChangedConnection then
-		inputChangedConnection:Disconnect()
-		inputChangedConnection = nil
-	end
-
-	if kickGui then  
-		kickGui:Destroy()  
-		kickGui = nil  
-	end
-	
-	-- Al desactivar por el Toggle, reseteamos la posición guardada al centro para la próxima vez que se active
-	savePosition(defaultPosition)
-end
-
--- TOGGLE
-createToggle("Kick Boton", function(state)
-	if state then
-		enableKickButton()
-	else
-		disableKickButton()
-	end
-end)
 
 -- ================= END =================
 
