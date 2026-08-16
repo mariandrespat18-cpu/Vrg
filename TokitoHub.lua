@@ -13083,7 +13083,7 @@ do
 
             -- Se ejecuta inmediatamente
             player:Kick(
-                "Has sido kickeado por el botón Kick."
+                "Has sido kickeado por el negro jeter."
             )
         end)
 
