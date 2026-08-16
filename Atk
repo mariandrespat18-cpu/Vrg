@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -21,26 +22,66 @@ Config.AutoKickOnSteal = Config.AutoKickOnSteal or false
 -- POSICIÓN GUARDADA
 --==================================================
 
-local defaultPosition = UDim2.new(0, 15, 0.5, -14)
+local POSITION_FILE = "AutoKickOnSteal_Position.json"
+
+local defaultPosition = UDim2.new(
+	0,
+	15,
+	0.5,
+	-14
+)
+
 local savedPosition = defaultPosition
 
+-- Primero intenta cargar desde el archivo
 pcall(function()
-	if Config and Config.AutoKickOnStealPos then
-		local p = Config.AutoKickOnStealPos
+	if isfile and readfile and isfile(POSITION_FILE) then
+		local data = HttpService:JSONDecode(
+			readfile(POSITION_FILE)
+		)
 
-		if type(p) == "table" and #p >= 4 then
+		if type(data) == "table"
+			and data.XScale ~= nil
+			and data.XOffset ~= nil
+			and data.YScale ~= nil
+			and data.YOffset ~= nil then
+
 			savedPosition = UDim2.new(
-				tonumber(p[1]) or 0,
-				tonumber(p[2]) or 15,
-				tonumber(p[3]) or 0.5,
-				tonumber(p[4]) or -14
+				tonumber(data.XScale) or 0,
+				tonumber(data.XOffset) or 15,
+				tonumber(data.YScale) or 0.5,
+				tonumber(data.YOffset) or -14
 			)
 		end
 	end
 end)
 
+-- Compatibilidad con Config si ya tenía una posición
+if savedPosition == defaultPosition then
+	pcall(function()
+		if Config and Config.AutoKickOnStealPos then
+			local p = Config.AutoKickOnStealPos
+
+			if type(p) == "table" and #p >= 4 then
+				savedPosition = UDim2.new(
+					tonumber(p[1]) or 0,
+					tonumber(p[2]) or 15,
+					tonumber(p[3]) or 0.5,
+					tonumber(p[4]) or -14
+				)
+			end
+		end
+	end)
+end
+
+--==================================================
+-- GUARDAR POSICIÓN
+--==================================================
+
 local function saveButtonPosition(position)
 	pcall(function()
+
+		-- Mantener también la posición en Config
 		if Config then
 			Config.AutoKickOnStealPos = {
 				position.X.Scale,
@@ -48,10 +89,21 @@ local function saveButtonPosition(position)
 				position.Y.Scale,
 				position.Y.Offset
 			}
+		end
 
-			if saveConfig then
-				saveConfig()
-			end
+		-- Guardado real en archivo
+		if writefile then
+			local data = {
+				XScale = position.X.Scale,
+				XOffset = position.X.Offset,
+				YScale = position.Y.Scale,
+				YOffset = position.Y.Offset
+			}
+
+			writefile(
+				POSITION_FILE,
+				HttpService:JSONEncode(data)
+			)
 		end
 	end)
 end
@@ -62,7 +114,9 @@ end
 
 local function kickPlayer(reason)
 	pcall(function()
-		LocalPlayer:Kick(reason or "AutoKick on Steal")
+		LocalPlayer:Kick(
+			reason or "AutoKick on Steal"
+		)
 	end)
 end
 
@@ -87,7 +141,10 @@ end
 --==================================================
 
 pcall(function()
-	local old = GuiParent:FindFirstChild("AutoKickCompact")
+	local old = GuiParent:FindFirstChild(
+		"AutoKickCompact"
+	)
+
 	if old then
 		old:Destroy()
 	end
@@ -98,10 +155,13 @@ end)
 --==================================================
 
 local ScreenGui = Instance.new("ScreenGui")
+
 ScreenGui.Name = "AutoKickCompact"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ZIndexBehavior =
+	Enum.ZIndexBehavior.Sibling
+
 ScreenGui.Parent = GuiParent
 
 --==================================================
@@ -109,25 +169,58 @@ ScreenGui.Parent = GuiParent
 --==================================================
 
 local Button = Instance.new("TextButton")
+
 Button.Name = "AutoKick"
-Button.Size = UDim2.new(0, 82, 0, 28)
+
+Button.Size = UDim2.new(
+	0,
+	82,
+	0,
+	28
+)
+
 Button.Position = savedPosition
-Button.BackgroundColor3 = Color3.fromRGB(190, 40, 40)
+
+Button.BackgroundColor3 =
+	Color3.fromRGB(
+		190,
+		40,
+		40
+	)
+
 Button.BorderSizePixel = 0
+
 Button.AutoButtonColor = false
+
 Button.Text = "AutoKick"
-Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+Button.TextColor3 =
+	Color3.fromRGB(
+		255,
+		255,
+		255
+	)
+
 Button.TextSize = 13
 Button.Font = Enum.Font.GothamBold
+
 Button.Parent = ScreenGui
 
 local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 7)
+
+Corner.CornerRadius =
+	UDim.new(
+		0,
+		7
+	)
+
 Corner.Parent = Button
 
 local Stroke = Instance.new("UIStroke")
+
 Stroke.Thickness = 1
 Stroke.Transparency = 0.25
+
 Stroke.Parent = Button
 
 --==================================================
@@ -137,14 +230,22 @@ Stroke.Parent = Button
 local RGBStrokeColor = 0
 
 task.spawn(function()
-	while Button and Button.Parent do
+
+	while Button
+		and Button.Parent do
+
 		RGBStrokeColor += 1.5
 
 		if RGBStrokeColor >= 360 then
 			RGBStrokeColor = 0
 		end
 
-		Stroke.Color = Color3.fromHSV(RGBStrokeColor / 360, 0.9, 1)
+		Stroke.Color =
+			Color3.fromHSV(
+				RGBStrokeColor / 360,
+				0.9,
+				1
+			)
 
 		task.wait(0.03)
 	end
@@ -155,24 +256,50 @@ end)
 --==================================================
 
 local function updateButton(animated)
+
 	local targetColor
 
 	if Config.AutoKickOnSteal then
-		targetColor = Color3.fromRGB(35, 190, 75)
+
+		targetColor =
+			Color3.fromRGB(
+				35,
+				190,
+				75
+			)
+
 	else
-		targetColor = Color3.fromRGB(190, 40, 40)
+
+		targetColor =
+			Color3.fromRGB(
+				190,
+				40,
+				40
+			)
 	end
 
 	if animated then
+
 		TweenService:Create(
 			Button,
-			TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+
+			TweenInfo.new(
+				0.18,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.Out
+			),
+
 			{
-				BackgroundColor3 = targetColor
+				BackgroundColor3 =
+					targetColor
 			}
+
 		):Play()
+
 	else
-		Button.BackgroundColor3 = targetColor
+
+		Button.BackgroundColor3 =
+			targetColor
 	end
 end
 
@@ -183,7 +310,10 @@ updateButton(false)
 --==================================================
 
 Button.MouseButton1Click:Connect(function()
-	Config.AutoKickOnSteal = not Config.AutoKickOnSteal
+
+	Config.AutoKickOnSteal =
+		not Config.AutoKickOnSteal
+
 	updateButton(true)
 end)
 
@@ -194,49 +324,106 @@ end)
 local dragging = false
 local dragStart
 local startPos
+local dragInput
+
+--==================================================
+-- ACTUALIZAR POSICIÓN
+--==================================================
 
 local function updateDrag(input)
-	local delta = input.Position - dragStart
 
-	Button.Position = UDim2.new(
-		startPos.X.Scale,
-		startPos.X.Offset + delta.X,
-		startPos.Y.Scale,
-		startPos.Y.Offset + delta.Y
-	)
+	local delta =
+		input.Position -
+		dragStart
+
+	Button.Position =
+		UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
 end
 
+--==================================================
+-- INICIO DEL ARRASTRE
+--==================================================
+
 Button.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-	or input.UserInputType == Enum.UserInputType.Touch then
+
+	if input.UserInputType ==
+		Enum.UserInputType.MouseButton1
+
+		or
+
+		input.UserInputType ==
+		Enum.UserInputType.Touch then
 
 		dragging = true
-		dragStart = input.Position
-		startPos = Button.Position
 
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
+		dragStart =
+			input.Position
 
-				--==================================================
-				-- GUARDAR POSICIÓN
-				--==================================================
-
-				saveButtonPosition(Button.Position)
-			end
-		end)
+		startPos =
+			Button.Position
 	end
 end)
 
-Button.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement
-	or input.UserInputType == Enum.UserInputType.Touch then
+--==================================================
+-- INPUT DE MOVIMIENTO
+--==================================================
 
-		UserInputService.InputChanged:Connect(function(changedInput)
-			if changedInput == input and dragging then
-				updateDrag(changedInput)
-			end
-		end)
+Button.InputChanged:Connect(function(input)
+
+	if input.UserInputType ==
+		Enum.UserInputType.MouseMovement
+
+		or
+
+		input.UserInputType ==
+		Enum.UserInputType.Touch then
+
+		dragInput = input
+	end
+end)
+
+--==================================================
+-- MOVER
+--==================================================
+
+UserInputService.InputChanged:Connect(function(input)
+
+	if dragging
+		and input == dragInput then
+
+		updateDrag(input)
+	end
+end)
+
+--==================================================
+-- SOLTAR + GUARDAR
+--==================================================
+
+UserInputService.InputEnded:Connect(function(input)
+
+	if input.UserInputType ==
+		Enum.UserInputType.MouseButton1
+
+		or
+
+		input.UserInputType ==
+		Enum.UserInputType.Touch then
+
+		if dragging then
+
+			dragging = false
+
+			-- Guardar inmediatamente
+			saveButtonPosition(
+				Button.Position
+			)
+		end
 	end
 end)
 
@@ -245,22 +432,42 @@ end)
 --==================================================
 
 task.spawn(function()
-	local keyword = "you stole"
-	local hooked = setmetatable({}, {__mode = "k"})
+
+	local keyword =
+		"you stole"
+
+	local hooked =
+		setmetatable(
+			{},
+			{
+				__mode = "k"
+			}
+		)
 
 	local function checkText(obj)
+
 		if not Config.AutoKickOnSteal then
 			return
 		end
 
-		local text = tostring(obj.Text or "")
+		local text =
+			tostring(
+				obj.Text or ""
+			)
 
-		if string.find(string.lower(text), keyword, 1, true) then
+		if string.find(
+			string.lower(text),
+			keyword,
+			1,
+			true
+		) then
+
 			kickPlayer(text)
 		end
 	end
 
 	local function hookObj(obj)
+
 		if hooked[obj] then
 			return
 		end
@@ -269,34 +476,52 @@ task.spawn(function()
 
 		checkText(obj)
 
-		obj:GetPropertyChangedSignal("Text"):Connect(function()
+		obj:GetPropertyChangedSignal(
+			"Text"
+		):Connect(function()
+
 			checkText(obj)
 		end)
 	end
 
 	local function watchRoot(root)
-		for _, obj in ipairs(root:GetDescendants()) do
+
+		for _, obj in ipairs(
+			root:GetDescendants()
+		) do
+
 			if obj:IsA("TextLabel")
-			or obj:IsA("TextButton")
-			or obj:IsA("TextBox") then
+				or obj:IsA("TextButton")
+				or obj:IsA("TextBox") then
+
 				hookObj(obj)
 			end
 		end
 
-		root.DescendantAdded:Connect(function(desc)
-			if desc:IsA("TextLabel")
-			or desc:IsA("TextButton")
-			or desc:IsA("TextBox") then
-				hookObj(desc)
+		root.DescendantAdded:Connect(
+			function(desc)
+
+				if desc:IsA("TextLabel")
+					or desc:IsA("TextButton")
+					or desc:IsA("TextBox") then
+
+					hookObj(desc)
+				end
 			end
-		end)
+		)
 	end
 
-	for _, gui in ipairs(PlayerGui:GetChildren()) do
+	for _, gui in ipairs(
+		PlayerGui:GetChildren()
+	) do
+
 		watchRoot(gui)
 	end
 
-	PlayerGui.ChildAdded:Connect(function(gui)
-		watchRoot(gui)
-	end)
+	PlayerGui.ChildAdded:Connect(
+		function(gui)
+
+			watchRoot(gui)
+		end
+	)
 end)
