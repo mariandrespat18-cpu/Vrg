@@ -21,6 +21,47 @@ local ALL_COMMANDS={"balloon","inverse","jail","jumpscare","morph","nightvision"
 local COOLDOWNS={rocket=120,ragdoll=30,balloon=30,inverse=60,nightvision=60,jail=60,tiny=60,jumpscare=60,morph=60}
 local activeCooldowns={}
 
+--==================================================
+-- POSICIÓN MEMORIZADA
+--==================================================
+
+Config = Config or {}
+
+local defaultPosition=UDim2.new(0.02,0,0.35,0)
+local savedPosition=defaultPosition
+
+pcall(function()
+    if Config and Config["jackAPCPos"] then
+        local p=Config["jackAPCPos"]
+
+        if type(p)=="table" and #p>=4 then
+            savedPosition=UDim2.new(
+                tonumber(p[1]) or 0.02,
+                tonumber(p[2]) or 0,
+                tonumber(p[3]) or 0.35,
+                tonumber(p[4]) or 0
+            )
+        end
+    end
+end)
+
+local function saveJackPosition(position)
+    pcall(function()
+        if Config then
+            Config["jackAPCPos"]={
+                position.X.Scale,
+                position.X.Offset,
+                position.Y.Scale,
+                position.Y.Offset
+            }
+
+            if saveConfig then
+                saveConfig()
+            end
+        end
+    end)
+end
+
 local function isOnCooldown(cmd)
     if not activeCooldowns[cmd] then return false end
     return (tick() - activeCooldowns[cmd]) < (COOLDOWNS[cmd] or 0)
@@ -67,7 +108,7 @@ toolsGui.Parent=PlayerGui
 local toolsFrame=Instance.new("Frame")
 toolsFrame.Name="Frame"
 toolsFrame.Size=UDim2.new(0,160 * mobileScale,0,100 * mobileScale)
-toolsFrame.Position=UDim2.new(0.02,0,0.35,0)
+toolsFrame.Position=savedPosition
 toolsFrame.BackgroundColor3=Theme.Background
 toolsFrame.BackgroundTransparency=0.05
 toolsFrame.BorderSizePixel=0
@@ -82,28 +123,44 @@ panelStroke.Transparency=0.55
 
 local function MakeDraggable(handle,target)
     local dragging,dragInput,dragStart,startPos
+
     handle.InputBegan:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+        if input.UserInputType==Enum.UserInputType.MouseButton1
+        or input.UserInputType==Enum.UserInputType.Touch then
+
             dragging=true
             dragStart=input.Position
             startPos=target.Position
+
             input.Changed:Connect(function()
                 if input.UserInputState==Enum.UserInputState.End then
                     dragging=false
+
+                    --==================================================
+                    -- GUARDAR POSICIÓN AL SOLTAR
+                    --==================================================
+
+                    saveJackPosition(target.Position)
                 end
             end)
         end
     end)
+
     handle.InputChanged:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then
+        if input.UserInputType==Enum.UserInputType.MouseMovement
+        or input.UserInputType==Enum.UserInputType.Touch then
             dragInput=input
         end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
         if input==dragInput and dragging then
             local delta=input.Position - dragStart
             target.Position=UDim2.new(
-                startPos.X.Scale,startPos.X.Offset + delta.X,startPos.Y.Scale,startPos.Y.Offset + delta.Y
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
             )
         end
     end)
@@ -266,11 +323,9 @@ task.spawn(function()
         if ProximityAPActive then
             local myChar=LocalPlayer.Character
             if myChar and myChar:FindFirstChild("HumanoidRootPart") then
-                -- Activar el círculo y pegarlo al jugador
                 circleAdornment.Adornee = myChar.HumanoidRootPart
                 circleAdornment.Visible = true
-                
-                -- Lógica de rango
+
                 for _,p in ipairs(Players:GetPlayers()) do
                     if p ~=LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                         local dist=(p.Character.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
@@ -305,4 +360,5 @@ proxBtn.MouseButton1Click:Connect(function()
     ProximityAPActive=not ProximityAPActive
     jack()
 end)
+
 jack()
