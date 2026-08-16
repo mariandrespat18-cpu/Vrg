@@ -1,7 +1,7 @@
 --// AUTO KICK ON STEAL - COMPACT RGB TOGGLE
 --// Detecta textos como: "You stole ..."
 --// ON = Verde | OFF = Rojo
---// Movible y compacto
+--// Movible y compacto + POSICIÓN MEMORIZADA
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -16,6 +16,45 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 Config = Config or {}
 Config.AutoKickOnSteal = Config.AutoKickOnSteal or false
+
+--==================================================
+-- POSICIÓN GUARDADA
+--==================================================
+
+local defaultPosition = UDim2.new(0, 15, 0.5, -14)
+local savedPosition = defaultPosition
+
+pcall(function()
+	if Config and Config.AutoKickOnStealPos then
+		local p = Config.AutoKickOnStealPos
+
+		if type(p) == "table" and #p >= 4 then
+			savedPosition = UDim2.new(
+				tonumber(p[1]) or 0,
+				tonumber(p[2]) or 15,
+				tonumber(p[3]) or 0.5,
+				tonumber(p[4]) or -14
+			)
+		end
+	end
+end)
+
+local function saveButtonPosition(position)
+	pcall(function()
+		if Config then
+			Config.AutoKickOnStealPos = {
+				position.X.Scale,
+				position.X.Offset,
+				position.Y.Scale,
+				position.Y.Offset
+			}
+
+			if saveConfig then
+				saveConfig()
+			end
+		end
+	end)
+end
 
 --==================================================
 -- KICK
@@ -72,7 +111,7 @@ ScreenGui.Parent = GuiParent
 local Button = Instance.new("TextButton")
 Button.Name = "AutoKick"
 Button.Size = UDim2.new(0, 82, 0, 28)
-Button.Position = UDim2.new(0, 15, 0.5, -14)
+Button.Position = savedPosition
 Button.BackgroundColor3 = Color3.fromRGB(190, 40, 40)
 Button.BorderSizePixel = 0
 Button.AutoButtonColor = false
@@ -178,6 +217,12 @@ Button.InputBegan:Connect(function(input)
 		input.Changed:Connect(function()
 			if input.UserInputState == Enum.UserInputState.End then
 				dragging = false
+
+				--==================================================
+				-- GUARDAR POSICIÓN
+				--==================================================
+
+				saveButtonPosition(Button.Position)
 			end
 		end)
 	end
