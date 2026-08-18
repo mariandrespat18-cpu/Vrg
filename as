@@ -21,10 +21,19 @@ local COLORS = {
 }
 
 local POS_FILE = "Internal_AP_System_pos.txt"
+local REVERSE_FILE = "Internal_AP_System_reverse.txt"
+
+--------------------------------------------------
+-- DEFAULT POSITION
+--------------------------------------------------
 
 local function getDefaultPosition()
 	return UDim2.new(0.5, -75, 0.5, -14)
 end
+
+--------------------------------------------------
+-- SAVE POSITION
+--------------------------------------------------
 
 local function savePosition(pos)
 	if not writefile then
@@ -33,16 +42,21 @@ local function savePosition(pos)
 
 	local xs = tonumber(pos.X.Scale) or 0
 	local xo = math.floor((tonumber(pos.X.Offset) or 0) + 0.5)
+
 	local ys = tonumber(pos.Y.Scale) or 0
 	local yo = math.floor((tonumber(pos.Y.Offset) or 0) + 0.5)
 
 	pcall(function()
 		writefile(
 			POS_FILE,
-			string.format("%.6f,%d,%.6f,%d", xs, xo, ys, yo)
+			string.format("%.6f,%d,%.6f,%d",xs,xo,ys,yo)
 		)
 	end)
 end
+
+--------------------------------------------------
+-- LOAD POSITION
+--------------------------------------------------
 
 local function loadPosition()
 	if not (readfile and isfile) then
@@ -83,13 +97,64 @@ local function loadPosition()
 	return getDefaultPosition()
 end
 
+--------------------------------------------------
+-- REVERSE SETTING PERSISTENCE
+--------------------------------------------------
+
+local function saveReverseState(value)
+	if not writefile then
+		return
+	end
+
+	pcall(function()
+		writefile(
+			REVERSE_FILE,
+			value and "1" or "0"
+		)
+	end)
+end
+
+local function loadReverseState()
+	if not (readfile and isfile) then
+		return false
+	end
+
+	local ok,data=pcall(function()
+		if isfile(REVERSE_FILE) then
+			return readfile(REVERSE_FILE)
+		end
+
+		return nil
+	end)
+
+	if not ok or type(data)~="string" then
+		return false
+	end
+
+	data=data:gsub("%s+","")
+
+	return data=="1"
+end
+
+--------------------------------------------------
+-- DESTROY OLD GUI
+--------------------------------------------------
+
 if targetFolder:FindFirstChild(spmName) then
 	targetFolder[spmName]:Destroy()
 end
 
+--------------------------------------------------
+-- TWEEN
+--------------------------------------------------
+
 local function tw(o,i,p)
 	TweenService:Create(o,i,p):Play()
 end
+
+--------------------------------------------------
+-- FIRE CLICK
+--------------------------------------------------
 
 local function fireClick(button)
 	if not button then
@@ -111,28 +176,37 @@ local function fireClick(button)
 	end
 end
 
+--------------------------------------------------
+-- RUN ADMIN COMMAND
+--------------------------------------------------
+
 local function runAdminCommand(targetPlayer,commandName)
 	local adminGui=targetFolder:FindFirstChild("AdminPanel")
+
 	if not adminGui then
 		return false
 	end
 
 	local adminPanel=adminGui:FindFirstChild("AdminPanel")
+
 	if not adminPanel then
 		return false
 	end
 
 	local contentScroll=adminPanel:FindFirstChild("Content")
+
 	if not contentScroll then
 		return false
 	end
 
 	local scrollingFrame=contentScroll:FindFirstChild("ScrollingFrame")
+
 	if not scrollingFrame then
 		return false
 	end
 
 	local cmdBtn=scrollingFrame:FindFirstChild(commandName)
+
 	if not cmdBtn then
 		return false
 	end
@@ -142,16 +216,19 @@ local function runAdminCommand(targetPlayer,commandName)
 	task.wait(0.05)
 
 	local profilesScroll=adminPanel:FindFirstChild("Profiles")
+
 	if not profilesScroll then
 		return false
 	end
 
 	local profilesScrollingFrame=profilesScroll:FindFirstChild("ScrollingFrame")
+
 	if not profilesScrollingFrame then
 		return false
 	end
 
 	local playerBtn=profilesScrollingFrame:FindFirstChild(targetPlayer.Name)
+
 	if not playerBtn then
 		return false
 	end
@@ -161,9 +238,17 @@ local function runAdminCommand(targetPlayer,commandName)
 	return true
 end
 
+--------------------------------------------------
+-- SINGLE COMMAND
+--------------------------------------------------
+
 local function runSingleCmd(targetPlayer,cmd)
 	pcall(runAdminCommand,targetPlayer,cmd)
 end
+
+--------------------------------------------------
+-- COMMAND LIST
+--------------------------------------------------
 
 local cmdsToSpam={
 	"rocket",
@@ -182,7 +267,8 @@ local cmdsToSpam={
 -- ADMIN PANEL REVERSA
 --------------------------------------------------
 
-local reverseEnabled=false
+-- Carga el estado guardado ANTES de crear la interfaz
+local reverseEnabled=loadReverseState()
 
 local reverseCommands={}
 
@@ -191,6 +277,10 @@ for _,cmd in ipairs(cmdsToSpam) do
 end
 
 local reverseDebounce={}
+
+--------------------------------------------------
+-- NORMALIZE
+--------------------------------------------------
 
 local function normalizeText(text)
 	if type(text)~="string" then
@@ -203,6 +293,10 @@ local function normalizeText(text)
 	return text
 end
 
+--------------------------------------------------
+-- FIND PLAYER
+--------------------------------------------------
+
 local function findPlayerByName(name)
 	name=normalizeText(name):lower()
 
@@ -210,6 +304,7 @@ local function findPlayerByName(name)
 		return nil
 	end
 
+	-- Coincidencia exacta
 	for _,p in ipairs(Players:GetPlayers()) do
 		if p~=LocalPlayer then
 			if p.Name:lower()==name then
@@ -222,7 +317,7 @@ local function findPlayerByName(name)
 		end
 	end
 
-	-- Búsqueda parcial por si el texto mostrado trae algún formato adicional
+	-- Coincidencia parcial
 	for _,p in ipairs(Players:GetPlayers()) do
 		if p~=LocalPlayer then
 			if name:find(p.Name:lower(),1,true) then
@@ -238,6 +333,10 @@ local function findPlayerByName(name)
 	return nil
 end
 
+--------------------------------------------------
+-- REVERSE INCOMING COMMAND
+--------------------------------------------------
+
 local function reverseIncomingCommand(text)
 	if not reverseEnabled then
 		return
@@ -251,7 +350,7 @@ local function reverseIncomingCommand(text)
 
 	------------------------------------------------
 	-- FORMATO:
-	-- Tokito_2025Muichiro ran "jumpscare" on you! BOO!
+	-- Bx ran "jumpscare" on you! BOO!
 	------------------------------------------------
 
 	local playerName,commandName=text:match(
@@ -269,10 +368,17 @@ local function reverseIncomingCommand(text)
 		return
 	end
 
-	-- Solo devuelve comandos permitidos
+	------------------------------------------------
+	-- SOLO COMANDOS DE LA LISTA
+	------------------------------------------------
+
 	if not reverseCommands[commandName] then
 		return
 	end
+
+	------------------------------------------------
+	-- BUSCAR JUGADOR
+	------------------------------------------------
 
 	local targetPlayer=findPlayerByName(playerName)
 
@@ -281,10 +387,13 @@ local function reverseIncomingCommand(text)
 	end
 
 	------------------------------------------------
-	-- Evitar duplicados por un mismo mensaje
+	-- DEBOUNCE
 	------------------------------------------------
 
-	local debounceKey=tostring(targetPlayer.UserId)..":"..commandName
+	local debounceKey=
+		tostring(targetPlayer.UserId)
+		..":"
+		..commandName
 
 	if reverseDebounce[debounceKey] then
 		return
@@ -294,7 +403,10 @@ local function reverseIncomingCommand(text)
 
 	task.spawn(function()
 		pcall(function()
-			runAdminCommand(targetPlayer,commandName)
+			runAdminCommand(
+				targetPlayer,
+				commandName
+			)
 		end)
 
 		task.wait(0.35)
@@ -304,7 +416,7 @@ local function reverseIncomingCommand(text)
 end
 
 --------------------------------------------------
--- DETECTOR DE MENSAJES
+-- WATCH TEXT OBJECTS
 --------------------------------------------------
 
 local watchedObjects={}
@@ -337,6 +449,10 @@ local function watchTextObject(obj)
 	end
 end
 
+--------------------------------------------------
+-- WATCH GUI TREE
+--------------------------------------------------
+
 local function watchGuiTree(root)
 	if not root then
 		return
@@ -362,17 +478,26 @@ pcall(function()
 end)
 
 --------------------------------------------------
--- OWNER / SPAM
+-- SPAM PLAYER
 --------------------------------------------------
 
 local function spamPlayer(targetPlayer)
 	task.spawn(function()
 		for _,cmd in ipairs(cmdsToSpam) do
-			pcall(runAdminCommand,targetPlayer,cmd)
+			pcall(
+				runAdminCommand,
+				targetPlayer,
+				cmd
+			)
+
 			task.wait(0.15)
 		end
 	end)
 end
+
+--------------------------------------------------
+-- STEALING INFO
+--------------------------------------------------
 
 local function getStealingInfo(p)
 	local s=p:GetAttribute("Stealing")
@@ -386,6 +511,10 @@ local function getStealingInfo(p)
 
 	return false,nil
 end
+
+--------------------------------------------------
+-- NEAREST OWNER
+--------------------------------------------------
 
 local function getNearestOwner()
 	local char=LocalPlayer.Character
@@ -402,6 +531,7 @@ local function getNearestOwner()
 	end
 
 	local myPlot
+
 	local lpName=LocalPlayer.Name:lower()
 	local lpDisplay=LocalPlayer.DisplayName:lower()
 
@@ -433,7 +563,8 @@ local function getNearestOwner()
 			)
 
 			if part then
-				local dist=(hrp.Position-part.Position).Magnitude
+				local dist=
+					(hrp.Position-part.Position).Magnitude
 
 				if dist<nearestDist then
 					nearestDist=dist
@@ -469,6 +600,10 @@ local function getNearestOwner()
 	return nil
 end
 
+--------------------------------------------------
+-- SPAM OWNER
+--------------------------------------------------
+
 local function spamOwner()
 	local target=getNearestOwner()
 
@@ -477,10 +612,20 @@ local function spamOwner()
 	end
 
 	task.spawn(function()
-		pcall(runAdminCommand,target,"rocket")
+		pcall(
+			runAdminCommand,
+			target,
+			"rocket"
+		)
+
 		task.wait(0.1)
 
-		pcall(runAdminCommand,target,"jail")
+		pcall(
+			runAdminCommand,
+			target,
+			"jail"
+		)
+
 		task.wait(1)
 
 		local ownerCmds={
@@ -495,68 +640,131 @@ local function spamOwner()
 		}
 
 		for _,cmd in ipairs(ownerCmds) do
-			pcall(runAdminCommand,target,cmd)
+			pcall(
+				runAdminCommand,
+				target,
+				cmd
+			)
+
 			task.wait(0.15)
 		end
 	end)
 end
 
 --------------------------------------------------
--- GUI
+-- SCREEN GUI
 --------------------------------------------------
 
-local sg=Instance.new("ScreenGui",targetFolder)
+local sg=Instance.new(
+	"ScreenGui",
+	targetFolder
+)
+
 sg.Name=spmName
 sg.ResetOnSpawn=false
 sg.DisplayOrder=999
 
-local main=Instance.new("Frame",sg)
+--------------------------------------------------
+-- MAIN
+--------------------------------------------------
+
+local main=Instance.new(
+	"Frame",
+	sg
+)
+
 main.Size=UDim2.new(0,150,0,28)
 main.Position=loadPosition()
 main.BackgroundColor3=COLORS.bg
 main.BorderSizePixel=0
 main.ClipsDescendants=true
 
-Instance.new("UICorner",main).CornerRadius=UDim.new(0,8)
+Instance.new(
+	"UICorner",
+	main
+).CornerRadius=UDim.new(0,8)
 
-local mainStroke=Instance.new("UIStroke",main)
+local mainStroke=Instance.new(
+	"UIStroke",
+	main
+)
+
 mainStroke.Color=COLORS.stroke
 mainStroke.Thickness=1
 mainStroke.Transparency=0.15
 
-local mainGrad=Instance.new("UIGradient",main)
+local mainGrad=Instance.new(
+	"UIGradient",
+	main
+)
+
 mainGrad.Color=ColorSequence.new({
-	ColorSequenceKeypoint.new(0,COLORS.bg3),
-	ColorSequenceKeypoint.new(1,COLORS.bg)
+	ColorSequenceKeypoint.new(
+		0,
+		COLORS.bg3
+	),
+
+	ColorSequenceKeypoint.new(
+		1,
+		COLORS.bg
+	)
 })
+
 mainGrad.Rotation=90
 
 --------------------------------------------------
 -- HEADER
 --------------------------------------------------
 
-local header=Instance.new("TextButton",main)
+local header=Instance.new(
+	"TextButton",
+	main
+)
+
 header.Size=UDim2.new(1,0,0,28)
 header.BackgroundColor3=COLORS.bg2
 header.BorderSizePixel=0
 header.Text=""
 header.AutoButtonColor=false
 
-Instance.new("UICorner",header).CornerRadius=UDim.new(0,8)
+Instance.new(
+	"UICorner",
+	header
+).CornerRadius=UDim.new(0,8)
 
-local headerStroke=Instance.new("UIStroke",header)
+local headerStroke=Instance.new(
+	"UIStroke",
+	header
+)
+
 headerStroke.Color=COLORS.accent
 headerStroke.Thickness=1
 headerStroke.Transparency=0.35
 
-local headerGrad=Instance.new("UIGradient",header)
+local headerGrad=Instance.new(
+	"UIGradient",
+	header
+)
+
 headerGrad.Color=ColorSequence.new({
-	ColorSequenceKeypoint.new(0,COLORS.accent),
-	ColorSequenceKeypoint.new(1,COLORS.bg2)
+	ColorSequenceKeypoint.new(
+		0,
+		COLORS.accent
+	),
+
+	ColorSequenceKeypoint.new(
+		1,
+		COLORS.bg2
+	)
 })
+
 headerGrad.Rotation=0
 
-local title=Instance.new("TextLabel",header)
+local title=Instance.new(
+	"TextLabel",
+	header
+)
+
 title.Size=UDim2.new(1,-20,1,0)
 title.Position=UDim2.new(0,8,0,0)
 title.BackgroundTransparency=1
@@ -566,7 +774,11 @@ title.TextSize=11
 title.Font=Enum.Font.GothamBold
 title.TextXAlignment=Enum.TextXAlignment.Left
 
-local arrow=Instance.new("TextLabel",header)
+local arrow=Instance.new(
+	"TextLabel",
+	header
+)
+
 arrow.Size=UDim2.new(0,16,1,0)
 arrow.Position=UDim2.new(1,-16,0,0)
 arrow.BackgroundTransparency=1
@@ -575,7 +787,15 @@ arrow.TextColor3=COLORS.muted
 arrow.TextSize=9
 arrow.Font=Enum.Font.GothamBold
 
-local ownerBtn=Instance.new("TextButton",header)
+--------------------------------------------------
+-- OWNER BUTTON
+--------------------------------------------------
+
+local ownerBtn=Instance.new(
+	"TextButton",
+	header
+)
+
 ownerBtn.Size=UDim2.new(0,26,0,18)
 ownerBtn.Position=UDim2.new(1,-45,0.5,-9)
 ownerBtn.BackgroundColor3=COLORS.accent
@@ -585,9 +805,16 @@ ownerBtn.Font=Enum.Font.GothamBold
 ownerBtn.TextColor3=COLORS.text
 ownerBtn.AutoButtonColor=false
 
-Instance.new("UICorner",ownerBtn).CornerRadius=UDim.new(0,5)
+Instance.new(
+	"UICorner",
+	ownerBtn
+).CornerRadius=UDim.new(0,5)
 
-local ownerStroke=Instance.new("UIStroke",ownerBtn)
+local ownerStroke=Instance.new(
+	"UIStroke",
+	ownerBtn
+)
+
 ownerStroke.Color=COLORS.accent2
 ownerStroke.Thickness=1
 ownerStroke.Transparency=0.2
@@ -596,27 +823,42 @@ ownerStroke.Transparency=0.2
 -- CONTAINER
 --------------------------------------------------
 
-local container=Instance.new("Frame",main)
+local container=Instance.new(
+	"Frame",
+	main
+)
+
 container.Size=UDim2.new(1,0,0,0)
 container.Position=UDim2.new(0,0,0,28)
 container.BackgroundColor3=COLORS.bg
 container.BorderSizePixel=0
 container.ClipsDescendants=true
 
-Instance.new("UICorner",container).CornerRadius=UDim.new(0,8)
+Instance.new(
+	"UICorner",
+	container
+).CornerRadius=UDim.new(0,8)
 
-local containerStroke=Instance.new("UIStroke",container)
+local containerStroke=Instance.new(
+	"UIStroke",
+	container
+)
+
 containerStroke.Color=COLORS.stroke
 containerStroke.Thickness=1
 containerStroke.Transparency=0.25
 
 --------------------------------------------------
--- ADMIN PANEL REVERSA OPTION
+-- ADMIN PANEL REVERSA BUTTON
 --------------------------------------------------
 
 local OPTION_H=22
 
-local reverseOption=Instance.new("TextButton",container)
+local reverseOption=Instance.new(
+	"TextButton",
+	container
+)
+
 reverseOption.Size=UDim2.new(1,-6,0,20)
 reverseOption.Position=UDim2.new(0,3,0,1)
 reverseOption.BackgroundColor3=COLORS.bg2
@@ -624,14 +866,25 @@ reverseOption.BorderSizePixel=0
 reverseOption.Text=""
 reverseOption.AutoButtonColor=false
 
-Instance.new("UICorner",reverseOption).CornerRadius=UDim.new(0,5)
+Instance.new(
+	"UICorner",
+	reverseOption
+).CornerRadius=UDim.new(0,5)
 
-local reverseStroke=Instance.new("UIStroke",reverseOption)
+local reverseStroke=Instance.new(
+	"UIStroke",
+	reverseOption
+)
+
 reverseStroke.Color=COLORS.stroke
 reverseStroke.Thickness=1
 reverseStroke.Transparency=0.55
 
-local reverseCheck=Instance.new("TextLabel",reverseOption)
+local reverseCheck=Instance.new(
+	"TextLabel",
+	reverseOption
+)
+
 reverseCheck.Size=UDim2.new(0,18,1,0)
 reverseCheck.Position=UDim2.new(0,4,0,0)
 reverseCheck.BackgroundTransparency=1
@@ -642,7 +895,11 @@ reverseCheck.Font=Enum.Font.GothamBold
 reverseCheck.TextXAlignment=Enum.TextXAlignment.Center
 reverseCheck.TextYAlignment=Enum.TextYAlignment.Center
 
-local reverseText=Instance.new("TextLabel",reverseOption)
+local reverseText=Instance.new(
+	"TextLabel",
+	reverseOption
+)
+
 reverseText.Size=UDim2.new(1,-28,1,0)
 reverseText.Position=UDim2.new(0,25,0,0)
 reverseText.BackgroundTransparency=1
@@ -651,6 +908,10 @@ reverseText.TextColor3=COLORS.muted
 reverseText.TextSize=9
 reverseText.Font=Enum.Font.GothamBold
 reverseText.TextXAlignment=Enum.TextXAlignment.Left
+
+--------------------------------------------------
+-- UPDATE REVERSE UI
+--------------------------------------------------
 
 local function updateReverseUI()
 	if reverseEnabled then
@@ -666,30 +927,59 @@ local function updateReverseUI()
 	end
 end
 
+--------------------------------------------------
+-- CLICK REVERSE
+--------------------------------------------------
+
 reverseOption.MouseButton1Click:Connect(function()
 	reverseEnabled=not reverseEnabled
+
+	-- Guardar inmediatamente
+	saveReverseState(reverseEnabled)
+
 	updateReverseUI()
 end)
 
+-- Restaurar estado guardado
 updateReverseUI()
 
 --------------------------------------------------
 -- PLAYER LIST
 --------------------------------------------------
 
-local playerList=Instance.new("ScrollingFrame",container)
-playerList.Size=UDim2.new(1,0,1,-OPTION_H)
-playerList.Position=UDim2.new(0,0,0,OPTION_H)
+local playerList=Instance.new(
+	"ScrollingFrame",
+	container
+)
+
+playerList.Size=UDim2.new(
+	1,
+	0,
+	1,
+	-OPTION_H
+)
+
+playerList.Position=UDim2.new(
+	0,
+	0,
+	0,
+	OPTION_H
+)
+
 playerList.BackgroundTransparency=1
 playerList.BorderSizePixel=0
 playerList.ScrollBarThickness=3
 playerList.ScrollBarImageColor3=COLORS.accent
 
-local UIList=Instance.new("UIListLayout",playerList)
+local UIList=Instance.new(
+	"UIListLayout",
+	playerList
+)
+
 UIList.Padding=UDim.new(0,2)
 
 --------------------------------------------------
--- POSITION / DRAG
+-- DRAG VARIABLES
 --------------------------------------------------
 
 local minimized=true
@@ -701,7 +991,12 @@ local dragInput=nil
 local dragStart=nil
 local startPos=nil
 local dragMoved=false
+
 local DRAG_THRESHOLD=8
+
+--------------------------------------------------
+-- CLAMP
+--------------------------------------------------
 
 local function clampMainToScreen()
 	local cam=Workspace.CurrentCamera
@@ -718,16 +1013,41 @@ local function clampMainToScreen()
 
 	local pos=main.AbsolutePosition
 
-	local maxX=math.max(0,cam.ViewportSize.X-size.X)
-	local maxY=math.max(0,cam.ViewportSize.Y-size.Y)
+	local maxX=math.max(
+		0,
+		cam.ViewportSize.X-size.X
+	)
 
-	local x=math.clamp(pos.X,0,maxX)
-	local y=math.clamp(pos.Y,0,maxY)
+	local maxY=math.max(
+		0,
+		cam.ViewportSize.Y-size.Y
+	)
+
+	local x=math.clamp(
+		pos.X,
+		0,
+		maxX
+	)
+
+	local y=math.clamp(
+		pos.Y,
+		0,
+		maxY
+	)
 
 	if x~=pos.X or y~=pos.Y then
-		main.Position=UDim2.new(0,x,0,y)
+		main.Position=UDim2.new(
+			0,
+			x,
+			0,
+			y
+		)
 	end
 end
+
+--------------------------------------------------
+-- DRAG INPUT
+--------------------------------------------------
 
 header.InputBegan:Connect(function(i)
 	if i.UserInputType==Enum.UserInputType.MouseButton1
@@ -743,7 +1063,10 @@ header.InputBegan:Connect(function(i)
 			if i.UserInputState==Enum.UserInputState.End then
 				if dragging then
 					dragging=false
-					savePosition(main.Position)
+
+					savePosition(
+						main.Position
+					)
 
 					task.defer(function()
 						clampMainToScreen()
@@ -763,7 +1086,11 @@ header.InputChanged:Connect(function(i)
 end)
 
 UserInputService.InputChanged:Connect(function(i)
-	if dragging and i==dragInput and dragStart and startPos then
+	if dragging
+		and i==dragInput
+		and dragStart
+		and startPos then
+
 		local d=i.Position-dragStart
 
 		if d.Magnitude>=DRAG_THRESHOLD then
@@ -777,7 +1104,9 @@ UserInputService.InputChanged:Connect(function(i)
 			startPos.Y.Offset+d.Y
 		)
 
-		savePosition(main.Position)
+		savePosition(
+			main.Position
+		)
 	end
 end)
 
@@ -840,7 +1169,9 @@ header.MouseButton1Click:Connect(function()
 	toggle()
 end)
 
-ownerBtn.MouseButton1Click:Connect(spamOwner)
+ownerBtn.MouseButton1Click:Connect(
+	spamOwner
+)
 
 --------------------------------------------------
 -- ICONS
@@ -852,6 +1183,10 @@ local icons={
 	{icon="🔒",cmd="jail"},
 	{icon="🎈",cmd="balloon"}
 }
+
+--------------------------------------------------
+-- FLASH
+--------------------------------------------------
 
 local function flash(ic)
 	ic.BackgroundTransparency=0
@@ -899,22 +1234,36 @@ local function updatePlayerList()
 	end
 
 	for _,p in ipairs(list) do
-		local stealing,index=getStealingInfo(p)
+		local stealing,index=
+			getStealingInfo(p)
 
 		local btn=Instance.new(
 			"TextButton",
 			playerList
 		)
 
-		btn.Size=UDim2.new(1,-8,0,34)
+		btn.Size=UDim2.new(
+			1,
+			-8,
+			0,
+			34
+		)
+
 		btn.BackgroundColor3=COLORS.bg2
 		btn.BorderSizePixel=0
 		btn.Text=""
 		btn.AutoButtonColor=false
 
-		Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+		Instance.new(
+			"UICorner",
+			btn
+		).CornerRadius=UDim.new(0,6)
 
-		local btnStroke=Instance.new("UIStroke",btn)
+		local btnStroke=Instance.new(
+			"UIStroke",
+			btn
+		)
+
 		btnStroke.Color=COLORS.stroke
 		btnStroke.Thickness=1
 		btnStroke.Transparency=0.45
@@ -927,18 +1276,42 @@ local function updatePlayerList()
 		-- AVATAR
 		------------------------------------------------
 
-		local avatar=Instance.new("ImageLabel",btn)
-		avatar.Size=UDim2.new(0,24,0,24)
-		avatar.Position=UDim2.new(0,5,0.5,-12)
+		local avatar=Instance.new(
+			"ImageLabel",
+			btn
+		)
+
+		avatar.Size=UDim2.new(
+			0,
+			24,
+			0,
+			24
+		)
+
+		avatar.Position=UDim2.new(
+			0,
+			5,
+			0.5,
+			-12
+		)
+
 		avatar.BackgroundColor3=COLORS.bg3
+
 		avatar.Image=
 			"rbxthumb://type=AvatarHeadShot&id="
 			..p.UserId..
 			"&w=48&h=48"
 
-		Instance.new("UICorner",avatar).CornerRadius=UDim.new(1,0)
+		Instance.new(
+			"UICorner",
+			avatar
+		).CornerRadius=UDim.new(1,0)
 
-		local avatarStroke=Instance.new("UIStroke",avatar)
+		local avatarStroke=Instance.new(
+			"UIStroke",
+			avatar
+		)
+
 		avatarStroke.Color=COLORS.accent
 		avatarStroke.Thickness=1
 		avatarStroke.Transparency=0.35
@@ -947,9 +1320,25 @@ local function updatePlayerList()
 		-- NAME
 		------------------------------------------------
 
-		local name=Instance.new("TextLabel",btn)
-		name.Size=UDim2.new(1,-65,0,12)
-		name.Position=UDim2.new(0,34,0,2)
+		local name=Instance.new(
+			"TextLabel",
+			btn
+		)
+
+		name.Size=UDim2.new(
+			1,
+			-65,
+			0,
+			12
+		)
+
+		name.Position=UDim2.new(
+			0,
+			34,
+			0,
+			2
+		)
+
 		name.BackgroundTransparency=1
 		name.Text=p.DisplayName
 		name.TextColor3=COLORS.text
@@ -961,9 +1350,25 @@ local function updatePlayerList()
 		-- INDEX
 		------------------------------------------------
 
-		local sub=Instance.new("TextLabel",btn)
-		sub.Size=UDim2.new(1,-65,0,10)
-		sub.Position=UDim2.new(0,34,0,13)
+		local sub=Instance.new(
+			"TextLabel",
+			btn
+		)
+
+		sub.Size=UDim2.new(
+			1,
+			-65,
+			0,
+			10
+		)
+
+		sub.Position=UDim2.new(
+			0,
+			34,
+			0,
+			13
+		)
+
 		sub.BackgroundTransparency=1
 		sub.Text=index and tostring(index) or ""
 		sub.TextColor3=COLORS.gold
@@ -972,13 +1377,21 @@ local function updatePlayerList()
 		sub.TextXAlignment=Enum.TextXAlignment.Left
 
 		------------------------------------------------
-		-- COMMAND ICONS
+		-- ICONS
 		------------------------------------------------
 
 		for i,v in ipairs(icons) do
-			local ic=Instance.new("TextButton",btn)
+			local ic=Instance.new(
+				"TextButton",
+				btn
+			)
 
-			ic.Size=UDim2.new(0,18,0,10)
+			ic.Size=UDim2.new(
+				0,
+				18,
+				0,
+				10
+			)
 
 			ic.Position=UDim2.new(
 				0,
@@ -990,8 +1403,18 @@ local function updatePlayerList()
 			ic.BackgroundTransparency=1
 			ic.Text=""
 
-			local emoji=Instance.new("TextLabel",ic)
-			emoji.Size=UDim2.new(1,0,1,0)
+			local emoji=Instance.new(
+				"TextLabel",
+				ic
+			)
+
+			emoji.Size=UDim2.new(
+				1,
+				0,
+				1,
+				0
+			)
+
 			emoji.BackgroundTransparency=1
 			emoji.Text=v.icon
 			emoji.TextSize=10
@@ -999,7 +1422,11 @@ local function updatePlayerList()
 			emoji.TextColor3=COLORS.text
 
 			ic.MouseButton1Click:Connect(function()
-				runSingleCmd(p,v.cmd)
+				runSingleCmd(
+					p,
+					v.cmd
+				)
+
 				flash(ic)
 			end)
 		end
@@ -1013,7 +1440,10 @@ local function updatePlayerList()
 	)
 
 	if not minimized then
-		local h=math.min(#list,SHOW)*HEIGHT
+		local h=math.min(
+			#list,
+			SHOW
+		)*HEIGHT
 
 		container.Size=UDim2.new(
 			1,
