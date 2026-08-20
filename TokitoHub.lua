@@ -561,7 +561,37 @@ local function applyLightingAntiLag(state)
 	end  
 end  
 
-  
+  -- ============================================================
+-- ANTIRAGDOLL V2 TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetAntiRagdollV2(state)
+        State.AntiRagdollV2Enabled = state
+
+        if state then
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet("https://pastefy.app/ZqWdbCDe/raw"))()
+                end)
+            end
+        end
+    end
+
+    -- Toggle en la interfaz
+    createToggle("AntiRagdoll V2", function(state)
+        SetAntiRagdollV2(state)
+    end)
+end
+
 local ANTI_RAGDOLL = {}
 
 local antiRagdollMode = nil
@@ -2242,7 +2272,904 @@ do
     end)
 end
 
+-- AIMBOT OPTIMIZED
+do
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local Camera = workspace.CurrentCamera
+    local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local Mouse = LocalPlayer:GetMouse()
 
+    Config = Config or {}
+
+    local AimbotEnabled = false
+    local Minimized = false
+    local CurrentTarget = nil
+    local SettingsOpen = false
+
+    -- ============================================================
+    -- CONFIGURACIÓN DE ESCALA
+    -- ============================================================
+
+    local DefaultScale = 1
+    local MinScale = 0.70
+    local MaxScale = 1.50
+
+    local SavedScale = DefaultScale
+
+    pcall(function()
+        local saved = tonumber(Config["CapaAimbotScale"])
+
+        if saved then
+            SavedScale = saved
+        end
+    end)
+
+    SavedScale = math.clamp(SavedScale, MinScale, MaxScale)
+
+    -- ============================================================
+    -- USUARIOS EXCLUIDOS
+    -- ============================================================
+
+    local WhitelistedUsers = {
+        ["Toki"] = true,
+        ["Tokito"] = true,
+        ["DavidAlejandro78892"] = true,
+        ["davidalejandro78892"] = true,
+        ["KenalGotas789"] = true
+    }
+
+    -- ============================================================
+    -- SCREEN GUI
+    -- ============================================================
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TokitoLaserGui"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.IgnoreGuiInset = true
+
+    local GuiParent
+
+    pcall(function()
+        GuiParent = gethui()
+    end)
+
+    if not GuiParent then
+        GuiParent = game:GetService("CoreGui")
+    end
+
+    ScreenGui.Parent = GuiParent
+
+    -- ============================================================
+    -- CARGAR POSICIÓN
+    -- ============================================================
+
+    local defaultPos = UDim2.new(0.5, -80, 0.15, 0)
+    local framePos = defaultPos
+
+    pcall(function()
+        local p = Config["CapaAimbotPos"]
+
+        if type(p) == "table" and #p >= 4 then
+            framePos = UDim2.new(
+                tonumber(p[1]) or 0.5,
+                tonumber(p[2]) or -80,
+                tonumber(p[3]) or 0.15,
+                tonumber(p[4]) or 0
+            )
+        end
+    end)
+
+    -- ============================================================
+    -- MARCO PRINCIPAL
+    -- ============================================================
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 160, 0, 75)
+    MainFrame.Position = framePos
+    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
+    MainFrame.BackgroundTransparency = 0.15
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = false
+    MainFrame.Visible = false
+    MainFrame.Active = true
+    MainFrame.Parent = ScreenGui
+
+    -- ============================================================
+    -- UI SCALE
+    -- ============================================================
+
+    local UIScale = Instance.new("UIScale")
+    UIScale.Name = "ResponsiveScale"
+    UIScale.Scale = SavedScale
+    UIScale.Parent = MainFrame
+
+    -- ============================================================
+    -- CORNER / STROKE
+    -- ============================================================
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.Parent = MainFrame
+
+    local MainStroke = Instance.new("UIStroke")
+    MainStroke.Thickness = 2
+    MainStroke.Color = Color3.fromRGB(0, 170, 255)
+    MainStroke.Transparency = 0.2
+    MainStroke.Parent = MainFrame
+
+    -- ============================================================
+    -- TÍTULO
+    -- ============================================================
+
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(0, 102, 0, 25)
+    Title.Position = UDim2.new(0, 8, 0, 4)
+    Title.Text = "Capa laser aim"
+    Title.TextColor3 = Color3.fromRGB(0, 220, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 12
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.BackgroundTransparency = 1
+    Title.Parent = MainFrame
+
+    -- ============================================================
+    -- BOTÓN CONFIGURACIÓN
+    -- ============================================================
+
+    local SettingsBtn = Instance.new("TextButton")
+    SettingsBtn.Name = "SettingsBtn"
+    SettingsBtn.Size = UDim2.new(0, 20, 0, 20)
+    SettingsBtn.Position = UDim2.new(1, -48, 0, 4)
+    SettingsBtn.Text = "⚙"
+    SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
+    SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    SettingsBtn.Font = Enum.Font.GothamBold
+    SettingsBtn.TextSize = 13
+    SettingsBtn.AutoButtonColor = false
+    SettingsBtn.Parent = MainFrame
+
+    local SettingsCorner = Instance.new("UICorner")
+    SettingsCorner.CornerRadius = UDim.new(0, 5)
+    SettingsCorner.Parent = SettingsBtn
+
+    local SettingsStroke = Instance.new("UIStroke")
+    SettingsStroke.Color = Color3.fromRGB(0, 170, 255)
+    SettingsStroke.Thickness = 1
+    SettingsStroke.Parent = SettingsBtn
+
+    -- ============================================================
+    -- BOTÓN MINIMIZAR
+    -- ============================================================
+
+    local MinimizeBtn = Instance.new("TextButton")
+    MinimizeBtn.Name = "MinimizeBtn"
+    MinimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+    MinimizeBtn.Position = UDim2.new(1, -24, 0, 4)
+    MinimizeBtn.Text = "—"
+    MinimizeBtn.TextColor3 = Color3.fromRGB(0, 170, 255)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    MinimizeBtn.Font = Enum.Font.GothamBold
+    MinimizeBtn.TextSize = 10
+    MinimizeBtn.Parent = MainFrame
+
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 5)
+    MinCorner.Parent = MinimizeBtn
+
+    local MinStroke = Instance.new("UIStroke")
+    MinStroke.Color = Color3.fromRGB(0, 170, 255)
+    MinStroke.Thickness = 1
+    MinStroke.Parent = MinimizeBtn
+
+    -- ============================================================
+    -- BOTÓN TOGGLE
+    -- ============================================================
+
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Size = UDim2.new(0, 144, 0, 32)
+    ToggleBtn.Position = UDim2.new(0, 8, 0, 35)
+    ToggleBtn.Text = "AIMBOT: OFF"
+    ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+    ToggleBtn.Font = Enum.Font.GothamBold
+    ToggleBtn.TextSize = 12
+    ToggleBtn.Parent = MainFrame
+
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 6)
+    ToggleCorner.Parent = ToggleBtn
+
+    local ToggleStroke = Instance.new("UIStroke")
+    ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
+    ToggleStroke.Thickness = 1.5
+    ToggleStroke.Parent = ToggleBtn
+
+    -- ============================================================
+    -- PANEL DE CONFIGURACIÓN
+    -- ============================================================
+
+    local SettingsFrame = Instance.new("Frame")
+    SettingsFrame.Name = "SettingsFrame"
+    SettingsFrame.Size = UDim2.new(0, 190, 0, 128)
+    SettingsFrame.Position = UDim2.new(0, -15, 0, 82)
+    SettingsFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
+    SettingsFrame.BackgroundTransparency = 0.05
+    SettingsFrame.BorderSizePixel = 0
+    SettingsFrame.Visible = false
+    SettingsFrame.ZIndex = 20
+    SettingsFrame.Parent = MainFrame
+
+    local SettingsCorner2 = Instance.new("UICorner")
+    SettingsCorner2.CornerRadius = UDim.new(0, 8)
+    SettingsCorner2.Parent = SettingsFrame
+
+    local SettingsStroke2 = Instance.new("UIStroke")
+    SettingsStroke2.Color = Color3.fromRGB(0, 170, 255)
+    SettingsStroke2.Thickness = 1.5
+    SettingsStroke2.Parent = SettingsFrame
+
+    -- ============================================================
+    -- TÍTULO SETTINGS
+    -- ============================================================
+
+    local SettingsTitle = Instance.new("TextLabel")
+    SettingsTitle.Name = "SettingsTitle"
+    SettingsTitle.Size = UDim2.new(1, -20, 0, 24)
+    SettingsTitle.Position = UDim2.new(0, 10, 0, 8)
+    SettingsTitle.BackgroundTransparency = 1
+    SettingsTitle.Text = "⚙ CONFIGURACIÓN"
+    SettingsTitle.TextColor3 = Color3.fromRGB(0, 220, 255)
+    SettingsTitle.Font = Enum.Font.GothamBold
+    SettingsTitle.TextSize = 12
+    SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SettingsTitle.ZIndex = 21
+    SettingsTitle.Parent = SettingsFrame
+
+    -- ============================================================
+    -- LABEL ESCALA
+    -- ============================================================
+
+    local ScaleLabel = Instance.new("TextLabel")
+    ScaleLabel.Name = "ScaleLabel"
+    ScaleLabel.Size = UDim2.new(1, -20, 0, 22)
+    ScaleLabel.Position = UDim2.new(0, 10, 0, 36)
+    ScaleLabel.BackgroundTransparency = 1
+    ScaleLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+    ScaleLabel.Font = Enum.Font.GothamBold
+    ScaleLabel.TextSize = 11
+    ScaleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ScaleLabel.ZIndex = 21
+    ScaleLabel.Parent = SettingsFrame
+
+    -- ============================================================
+    -- SLIDER BAR
+    -- ============================================================
+
+    local SliderBar = Instance.new("Frame")
+    SliderBar.Name = "SliderBar"
+    SliderBar.Size = UDim2.new(1, -40, 0, 7)
+    SliderBar.Position = UDim2.new(0, 20, 0, 69)
+    SliderBar.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
+    SliderBar.BorderSizePixel = 0
+    SliderBar.ZIndex = 21
+    SliderBar.Parent = SettingsFrame
+
+    local SliderCorner = Instance.new("UICorner")
+    SliderCorner.CornerRadius = UDim.new(1, 0)
+    SliderCorner.Parent = SliderBar
+
+    local SliderFill = Instance.new("Frame")
+    SliderFill.Name = "SliderFill"
+    SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+    SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    SliderFill.BorderSizePixel = 0
+    SliderFill.ZIndex = 22
+    SliderFill.Parent = SliderBar
+
+    local SliderFillCorner = Instance.new("UICorner")
+    SliderFillCorner.CornerRadius = UDim.new(1, 0)
+    SliderFillCorner.Parent = SliderFill
+
+    local SliderKnob = Instance.new("TextButton")
+    SliderKnob.Name = "SliderKnob"
+    SliderKnob.Size = UDim2.new(0, 16, 0, 16)
+    SliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
+    SliderKnob.Position = UDim2.new(0.5, 0, 0.5, 0)
+    SliderKnob.Text = ""
+    SliderKnob.AutoButtonColor = false
+    SliderKnob.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
+    SliderKnob.ZIndex = 23
+    SliderKnob.Parent = SliderBar
+
+    local KnobCorner = Instance.new("UICorner")
+    KnobCorner.CornerRadius = UDim.new(1, 0)
+    KnobCorner.Parent = SliderKnob
+
+    local KnobStroke = Instance.new("UIStroke")
+    KnobStroke.Color = Color3.fromRGB(255, 255, 255)
+    KnobStroke.Thickness = 1
+    KnobStroke.Transparency = 0.4
+    KnobStroke.Parent = SliderKnob
+
+    -- ============================================================
+    -- BOTÓN -
+    -- ============================================================
+
+    local MinusBtn = Instance.new("TextButton")
+    MinusBtn.Name = "MinusBtn"
+    MinusBtn.Size = UDim2.new(0, 34, 0, 24)
+    MinusBtn.Position = UDim2.new(0, 20, 0, 88)
+    MinusBtn.Text = "−"
+    MinusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    MinusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
+    MinusBtn.Font = Enum.Font.GothamBold
+    MinusBtn.TextSize = 15
+    MinusBtn.ZIndex = 21
+    MinusBtn.Parent = SettingsFrame
+
+    local MinusCorner = Instance.new("UICorner")
+    MinusCorner.CornerRadius = UDim.new(0, 5)
+    MinusCorner.Parent = MinusBtn
+
+    local MinusStroke = Instance.new("UIStroke")
+    MinusStroke.Color = Color3.fromRGB(0, 120, 180)
+    MinusStroke.Thickness = 1
+    MinusStroke.Parent = MinusBtn
+
+    -- ============================================================
+    -- BOTÓN +
+    -- ============================================================
+
+    local PlusBtn = Instance.new("TextButton")
+    PlusBtn.Name = "PlusBtn"
+    PlusBtn.Size = UDim2.new(0, 34, 0, 24)
+    PlusBtn.Position = UDim2.new(1, -54, 0, 88)
+    PlusBtn.Text = "+"
+    PlusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    PlusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
+    PlusBtn.Font = Enum.Font.GothamBold
+    PlusBtn.TextSize = 15
+    PlusBtn.ZIndex = 21
+    PlusBtn.Parent = SettingsFrame
+
+    local PlusCorner = Instance.new("UICorner")
+    PlusCorner.CornerRadius = UDim.new(0, 5)
+    PlusCorner.Parent = PlusBtn
+
+    local PlusStroke = Instance.new("UIStroke")
+    PlusStroke.Color = Color3.fromRGB(0, 120, 180)
+    PlusStroke.Thickness = 1
+    PlusStroke.Parent = PlusBtn
+
+    -- ============================================================
+    -- GUARDAR CONFIG
+    -- ============================================================
+
+    local function SaveScale()
+        pcall(function()
+            Config["CapaAimbotScale"] = SavedScale
+
+            if saveConfig then
+                saveConfig()
+            end
+        end)
+    end
+
+    local function SavePosition()
+        pcall(function()
+            Config["CapaAimbotPos"] = {
+                MainFrame.Position.X.Scale,
+                MainFrame.Position.X.Offset,
+                MainFrame.Position.Y.Scale,
+                MainFrame.Position.Y.Offset
+            }
+
+            if saveConfig then
+                saveConfig()
+            end
+        end)
+    end
+
+    -- ============================================================
+    -- ACTUALIZAR ESCALA
+    -- ============================================================
+
+    local function UpdateScale(newScale, shouldSave)
+        newScale = tonumber(newScale)
+
+        if not newScale then
+            return
+        end
+
+        newScale = math.clamp(newScale, MinScale, MaxScale)
+
+        SavedScale = newScale
+        UIScale.Scale = newScale
+
+        local percent = math.floor(newScale * 100 + 0.5)
+        ScaleLabel.Text = "Tamaño de interfaz: " .. percent .. "%"
+
+        local alpha = (newScale - MinScale) / (MaxScale - MinScale)
+
+        SliderFill.Size = UDim2.new(alpha, 0, 1, 0)
+        SliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+
+        if shouldSave then
+            SaveScale()
+        end
+    end
+
+    UpdateScale(SavedScale, false)
+
+    -- ============================================================
+    -- SLIDER
+    -- ============================================================
+
+    local SliderDragging = false
+
+    local function UpdateSliderFromInput(inputPositionX)
+        local barAbsolutePosition = SliderBar.AbsolutePosition.X
+        local barAbsoluteSize = SliderBar.AbsoluteSize.X
+
+        if barAbsoluteSize <= 0 then
+            return
+        end
+
+        local alpha =
+            (inputPositionX - barAbsolutePosition) / barAbsoluteSize
+
+        alpha = math.clamp(alpha, 0, 1)
+
+        local newScale =
+            MinScale + ((MaxScale - MinScale) * alpha)
+
+        -- IMPORTANTE:
+        -- Durante el drag NO se guarda la configuración.
+        UpdateScale(newScale, false)
+    end
+
+    SliderKnob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            SliderDragging = true
+        end
+    end)
+
+    SliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            SliderDragging = true
+            UpdateSliderFromInput(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not SliderDragging then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            UpdateSliderFromInput(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            if SliderDragging then
+                SliderDragging = false
+                SaveScale()
+            end
+        end
+    end)
+
+    -- ============================================================
+    -- BOTONES DE ESCALA
+    -- ============================================================
+
+    MinusBtn.MouseButton1Click:Connect(function()
+        UpdateScale(SavedScale - 0.05, true)
+    end)
+
+    PlusBtn.MouseButton1Click:Connect(function()
+        UpdateScale(SavedScale + 0.05, true)
+    end)
+
+    -- ============================================================
+    -- SETTINGS
+    -- ============================================================
+
+    SettingsBtn.MouseButton1Click:Connect(function()
+        SettingsOpen = not SettingsOpen
+        SettingsFrame.Visible = SettingsOpen
+
+        if SettingsOpen then
+            SettingsBtn.BackgroundColor3 =
+                Color3.fromRGB(0, 70, 110)
+
+            SettingsBtn.TextColor3 =
+                Color3.fromRGB(255, 255, 255)
+        else
+            SettingsBtn.BackgroundColor3 =
+                Color3.fromRGB(20, 25, 35)
+
+            SettingsBtn.TextColor3 =
+                Color3.fromRGB(0, 190, 255)
+        end
+    end)
+
+    -- ============================================================
+    -- SISTEMA DE ARRASTRE
+    -- ============================================================
+
+    local dragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+
+    MainFrame.InputBegan:Connect(function(input)
+        if SliderDragging then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    SavePosition()
+                end
+            end)
+        end
+    end)
+
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput
+            and dragging
+            and not SliderDragging then
+
+            local delta = input.Position - dragStart
+
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    -- ============================================================
+    -- MINIMIZAR
+    -- ============================================================
+
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        Minimized = not Minimized
+
+        if Minimized then
+            SettingsOpen = false
+            SettingsFrame.Visible = false
+
+            SettingsBtn.BackgroundColor3 =
+                Color3.fromRGB(20, 25, 35)
+
+            SettingsBtn.TextColor3 =
+                Color3.fromRGB(0, 190, 255)
+
+            MainFrame:TweenSize(
+                UDim2.new(0, 160, 0, 30),
+                Enum.EasingDirection.Out,
+                Enum.EasingStyle.Quad,
+                0.2,
+                true
+            )
+
+            ToggleBtn.Visible = false
+            MinimizeBtn.Text = "+"
+        else
+            MainFrame:TweenSize(
+                UDim2.new(0, 160, 0, 75),
+                Enum.EasingDirection.Out,
+                Enum.EasingStyle.Quad,
+                0.2,
+                true
+            )
+
+            ToggleBtn.Visible = true
+            MinimizeBtn.Text = "—"
+        end
+    end)
+
+    -- ============================================================
+    -- ACTUALIZAR TARGET
+    -- ============================================================
+
+    local TargetUpdateInterval = 0.08
+    local TargetUpdateTimer = 0
+
+    local function UpdateAimbotTarget()
+        local MyCharacter = LocalPlayer.Character
+
+        if not MyCharacter then
+            CurrentTarget = nil
+            return
+        end
+
+        local MyRoot =
+            MyCharacter:FindFirstChild("HumanoidRootPart")
+
+        if not MyRoot then
+            CurrentTarget = nil
+            return
+        end
+
+        local MyPosition = MyRoot.Position
+
+        local BestTarget = nil
+        local BestDistanceSquared = math.huge
+
+        for _, Player in ipairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer
+                and not WhitelistedUsers[Player.Name]
+                and not WhitelistedUsers[Player.DisplayName] then
+
+                local Character = Player.Character
+
+                if Character and Character ~= MyCharacter then
+                    local Humanoid =
+                        Character:FindFirstChildOfClass("Humanoid")
+
+                    if Humanoid
+                        and Humanoid.Health > 0
+                        and (
+                            Player.Team == nil
+                            or Player.Team ~= LocalPlayer.Team
+                        ) then
+
+                        local Hitbox =
+                            Character:FindFirstChild("Head")
+                            or Character:FindFirstChild("HumanoidRootPart")
+
+                        if Hitbox then
+                            local Offset =
+                                Hitbox.Position - MyPosition
+
+                            -- Más barato que Magnitude porque evita sqrt
+                            local DistanceSquared =
+                                Offset.X * Offset.X
+                                + Offset.Y * Offset.Y
+                                + Offset.Z * Offset.Z
+
+                            if DistanceSquared < BestDistanceSquared then
+                                BestDistanceSquared = DistanceSquared
+                                BestTarget = Hitbox
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        CurrentTarget = BestTarget
+    end
+
+    -- ============================================================
+    -- BOTÓN AIMBOT
+    -- ============================================================
+
+    ToggleBtn.MouseButton1Click:Connect(function()
+        AimbotEnabled = not AimbotEnabled
+
+        if AimbotEnabled then
+            TargetUpdateTimer = TargetUpdateInterval
+            UpdateAimbotTarget()
+
+            ToggleBtn.Text = "AIMBOT: ON"
+            ToggleBtn.TextColor3 =
+                Color3.fromRGB(255, 255, 255)
+
+            ToggleBtn.BackgroundColor3 =
+                Color3.fromRGB(0, 80, 180)
+
+            ToggleStroke.Color =
+                Color3.fromRGB(0, 200, 255)
+        else
+            CurrentTarget = nil
+            TargetUpdateTimer = 0
+
+            ToggleBtn.Text = "AIMBOT: OFF"
+
+            ToggleBtn.TextColor3 =
+                Color3.fromRGB(150, 150, 150)
+
+            ToggleBtn.BackgroundColor3 =
+                Color3.fromRGB(15, 20, 25)
+
+            ToggleStroke.Color =
+                Color3.fromRGB(100, 100, 100)
+        end
+    end)
+
+    -- ============================================================
+    -- ANIMACIÓN + ACTUALIZACIÓN DEL TARGET
+    -- ============================================================
+
+    RunService.RenderStepped:Connect(function(deltaTime)
+        if not AimbotEnabled then
+            MainStroke.Color = Color3.fromRGB(0, 120, 200)
+            return
+        end
+
+        -- Animación visual
+        local glow =
+            math.abs(math.sin(os.clock() * 3)) * 0.5 + 0.5
+
+        local green =
+            math.floor(150 * glow) + 100
+
+        MainStroke.Color =
+            Color3.fromRGB(0, green, 255)
+
+        ToggleStroke.Color =
+            Color3.fromRGB(0, green, 255)
+
+        -- Actualización limitada del objetivo
+        TargetUpdateTimer += deltaTime
+
+        if TargetUpdateTimer >= TargetUpdateInterval then
+            TargetUpdateTimer = 0
+            UpdateAimbotTarget()
+        end
+    end)
+
+    -- ============================================================
+    -- RAYCAST PARAMS REUTILIZABLE
+    -- ============================================================
+
+    local WallbangParams = RaycastParams.new()
+
+    WallbangParams.FilterType =
+        Enum.RaycastFilterType.Include
+
+    WallbangParams.IgnoreWater = true
+
+    -- ============================================================
+    -- INTERCEPCIÓN DEL DISPARO
+    -- ============================================================
+
+    pcall(function()
+        local OldNamecall
+
+        OldNamecall = hookmetamethod(
+            game,
+            "__namecall",
+            newcclosure(function(self, ...)
+                local Method = getnamecallmethod()
+
+                if AimbotEnabled
+                    and CurrentTarget
+                    and not checkcaller() then
+
+                    if string.find(Method, "FindPartOnRay") then
+                        return
+                            CurrentTarget,
+                            CurrentTarget.Position,
+                            Vector3.new(0, 1, 0),
+                            Enum.Material.Plastic
+
+                    elseif Method == "Raycast" then
+                        local Args = {...}
+                        local Origin = Args[1]
+
+                        if typeof(Origin) == "Vector3" then
+                            local Direction =
+                                (CurrentTarget.Position - Origin).Unit * 10000
+
+                            WallbangParams.FilterDescendantsInstances = {
+                                CurrentTarget.Parent
+                            }
+
+                            Args[2] = Direction
+                            Args[3] = WallbangParams
+
+                            return OldNamecall(
+                                self,
+                                unpack(Args)
+                            )
+                        end
+                    end
+                end
+
+                return OldNamecall(self, ...)
+            end)
+        )
+
+        local OldIndex
+
+        OldIndex = hookmetamethod(
+            game,
+            "__index",
+            newcclosure(function(self, Index)
+                if AimbotEnabled
+                    and CurrentTarget
+                    and not checkcaller()
+                    and self == Mouse then
+
+                    if Index == "Hit"
+                        or Index == "hit" then
+
+                        return CurrentTarget.CFrame
+                    end
+
+                    if Index == "Target"
+                        or Index == "target" then
+
+                        return CurrentTarget
+                    end
+                end
+
+                return OldIndex(self, Index)
+            end)
+        )
+    end)
+
+    -- ============================================================
+    -- INTEGRACIÓN CON createToggle
+    -- ============================================================
+
+    createToggle("AIMBOT OPTIMIZADO", function(state)
+        MainFrame.Visible = state
+
+        if not state then
+            AimbotEnabled = false
+            CurrentTarget = nil
+            TargetUpdateTimer = 0
+
+            ToggleBtn.Text = "AIMBOT: OFF"
+
+            ToggleBtn.TextColor3 =
+                Color3.fromRGB(150, 150, 150)
+
+            ToggleBtn.BackgroundColor3 =
+                Color3.fromRGB(15, 20, 25)
+
+            ToggleStroke.Color =
+                Color3.fromRGB(100, 100, 100)
+
+            SettingsOpen = false
+            SettingsFrame.Visible = false
+
+            SettingsBtn.BackgroundColor3 =
+                Color3.fromRGB(20, 25, 35)
+
+            SettingsBtn.TextColor3 =
+                Color3.fromRGB(0, 190, 255)
+        end
+    end)
+end
 -- ========================================================
 -- TOKITO PVP SCRIPT V4
 -- AUTO LASER + INTERFAZ RESPONSIVA + ARRASTRE REAL
@@ -10842,368 +11769,8 @@ createToggle("Use Potion", function(state)
 end)
 
 -- ================= END USE POTION =================
--- ============================================================
---           TOKITO FPS BOOST :3 - MÓDULO DE TOGGLE FIXED
--- ============================================================
 
-local TokitoFpsBoost = {
-    Enabled = false,
-    Connections = {},
-    OriginalSettings = {},
-    SavedObjects = {},
-    GCLoop = nil
-}
 
-local Services = {
-    Workspace = game:GetService("Workspace"),
-    Lighting = game:GetService("Lighting")
-}
-
-local function SetFpsBoost(state)
-    TokitoFpsBoost.Enabled = state
-
-    if state then
-        -- 1. Guardar y optimizar Lighting (Sin 'Technology' por seguridad de ejecución)
-        pcall(function()
-            TokitoFpsBoost.OriginalSettings.GlobalShadows = Services.Lighting.GlobalShadows
-            TokitoFpsBoost.OriginalSettings.FogEnd = Services.Lighting.FogEnd
-            
-            Services.Lighting.GlobalShadows = false
-            Services.Lighting.FogEnd = 9e9
-        end)
-
-        -- 2. Modificar partes progresivamente para evitar congelamiento de pantalla (Crash)
-        task.spawn(function()
-            local descendants = Services.Workspace:GetDescendants()
-            for i, obj in ipairs(descendants) do
-                if not TokitoFpsBoost.Enabled then break end -- Detener si se desactiva en medio del proceso
-                
-                pcall(function()
-                    if obj:IsA("BasePart") and not TokitoFpsBoost.SavedObjects[obj] then
-                        TokitoFpsBoost.SavedObjects[obj] = {
-                            Material = obj.Material,
-                            CastShadow = obj.CastShadow
-                        }
-                        obj.Material = Enum.Material.SmoothPlastic
-                        obj.CastShadow = false
-                    elseif obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-                        if obj.Enabled then
-                            TokitoFpsBoost.SavedObjects[obj] = { Enabled = true }
-                            obj.Enabled = false
-                        end
-                    end
-                end)
-                
-                -- Ceder el hilo cada 500 objetos para mantener los FPS estables durante la carga
-                if i % 500 == 0 then 
-                    task.wait() 
-                end
-            end
-        end)
-
-        -- 3. Optimizar nuevos elementos en tiempo real
-        local conn = Services.Workspace.DescendantAdded:Connect(function(obj)
-            if not TokitoFpsBoost.Enabled then return end
-            task.defer(function()
-                pcall(function()
-                    if obj:IsA("BasePart") then
-                        obj.CastShadow = false
-                        obj.Material = Enum.Material.SmoothPlastic
-                    elseif obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-                        obj.Enabled = false
-                    end
-                end)
-            end)
-        end)
-        table.insert(TokitoFpsBoost.Connections, conn)
-
-        -- 4. Colector de basura periódico seguro
-        if TokitoFpsBoost.GCLoop then task.cancel(TokitoFpsBoost.GCLoop) end
-        TokitoFpsBoost.GCLoop = task.spawn(function()
-            while TokitoFpsBoost.Enabled do
-                task.wait(60)
-                pcall(function() collectgarbage("collect") end)
-            end
-        end)
-
-    else
-        -- RESTAURAR ESTADO ORIGINAL AL DESACTIVAR
-        pcall(function()
-            if TokitoFpsBoost.OriginalSettings.GlobalShadows ~= nil then
-                Services.Lighting.GlobalShadows = TokitoFpsBoost.OriginalSettings.GlobalShadows
-                Services.Lighting.FogEnd = TokitoFpsBoost.OriginalSettings.FogEnd
-            end
-        end)
-
-        -- Restaurar objetos progresivamente
-        task.spawn(function()
-            local count = 0
-            for obj, data in pairs(TokitoFpsBoost.SavedObjects) do
-                count = count + 1
-                if obj and obj.Parent then
-                    pcall(function()
-                        if data.Material then obj.Material = data.Material end
-                        if data.CastShadow ~= nil then obj.CastShadow = data.CastShadow end
-                        if data.Enabled ~= nil then obj.Enabled = data.Enabled end
-                    end)
-                end
-                
-                if count % 500 == 0 then task.wait() end
-            end
-            table.clear(TokitoFpsBoost.SavedObjects)
-        end)
-
-        -- Desconectar eventos activos
-        for _, conn in ipairs(TokitoFpsBoost.Connections) do
-            if typeof(conn) == "RBXScriptConnection" and conn.Connected then
-                conn:Disconnect()
-            end
-        end
-        table.clear(TokitoFpsBoost.Connections)
-        
-        -- Detener hilo de limpieza de RAM
-        if TokitoFpsBoost.GCLoop then 
-            task.cancel(TokitoFpsBoost.GCLoop)
-            TokitoFpsBoost.GCLoop = nil
-        end
-    end
-end
-
--- ============================================================
--- INTEGRACIÓN SEGURA EN EL MENÚ
--- ============================================================
-
-pcall(function()
-    createToggle("Tokito Fps Boost :3", function(state)
-        -- Encapsulamos la ejecución para que, en caso extremo, el menú nunca se rompa
-        local ok, err = pcall(function()
-            SetFpsBoost(state)
-        end)
-        if not ok then
-            warn("[Tokito Hub Safe Error]: Fps Boost falló internamente ->", tostring(err))
-        end
-    end)
-end)
-
--- ============================================================
--- FPS BOOST V2
--- ============================================================
-do
-	local WorkspaceService = game:GetService("Workspace")
-	local LightingService = game:GetService("Lighting")
-
-	-- Protecciones para evitar errores si estas variables no existen en tu hub
-	local _Config = type(Config) == "table" and Config or {}
-	local _saveConfig = type(saveConfig) == "function" and saveConfig or function() end
-	local _setToggle = type(setToggle) == "function" and setToggle or function() end
-
-	local function IsProtected(obj)
-		if not obj then return false end
-		local name = obj.Name:lower()
-		if name:find("laser") or name:find("door") or name:find("gate") or name:find("shield") or name:find("barrier") or name:find("fence") or name:find("forcefield") or name:find("wall") or name:find("protect") then
-			return true
-		end
-		
-		local parent = obj.Parent
-		while parent and parent ~= WorkspaceService do
-			local pName = parent.Name:lower()
-			if pName:find("laser") or pName:find("door") or pName:find("gate") or pName:find("shield") or pName:find("barrier") or pName:find("fence") or pName:find("forcefield") or pName:find("wall") or pName:find("protect") then
-				return true
-			end
-			parent = parent.Parent
-		end
-		return false
-	end
-
-	local fpsBoostV2Connection = nil
-
-	local function setFPSBoostV2(enabled) 
-		_Config.FPSBoostV2 = enabled
-		_saveConfig()
-		_setToggle("Fps Boost V2", enabled)
-
-		if fpsBoostV2Connection then
-			pcall(function() fpsBoostV2Connection:Disconnect() end)
-			fpsBoostV2Connection = nil
-		end
-
-		if enabled then
-			pcall(function()
-				LightingService.GlobalShadows = false
-				LightingService.Brightness = 2
-				LightingService.FogEnd = 9e9
-				LightingService.FogStart = 0
-				LightingService.EnvironmentDiffuseScale = 0
-				LightingService.EnvironmentSpecularScale = 0
-			end)
-
-			for _, v in pairs(LightingService:GetChildren()) do
-				if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("SunRaysEffect") or v:IsA("DepthOfFieldEffect") then 
-					pcall(function() v.Enabled = false end) 
-				elseif v:IsA("Atmosphere") then 
-					pcall(function() v:Destroy() end) 
-				end
-			end
-
-			-- Se envuelve en task.spawn para evitar que el hub se congele mientras optimiza el mapa
-			task.spawn(function()
-				for _, obj in ipairs(WorkspaceService:GetDescendants()) do
-					if not _Config.FPSBoostV2 then break end -- Detiene el proceso si el usuario lo desactiva rápidamente
-					
-					if not IsProtected(obj) then
-						if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then 
-							pcall(function() obj.Enabled = false end) 
-						end
-						if obj:IsA("BasePart") then 
-							pcall(function() 
-								obj.Material = Enum.Material.Plastic
-								obj.CastShadow = false 
-							end) 
-						end
-						if obj:IsA("SurfaceAppearance") or obj:IsA("Texture") or obj:IsA("Decal") then 
-							pcall(function() obj:Destroy() end) 
-						end
-					end
-				end
-			end)
-
-			fpsBoostV2Connection = WorkspaceService.DescendantAdded:Connect(function(obj)
-				if not _Config.FPSBoostV2 then return end
-				if not IsProtected(obj) then
-					if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") then 
-						pcall(function() obj.Enabled = false end) 
-					end
-					if obj:IsA("BasePart") then 
-						pcall(function() 
-							obj.Material = Enum.Material.Plastic
-							obj.CastShadow = false 
-						end) 
-					end
-				end
-			end)
-		end
-	end
-
-	-- TOGGLE
-	if type(createToggle) == "function" then
-		createToggle("Fps Boost V2", function(state)
-			setFPSBoostV2(state)
-		end)
-	else
-		warn("[HUB] La función createToggle no está definida.")
-	end
-end
--- ============================================================
--- END FPS BOOST V2
--- ============================================================
-
--- ================= FPS BOOSTER =================
-
-local fpsBoostEnabled = false
-local fpsConnections = {}
-
-local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
-
-local function setFPSBoost(state)
-
-	local Terrain = workspace:FindFirstChildOfClass("Terrain")
-
-	-- TERRAIN
-	if Terrain then
-		Terrain.WaterWaveSize = 0
-		Terrain.WaterWaveSpeed = 0
-		Terrain.WaterReflectance = 0
-		Terrain.WaterTransparency = 0
-	end
-
-	-- LIGHTING + PERFORMANCE
-	Lighting.GlobalShadows = false
-	Lighting.FogEnd = 9e9
-	settings().Rendering.QualityLevel = 1
-
-	-- WORLD CLEAN
-	for _, v in pairs(game:GetDescendants()) do
-		pcall(function()
-			if v:IsA("BasePart") then
-				v.Material = Enum.Material.Plastic
-				v.Reflectance = 0
-
-			elseif v:IsA("Decal") then
-				v.Transparency = 1
-
-			elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-				v.Lifetime = NumberRange.new(0)
-
-			elseif v:IsA("Explosion") then
-				v.BlastPressure = 0
-				v.BlastRadius = 0
-			end
-		end)
-	end
-
-	-- EFFECTS CLEAN
-	for _, v in pairs(Lighting:GetDescendants()) do
-		if v:IsA("BlurEffect")
-		or v:IsA("SunRaysEffect")
-		or v:IsA("ColorCorrectionEffect")
-		or v:IsA("BloomEffect")
-		or v:IsA("DepthOfFieldEffect") then
-			pcall(function()
-				v.Enabled = false
-			end)
-		end
-	end
-
-	-- REMOVE NEW EFFECTS
-	table.insert(fpsConnections,
-		workspace.DescendantAdded:Connect(function(child)
-			if not fpsBoostEnabled then return end
-
-			task.spawn(function()
-				pcall(function()
-					if child:IsA("ForceField")
-					or child:IsA("Sparkles")
-					or child:IsA("Smoke")
-					or child:IsA("Fire") then
-						RunService.Heartbeat:Wait()
-						child:Destroy()
-					end
-				end)
-			end)
-		end)
-	)
-end
-
-local function enableFPSBoost()
-	if fpsBoostEnabled then return end
-	fpsBoostEnabled = true
-	setFPSBoost(true)
-end
-
-local function disableFPSBoost()
-	if not fpsBoostEnabled then return end
-	fpsBoostEnabled = false
-
-	for _, c in ipairs(fpsConnections) do
-		pcall(function()
-			c:Disconnect()
-		end)
-	end
-
-	table.clear(fpsConnections)
-end
-
--- TOGGLE
-createToggle("FPS Booster", function(state)
-	if state then
-		enableFPSBoost()
-	else
-		disableFPSBoost()
-	end
-end)
-
--- ================= END FPS BOOSTER =================
 -- ================= FPS BOOST ULTRA =================
 do
 local Players = game:GetService("Players")
