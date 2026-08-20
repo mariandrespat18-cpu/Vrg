@@ -254,7 +254,6 @@ local cmdsToSpam={
 	"rocket",
 	"morph",
 	"inverse",
-	"control",
 	"ragdoll",
 	"balloon",
 	"nightvision",
