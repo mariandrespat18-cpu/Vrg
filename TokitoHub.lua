@@ -5183,6 +5183,36 @@ do
     end)
 end
 -- ============================================================
+-- TOKITO AUTO RNG TOGGLE SYSTEM
+-- ============================================================
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+do
+    local ScriptLoaded = false
+
+    local function SetTokitoAutoRNG(state)
+        State.TokitoAutoRNGEnabled = state
+
+        if state then
+            if not ScriptLoaded then
+                ScriptLoaded = true
+
+                pcall(function()
+                    loadstring(game:HttpGet("https://pastefy.app/YkMRrI7t/raw"))()
+                end)
+            end
+        end
+    end
+
+    -- Toggle en la interfaz
+    createToggle("Tokito Auto RNG", function(state)
+        SetTokitoAutoRNG(state)
+    end)
+end
+-- ============================================================
 -- INVENTARIO CUSTOM TOGGLE SYSTEM
 -- ============================================================
 
@@ -9857,6 +9887,689 @@ createToggle(
 end
 
 end
+
+-- ========================================================
+-- DEFENDER
+-- 1 CLIC = 1 USO DE LOS 4 ITEMS
+-- MINI GUI + ARRASTRABLE + POSICIÓN PERSISTENTE
+-- INTEGRADO AL createToggle DEL HUB
+-- ========================================================
+
+do
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local defenderGui = nil
+local defenderConnections = {}
+
+local defenderBusy = false
+
+local ITEM_DELAY = 0.03
+
+local DEFAULT_POSITION = UDim2.new(
+0.5,
+-55,
+0.5,
+-18
+)
+
+-- ====================================================
+-- CARGAR POSICIÓN
+-- ====================================================
+
+local savedPosition = DEFAULT_POSITION
+
+pcall(function()
+local pos = Config["DefenderPos"]
+
+if type(pos) == "table" and #pos >= 4 then    
+    savedPosition = UDim2.new(    
+        pos[1],    
+        pos[2],    
+        pos[3],    
+        pos[4]    
+    )    
+end
+
+end)
+
+-- ====================================================
+-- GUARDAR POSICIÓN
+-- ====================================================
+
+local function saveDefenderPosition(position)
+Config["DefenderPos"] = {
+position.X.Scale,
+position.X.Offset,
+position.Y.Scale,
+position.Y.Offset
+}
+
+if saveConfig then    
+    saveConfig()    
+end
+
+end
+
+-- ====================================================
+-- BUSCAR TOOL
+-- ====================================================
+
+local function getDefenderItem(itemName)
+local character = LocalPlayer.Character
+local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+if not character or not backpack then    
+    return nil    
+end    
+
+for _, obj in ipairs(character:GetChildren()) do    
+    if obj:IsA("Tool") and obj.Name == itemName then    
+        return obj    
+    end    
+end    
+
+for _, obj in ipairs(backpack:GetChildren()) do    
+    if obj:IsA("Tool") and obj.Name == itemName then    
+        return obj    
+    end    
+end    
+
+return nil
+
+end
+
+-- ====================================================
+-- USAR TOOL
+-- ====================================================
+
+local function useDefenderItem(itemName)
+local tool = getDefenderItem(itemName)
+
+if not tool then    
+    return    
+end    
+
+pcall(function()    
+    local character = LocalPlayer.Character    
+
+    if not character then    
+        return    
+    end    
+
+    local humanoid =    
+        character:FindFirstChildOfClass("Humanoid")    
+
+    if not humanoid then    
+        return    
+    end    
+
+    if tool.Parent ~= character then    
+        humanoid:EquipTool(tool)    
+        task.wait()    
+    end    
+
+    if tool.Parent == character then    
+        tool:Activate()    
+    end    
+end)
+
+end
+
+-- ====================================================
+-- SECUENCIA
+-- ====================================================
+
+local function useDefenderOnce()
+
+if defenderBusy then    
+    return    
+end    
+
+defenderBusy = true    
+
+task.spawn(function()    
+
+    useDefenderItem(    
+        "All Seeing Sentry"    
+    )    
+
+    task.wait(ITEM_DELAY)    
+
+    if not defenderBusy then    
+        return    
+    end    
+
+    useDefenderItem(    
+        "BeeHive"    
+    )    
+
+    task.wait(ITEM_DELAY)    
+
+    if not defenderBusy then    
+        return    
+    end    
+
+    useDefenderItem(    
+        "Attack Doge"    
+    )    
+
+    task.wait(ITEM_DELAY)    
+
+    if not defenderBusy then    
+        return    
+    end    
+
+    useDefenderItem(    
+        "Subspace Mine"    
+    )    
+
+    defenderBusy = false    
+end)
+
+end
+
+-- ====================================================
+-- DESTRUIR GUI
+-- ====================================================
+
+local function destroyDefender()
+
+defenderBusy = false    
+
+for _, connection in ipairs(defenderConnections) do    
+    if connection then    
+        pcall(function()    
+            connection:Disconnect()    
+        end)    
+    end    
+end    
+
+table.clear(defenderConnections)    
+
+if defenderGui then    
+    pcall(function()    
+        defenderGui:Destroy()    
+    end)    
+
+    defenderGui = nil    
+end
+
+end
+
+-- ====================================================
+-- CREAR GUI
+-- ====================================================
+
+local function createDefender()
+
+destroyDefender()    
+
+local ScreenGui = Instance.new("ScreenGui")    
+
+ScreenGui.Name = "DefenderCompact"    
+ScreenGui.ResetOnSpawn = false    
+ScreenGui.IgnoreGuiInset = true    
+ScreenGui.ZIndexBehavior =    
+    Enum.ZIndexBehavior.Sibling    
+
+local parent    
+
+pcall(function()    
+    parent = gethui()    
+end)    
+
+if not parent then    
+    parent = game:GetService("CoreGui")    
+end    
+
+ScreenGui.Parent = parent    
+defenderGui = ScreenGui    
+
+-- ==================================================    
+-- FRAME    
+-- ==================================================    
+
+local Frame = Instance.new("Frame")    
+
+Frame.Name = "Defender"    
+
+Frame.Size = UDim2.new(    
+    0,    
+    110,    
+    0,    
+    36    
+)    
+
+Frame.Position = savedPosition    
+
+Frame.BackgroundColor3 = Color3.fromRGB(    
+    9,    
+    15,    
+    22    
+)    
+
+Frame.BorderSizePixel = 0    
+Frame.Active = true    
+Frame.Parent = ScreenGui    
+
+local Corner = Instance.new("UICorner")    
+Corner.CornerRadius = UDim.new(0, 9)    
+Corner.Parent = Frame    
+
+local Stroke = Instance.new("UIStroke")    
+Stroke.Thickness = 1    
+Stroke.Transparency = 0.15    
+Stroke.Color = Color3.fromRGB(    
+    0,    
+    150,    
+    220    
+)    
+Stroke.Parent = Frame    
+
+-- ==================================================    
+-- TITULO    
+-- ==================================================    
+
+local Title = Instance.new("TextLabel")    
+
+Title.Size = UDim2.new(    
+    0,    
+    65,    
+    1,    
+    0    
+)    
+
+Title.Position = UDim2.new(    
+    0,    
+    9,    
+    0,    
+    0    
+)    
+
+Title.BackgroundTransparency = 1    
+Title.Text = "DEFENDER"    
+
+Title.TextColor3 = Color3.fromRGB(    
+    220,    
+    235,    
+    245    
+)    
+
+Title.Font = Enum.Font.GothamBold    
+Title.TextSize = 9    
+Title.TextXAlignment =    
+    Enum.TextXAlignment.Left    
+
+Title.Parent = Frame    
+
+-- ==================================================    
+-- BOTÓN    
+-- ==================================================    
+
+local Toggle = Instance.new("TextButton")    
+
+Toggle.Name = "Use"    
+
+Toggle.Size = UDim2.new(    
+    0,    
+    32,    
+    0,    
+    18    
+)    
+
+Toggle.Position = UDim2.new(    
+    1,    
+    -40,    
+    0.5,    
+    -9    
+)    
+
+Toggle.BackgroundColor3 =    
+    Color3.fromRGB(    
+        35,    
+        45,    
+        55    
+    )    
+
+Toggle.BorderSizePixel = 0    
+Toggle.Text = ""    
+Toggle.AutoButtonColor = false    
+Toggle.ZIndex = 5    
+Toggle.Parent = Frame    
+
+local ToggleCorner = Instance.new("UICorner")    
+ToggleCorner.CornerRadius =    
+    UDim.new(1, 0)    
+ToggleCorner.Parent = Toggle    
+
+local Knob = Instance.new("Frame")    
+
+Knob.Size = UDim2.new(    
+    0,    
+    14,    
+    0,    
+    14    
+)    
+
+Knob.Position = UDim2.new(    
+    0,    
+    2,    
+    0.5,    
+    -7    
+)    
+
+Knob.BackgroundColor3 =    
+    Color3.fromRGB(    
+        170,    
+        185,    
+        195    
+    )    
+
+Knob.BorderSizePixel = 0    
+Knob.ZIndex = 6    
+Knob.Parent = Toggle    
+
+local KnobCorner = Instance.new("UICorner")    
+KnobCorner.CornerRadius =    
+    UDim.new(1, 0)    
+KnobCorner.Parent = Knob    
+
+-- ==================================================    
+-- CLICK DEL DEFENDER    
+-- ==================================================    
+
+table.insert(    
+    defenderConnections,    
+
+    Toggle.MouseButton1Click:Connect(    
+        function()    
+
+            if defenderBusy then    
+                return    
+            end    
+
+            -- Visual ON    
+            Toggle.BackgroundColor3 =    
+                Color3.fromRGB(    
+                    0,    
+                    155,    
+                    225    
+                )    
+
+            Knob.BackgroundColor3 =    
+                Color3.fromRGB(    
+                    255,    
+                    255,    
+                    255    
+                )    
+
+            Knob.Position =    
+                UDim2.new(    
+                    1,    
+                    -16,    
+                    0.5,    
+                    -7    
+                )    
+
+            Title.TextColor3 =    
+                Color3.fromRGB(    
+                    0,    
+                    210,    
+                    255    
+                )    
+
+            useDefenderOnce()    
+
+            task.spawn(function()    
+
+                while defenderBusy do    
+                    task.wait()    
+                end    
+
+                if not defenderGui    
+                    or not defenderGui.Parent then    
+                    return    
+                end    
+
+                -- Visual OFF    
+                Toggle.BackgroundColor3 =    
+                    Color3.fromRGB(    
+                        35,    
+                        45,    
+                        55    
+                    )    
+
+                Knob.BackgroundColor3 =    
+                    Color3.fromRGB(    
+                        170,    
+                        185,    
+                        195    
+                    )    
+
+                Knob.Position =    
+                    UDim2.new(    
+                        0,    
+                        2,    
+                        0.5,    
+                        -7    
+                    )    
+
+                Title.TextColor3 =    
+                    Color3.fromRGB(    
+                        220,    
+                        235,    
+                        245    
+                    )    
+            end)    
+        end    
+    )    
+)    
+
+-- ==================================================    
+-- ARRASTRE    
+-- ==================================================    
+
+local dragging = false    
+local dragStart = nil    
+local startPosition = nil    
+local activeTouch = nil    
+
+table.insert(    
+    defenderConnections,    
+
+    Frame.InputBegan:Connect(    
+        function(input)    
+
+            if input.UserInputType    
+                ~= Enum.UserInputType.MouseButton1    
+                and input.UserInputType    
+                ~= Enum.UserInputType.Touch then    
+
+                return    
+            end    
+
+            -- No iniciar drag si tocó el botón    
+            if input.UserInputType    
+                == Enum.UserInputType.MouseButton1 then    
+
+                local mouse =    
+                    UserInputService:GetMouseLocation()    
+
+                local pos =    
+                    Toggle.AbsolutePosition    
+
+                local size =    
+                    Toggle.AbsoluteSize    
+
+                if mouse.X >= pos.X    
+                    and mouse.X <= pos.X + size.X    
+                    and mouse.Y >= pos.Y    
+                    and mouse.Y <= pos.Y + size.Y then    
+
+                    return    
+                end    
+            end    
+
+            dragging = true    
+            dragStart = input.Position    
+            startPosition = Frame.Position    
+            activeTouch = input    
+        end    
+    )    
+)    
+
+table.insert(    
+    defenderConnections,    
+
+    UserInputService.InputChanged:Connect(    
+        function(input)    
+
+            if not dragging then    
+                return    
+            end    
+
+            if input.UserInputType    
+                == Enum.UserInputType.MouseMovement then    
+
+                local delta =    
+                    input.Position -    
+                    dragStart    
+
+                Frame.Position =    
+                    UDim2.new(    
+                        startPosition.X.Scale,    
+                        startPosition.X.Offset    
+                            + delta.X,    
+
+                        startPosition.Y.Scale,    
+                        startPosition.Y.Offset    
+                            + delta.Y    
+                    )    
+            end    
+        end    
+    )    
+)    
+
+table.insert(    
+    defenderConnections,    
+
+    UserInputService.TouchMoved:Connect(    
+        function(touch)    
+
+            if not dragging then    
+                return    
+            end    
+
+            if touch ~= activeTouch then    
+                return    
+            end    
+
+            local delta =    
+                touch.Position -    
+                dragStart    
+
+            Frame.Position =    
+                UDim2.new(    
+                    startPosition.X.Scale,    
+                    startPosition.X.Offset    
+                        + delta.X,    
+
+                    startPosition.Y.Scale,    
+                    startPosition.Y.Offset    
+                        + delta.Y    
+                )    
+        end    
+    )    
+)    
+
+table.insert(    
+    defenderConnections,    
+
+    UserInputService.InputEnded:Connect(    
+        function(input)    
+
+            if input.UserInputType    
+                ~= Enum.UserInputType.MouseButton1    
+                and input.UserInputType    
+                ~= Enum.UserInputType.Touch then    
+
+                return    
+            end    
+
+            if input.UserInputType    
+                == Enum.UserInputType.Touch    
+                and activeTouch    
+                and input ~= activeTouch then    
+
+                return    
+            end    
+
+            if dragging then    
+
+                dragging = false    
+                activeTouch = nil    
+
+                saveDefenderPosition(    
+                    Frame.Position    
+                )    
+            end    
+        end    
+    )    
+)    
+
+-- ==================================================    
+-- RGB    
+-- ==================================================    
+
+table.insert(    
+    defenderConnections,    
+
+    RunService.RenderStepped:Connect(    
+        function()    
+
+            if not defenderGui    
+                or not defenderGui.Parent then    
+
+                return    
+            end    
+
+            Stroke.Color =    
+                Color3.fromHSV(    
+                    0.55    
+                        + math.sin(    
+                            tick() * 2    
+                        ) * 0.04,    
+
+                    1,    
+                    1    
+                )    
+        end    
+    )    
+)
+
+end
+
+-- ====================================================
+-- HUB TOGGLE
+-- ====================================================
+
+createToggle(
+"Defender",
+function(state)
+
+if state then    
+        createDefender()    
+    else    
+        destroyDefender()    
+    end    
+
+end
+
+)
+
+end
 -- INFINITE JUMP
 local infiniteJumpEnabled = false
 
@@ -10966,70 +11679,146 @@ else
 end
 
 end
--- ================= FPS BOOSTER ULTRA V2 =================
+-- ================= FPS BOOSTER ULTRA V4 =================
 do
 	local Players = game:GetService("Players")
 	local Lighting = game:GetService("Lighting")
 	local WorkspaceService = game:GetService("Workspace")
 	local MaterialService = game:GetService("MaterialService")
 
-	-- Protecciones para evitar errores si tu hub no tiene estas funciones globales
+	-- =====================================================
+	-- COMPATIBILIDAD
+	-- =====================================================
+
 	local _Config = type(Config) == "table" and Config or {}
 	local _saveConfig = type(saveConfig) == "function" and saveConfig or function() end
 	local _setToggle = type(setToggle) == "function" and setToggle or function() end
 
-	local OriginalTransparency = setmetatable({}, { __mode = "k" })
+	-- =====================================================
+	-- ESTADO
+	-- =====================================================
+
+	local boosterEnabled = false
+
+	local OriginalTransparency = setmetatable({}, {
+		__mode = "k"
+	})
+
 	local _ultraThreads = {}
 	local _ultraConnections = {}
 
-	local function AddUltraThread(f)
-		table.insert(_ultraThreads, task.spawn(f))
-	end
+	-- =====================================================
+	-- AJUSTES
+	-- =====================================================
 
-	local function AddUltraConnection(c)
-		table.insert(_ultraConnections, c)
-	end
+	-- Cantidad procesada durante la carga inicial
+	local INITIAL_BATCH_SIZE = 200
 
-	local function SafeDestroyUltra(obj)
-		if not obj then
-			return
+	-- Objetos nuevos procesados por pequeña tanda
+	local NEW_OBJECT_BATCH_SIZE = 30
+
+	-- Tiempo entre tandas de objetos nuevos.
+	-- Esto evita que el booster esté trabajando constantemente.
+	local NEW_OBJECT_DELAY = 0.10
+
+	-- =====================================================
+	-- COLA DE OBJETOS NUEVOS
+	-- =====================================================
+
+	local pendingObjects = {}
+	local pendingSet = setmetatable({}, {
+		__mode = "k"
+	})
+
+	local queueProcessing = false
+
+	-- =====================================================
+	-- THREAD / CONNECTION HELPERS
+	-- =====================================================
+
+	local function AddUltraThread(thread)
+		if thread then
+			table.insert(_ultraThreads, thread)
 		end
-
-		-- No tocar nada del overhead ni del sistema que usa el ESP
-		if obj.Name == "Overhead"
-			or obj.Name == "AnimalOverhead"
-			or obj.Name == "Generation"
-			or obj.Name == "DisplayName"
-			or obj.Name == "FastOverheadTemplate" then
-			return
-		end
-
-		pcall(function()
-			obj:Destroy()
-		end)
 	end
 
-	local ClothingClasses = {
-		"Shirt", "Pants", "ShirtGraphic",
-		"Accessory", "Hat", "HairAccessory",
-		"FaceAccessory", "NeckAccessory", "ShoulderAccessory",
-		"FrontAccessory", "BackAccessory", "WaistAccessory",
-	}
+	local function AddUltraConnection(connection)
+		if connection then
+			table.insert(_ultraConnections, connection)
+		end
+	end
 
-	local function IsClothing(obj)
-		for _, c in ipairs(ClothingClasses) do
-			if obj:IsA(c) then
-				return true
+	local function DisconnectEverything()
+		for i = #_ultraConnections, 1, -1 do
+			local connection = _ultraConnections[i]
+
+			if typeof(connection) == "RBXScriptConnection" then
+				pcall(function()
+					connection:Disconnect()
+				end)
 			end
 		end
-		return false
+
+		table.clear(_ultraConnections)
 	end
 
-	local function IsCharacterPart(obj)
+	local function CancelEverything()
+		for i = #_ultraThreads, 1, -1 do
+			local thread = _ultraThreads[i]
+
+			pcall(function()
+				task.cancel(thread)
+			end)
+		end
+
+		table.clear(_ultraThreads)
+	end
+
+	-- =====================================================
+	-- LIMPIAR COLA
+	-- =====================================================
+
+	local function ClearPendingObjects()
+		table.clear(pendingObjects)
+		table.clear(pendingSet)
+	end
+
+	-- =====================================================
+	-- ENCOLAR OBJETO
+	-- =====================================================
+
+	local function QueueObject(obj)
+		if not boosterEnabled then
+			return
+		end
+
+		if not obj or not obj.Parent then
+			return
+		end
+
+		if pendingSet[obj] then
+			return
+		end
+
+		pendingSet[obj] = true
+
+		pendingObjects[#pendingObjects + 1] = obj
+	end
+
+	-- =====================================================
+	-- PROTECCIONES
+	-- =====================================================
+
+	local function IsProtectedFromBoost(obj)
 		local parent = obj
 
 		while parent and parent ~= WorkspaceService do
-			if parent:IsA("Model") and Players:GetPlayerFromCharacter(parent) then
+			local name = parent.Name
+
+			if name == "Debris"
+				or name == "FastOverheadTemplate"
+				or name == "AnimalOverhead" then
+
 				return true
 			end
 
@@ -11039,14 +11828,48 @@ do
 		return false
 	end
 
-	local function IsOutOfRange(obj)
-		if obj:IsA("BasePart") then
-			local x = obj.Position.X
-			return x < -560 or x > -240
+	-- =====================================================
+	-- ROPA / ACCESORIOS
+	-- =====================================================
+
+	local function IsClothing(obj)
+		return obj:IsA("Shirt")
+			or obj:IsA("Pants")
+			or obj:IsA("ShirtGraphic")
+			or obj:IsA("Accessory")
+			or obj:IsA("Hat")
+			or obj:IsA("HairAccessory")
+			or obj:IsA("FaceAccessory")
+			or obj:IsA("NeckAccessory")
+			or obj:IsA("ShoulderAccessory")
+			or obj:IsA("FrontAccessory")
+			or obj:IsA("BackAccessory")
+			or obj:IsA("WaistAccessory")
+	end
+
+	-- =====================================================
+	-- PERSONAJE
+	-- =====================================================
+
+	local function IsCharacterPart(obj)
+		local parent = obj
+
+		while parent and parent ~= WorkspaceService do
+			if parent:IsA("Model") then
+				if Players:GetPlayerFromCharacter(parent) then
+					return true
+				end
+			end
+
+			parent = parent.Parent
 		end
 
 		return false
 	end
+
+	-- =====================================================
+	-- BASE
+	-- =====================================================
 
 	local BASE_NAMES = {
 		["baseplate"] = true,
@@ -11066,181 +11889,365 @@ do
 			return true
 		end
 
-		for n in pairs(BASE_NAMES) do
-			if nameLower:find(n, 1, true) then
+		for name in pairs(BASE_NAMES) do
+			if nameLower:find(name, 1, true) then
 				return true
 			end
 		end
 
 		return false
 	end
+
+	-- =====================================================
+	-- DENTRO DE BASE
+	-- =====================================================
 
 	local function IsInBase(obj)
-		local p = obj.Parent
+		local parent = obj.Parent
 
-		while p and p ~= WorkspaceService do
-			if IsBase(p) then
+		while parent and parent ~= WorkspaceService do
+			if IsBase(parent) then
 				return true
 			end
 
-			p = p.Parent
+			parent = parent.Parent
 		end
 
 		return false
 	end
 
-	local function IsProtectedFromBoost(obj)
-		local p = obj
+	-- =====================================================
+	-- RANGO
+	-- =====================================================
 
-		while p and p ~= WorkspaceService do
-			if p.Name == "Debris"
-				or p.Name == "FastOverheadTemplate"
-				or p.Name == "AnimalOverhead" then
-				return true
-			end
-
-			p = p.Parent
+	local function IsOutOfRange(obj)
+		if not obj:IsA("BasePart") then
+			return false
 		end
 
-		return false
+		local x = obj.Position.X
+
+		return x < -560 or x > -240
 	end
+
+	-- =====================================================
+	-- TRANSPARENCIA DE BASE
+	-- =====================================================
 
 	local function MakeTransparentUltra(obj)
-		pcall(function()
-			if IsBase(obj) and not IsCharacterPart(obj) then
-				if OriginalTransparency[obj] == nil then
-					OriginalTransparency[obj] = {
-						trans = obj.Transparency,
-						shadow = obj.CastShadow
-					}
-				end
-
-				obj.Transparency = 1
-				obj.CastShadow = false
-			end
-		end)
-	end
-
-	local function StripObjectUltra(obj)
-		pcall(function()
-			if IsProtectedFromBoost(obj) then
-				return
-			end
-
-			if obj:IsA("Texture")
-				or obj:IsA("Decal")
-				or obj:IsA("SpecialMesh") then
-
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("ParticleEmitter")
-				or obj:IsA("Trail")
-				or obj:IsA("Beam")
-				or obj:IsA("Smoke")
-				or obj:IsA("Fire")
-				or obj:IsA("Sparkles") then
-
-				pcall(function()
-					obj.Enabled = false
-				end)
-
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("SurfaceAppearance") then
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("BasePart") then
-				obj.CastShadow = false
-				obj.Material = Enum.Material.Plastic
-				obj.MaterialVariant = ""
-				obj.Reflectance = 0
-			end
-		end)
-	end
-
-	local function CleanObjectUltra(obj)
-		pcall(function()
-			if IsProtectedFromBoost(obj) then
-				return
-
-			elseif obj:IsA("SurfaceAppearance") then
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("Decal") or obj:IsA("Texture") then
-				-- No tocar la cara del personaje
-				if not (obj.Name == "face"
-					and obj.Parent
-					and obj.Parent.Name == "Head"
-					and IsCharacterPart(obj)) then
-
-					SafeDestroyUltra(obj)
-				end
-
-			elseif obj:IsA("SpecialMesh") then
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("ParticleEmitter")
-				or obj:IsA("Trail")
-				or obj:IsA("Beam") then
-
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("PointLight")
-				or obj:IsA("SpotLight")
-				or obj:IsA("SurfaceLight") then
-
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("Fire")
-				or obj:IsA("Smoke")
-				or obj:IsA("Sparkles")
-				or obj:IsA("Explosion") then
-
-				SafeDestroyUltra(obj)
-
-			elseif obj:IsA("Animation")
-				or obj:IsA("AnimationController") then
-
-				-- Nunca tocar animaciones del personaje
-				if not IsCharacterPart(obj) then
-					SafeDestroyUltra(obj)
-				end
-
-			elseif obj:IsA("BasePart") then
-				-- No tocar partes del personaje
-				if IsCharacterPart(obj) then
-					return
-				end
-
-				obj.CastShadow = false
-				obj.Material = Enum.Material.Plastic
-				obj.MaterialVariant = ""
-				obj.Reflectance = 0
-			end
-		end)
-	end
-
-	local function StopAnimationsUltra(animator)
-		-- Protección absoluta: no detener animaciones de personajes
-		pcall(function()
-			if not animator or IsCharacterPart(animator) then
-				return
-			end
-
-			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-				pcall(function()
-					track:Stop()
-				end)
-			end
-		end)
-	end
-
-	local function OptimizeCharacterUltra(char)
-		-- No modificar skin, ropa, accesorios ni animaciones
-		if not char then
+		if not obj:IsA("BasePart") then
 			return
 		end
+
+		if not IsBase(obj) then
+			return
+		end
+
+		if IsCharacterPart(obj) then
+			return
+		end
+
+		pcall(function()
+			if OriginalTransparency[obj] == nil then
+				OriginalTransparency[obj] = {
+					trans = obj.Transparency,
+					shadow = obj.CastShadow
+				}
+			end
+
+			obj.Transparency = 1
+			obj.CastShadow = false
+		end)
 	end
+
+	-- =====================================================
+	-- ELIMINAR DE FORMA SEGURA
+	-- =====================================================
+
+	local function SafeDestroyUltra(obj)
+		if not obj then
+			return
+		end
+
+		local name = obj.Name
+
+		if name == "Overhead"
+			or name == "AnimalOverhead"
+			or name == "Generation"
+			or name == "DisplayName"
+			or name == "FastOverheadTemplate" then
+
+			return
+		end
+
+		pcall(function()
+			if obj.Parent then
+				obj:Destroy()
+			end
+		end)
+	end
+
+	-- =====================================================
+	-- OPTIMIZACIÓN DE OBJETO
+	-- =====================================================
+
+	local function OptimizeObjectUltra(obj)
+		if not boosterEnabled then
+			return
+		end
+
+		if not obj or not obj.Parent then
+			return
+		end
+
+		-- Protección
+		if IsProtectedFromBoost(obj) then
+			return
+		end
+
+		-- Protección completa de personajes
+		if IsCharacterPart(obj) then
+			return
+		end
+
+		-- Protección de ropa y accesorios
+		if IsClothing(obj) then
+			return
+		end
+
+		-- Bases
+		if IsBase(obj) then
+			MakeTransparentUltra(obj)
+			return
+		end
+
+		-- No tocar contenido de las bases
+		if IsInBase(obj) then
+			return
+		end
+
+		-- Eliminar objetos fuera del rango
+		if IsOutOfRange(obj) then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		-- =================================================
+		-- APARIENCIA
+		-- =================================================
+
+		if obj:IsA("SurfaceAppearance") then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		if obj:IsA("SpecialMesh") then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		if obj:IsA("Texture") then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		if obj:IsA("Decal") then
+			-- Mantener la cara del personaje
+			if obj.Name == "face"
+				and obj.Parent
+				and obj.Parent.Name == "Head" then
+
+				return
+			end
+
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		-- =================================================
+		-- EFECTOS
+		-- =================================================
+
+		if obj:IsA("ParticleEmitter")
+			or obj:IsA("Trail")
+			or obj:IsA("Beam")
+			or obj:IsA("Smoke")
+			or obj:IsA("Fire")
+			or obj:IsA("Sparkles") then
+
+			pcall(function()
+				if obj:IsA("ParticleEmitter")
+					or obj:IsA("Trail")
+					or obj:IsA("Beam") then
+
+					obj.Enabled = false
+				end
+			end)
+
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		-- =================================================
+		-- LUCES
+		-- =================================================
+
+		if obj:IsA("PointLight")
+			or obj:IsA("SpotLight")
+			or obj:IsA("SurfaceLight") then
+
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		-- =================================================
+		-- EXPLOSIONES
+		-- =================================================
+
+		if obj:IsA("Explosion") then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		-- =================================================
+		-- ANIMACIONES NO RELACIONADAS CON JUGADORES
+		-- =================================================
+
+		if obj:IsA("Animation") then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		if obj:IsA("AnimationController") then
+			SafeDestroyUltra(obj)
+			return
+		end
+
+		-- =================================================
+		-- PARTES
+		-- =================================================
+
+		if obj:IsA("BasePart") then
+			pcall(function()
+				obj.CastShadow = false
+				obj.Material = Enum.Material.Plastic
+				obj.MaterialVariant = ""
+				obj.Reflectance = 0
+			end)
+
+			return
+		end
+
+		-- =================================================
+		-- ANIMATOR
+		-- =================================================
+
+		if obj:IsA("Animator") then
+			pcall(function()
+				if not IsCharacterPart(obj) then
+					for _, track in ipairs(
+						obj:GetPlayingAnimationTracks()
+					) do
+						pcall(function()
+							track:Stop()
+						end)
+					end
+				end
+			end)
+		end
+	end
+
+	-- =====================================================
+	-- PROCESAR OBJETOS NUEVOS
+	-- =====================================================
+
+	local function StartNewObjectProcessor()
+		if queueProcessing then
+			return
+		end
+
+		queueProcessing = true
+
+		local thread = task.spawn(function()
+			while boosterEnabled do
+				local processed = 0
+				local total = #pendingObjects
+
+				while processed < NEW_OBJECT_BATCH_SIZE do
+					if not boosterEnabled then
+						break
+					end
+
+					if #pendingObjects == 0 then
+						break
+					end
+
+					local obj = table.remove(pendingObjects, 1)
+
+					if obj then
+						pendingSet[obj] = nil
+
+						if obj.Parent then
+							OptimizeObjectUltra(obj)
+						end
+					end
+
+					processed += 1
+				end
+
+				-- Solo espera cuando realmente hay trabajo.
+				-- NO usa Heartbeat continuamente.
+				if total > 0 and #pendingObjects > 0 then
+					task.wait(NEW_OBJECT_DELAY)
+				else
+					task.wait(0.25)
+				end
+			end
+
+			queueProcessing = false
+		end)
+
+		AddUltraThread(thread)
+	end
+
+	-- =====================================================
+	-- OPTIMIZACIÓN INICIAL
+	-- =====================================================
+
+	local function ProcessInitialWorkspace()
+		local objects = WorkspaceService:GetDescendants()
+		local total = #objects
+
+		for startIndex = 1, total, INITIAL_BATCH_SIZE do
+			if not boosterEnabled then
+				break
+			end
+
+			local endIndex = math.min(
+				startIndex + INITIAL_BATCH_SIZE - 1,
+				total
+			)
+
+			for i = startIndex, endIndex do
+				local obj = objects[i]
+
+				if obj and obj.Parent then
+					OptimizeObjectUltra(obj)
+				end
+			end
+
+			-- Un pequeño descanso entre lotes.
+			if endIndex < total then
+				task.wait()
+			end
+		end
+
+		table.clear(objects)
+	end
+
+	-- =====================================================
+	-- SKY
+	-- =====================================================
 
 	local function ApplyGreySkyUltra()
 		pcall(function()
@@ -11251,303 +12258,291 @@ do
 			end
 
 			local sky = Instance.new("Sky")
+
 			sky.SkyboxBk = ""
 			sky.SkyboxDn = ""
 			sky.SkyboxFt = ""
 			sky.SkyboxLf = ""
 			sky.SkyboxRt = ""
 			sky.SkyboxUp = ""
+
 			sky.CelestialBodiesShown = false
 			sky.Parent = Lighting
 		end)
 	end
+
+	-- =====================================================
+	-- LIGHTING
+	-- =====================================================
 
 	local function OptimizeLightingUltra()
 		pcall(function()
 			Lighting.GlobalShadows = false
 			Lighting.FogEnd = 9e9
 			Lighting.FogStart = 9e9
+
 			Lighting.EnvironmentDiffuseScale = 0
 			Lighting.EnvironmentSpecularScale = 0
+
 			Lighting.Brightness = 1.5
 			Lighting.Ambient = Color3.fromRGB(60, 60, 60)
 		end)
 
-		for _, v in ipairs(Lighting:GetChildren()) do
-			if v:IsA("PostEffect") then
+		for _, obj in ipairs(Lighting:GetChildren()) do
+			if obj:IsA("PostEffect") then
 				pcall(function()
-					v.Enabled = false
+					obj.Enabled = false
 				end)
 
-			elseif v:IsA("Atmosphere") or v:IsA("Clouds") then
-				SafeDestroyUltra(v)
+			elseif obj:IsA("Atmosphere")
+				or obj:IsA("Clouds") then
+
+				SafeDestroyUltra(obj)
 			end
 		end
 
 		ApplyGreySkyUltra()
 	end
 
+	-- =====================================================
+	-- TERRAIN
+	-- =====================================================
+
 	local function ApplyTerrainUltra()
 		pcall(function()
-			local T = WorkspaceService.Terrain
+			local terrain = WorkspaceService.Terrain
 
-			T.Decoration = false
-			T.WaterWaveSize = 0
-			T.WaterWaveSpeed = 0
-			T.WaterReflectance = 0
-			T.WaterTransparency = 1
+			terrain.Decoration = false
+			terrain.WaterWaveSize = 0
+			terrain.WaterWaveSpeed = 0
+			terrain.WaterReflectance = 0
+			terrain.WaterTransparency = 1
 		end)
 	end
+
+	-- =====================================================
+	-- RESTAURAR
+	-- =====================================================
+
+	local function RestoreUltra()
+		ClearPendingObjects()
+
+		pcall(function()
+			for part, data in pairs(OriginalTransparency) do
+				if part and part.Parent then
+					part.Transparency = data.trans
+					part.CastShadow = data.shadow
+				end
+			end
+		end)
+
+		table.clear(OriginalTransparency)
+
+		pcall(function()
+			settings().Rendering.QualityLevel =
+				Enum.QualityLevel.Automatic
+
+			settings().Rendering.MeshPartDetailLevel =
+				Enum.MeshPartDetailLevel.Automatic
+		end)
+
+		pcall(function()
+			Lighting.GlobalShadows = true
+			Lighting.Brightness = 2
+			Lighting.FogEnd = 100000
+		end)
+
+		pcall(function()
+			local terrain = WorkspaceService.Terrain
+
+			terrain.WaterWaveSize = 0.15
+			terrain.WaterWaveSpeed = 1
+			terrain.WaterReflectance = 0.5
+			terrain.WaterTransparency = 0.3
+			terrain.Decoration = true
+		end)
+	end
+
+	-- =====================================================
+	-- START / STOP
+	-- =====================================================
 
 	local function setFPSBoostUltra(enabled)
-		_Config.FPSBoosterUltraV2 = enabled
-		_saveConfig()
+		-- Evitar reiniciar el sistema innecesariamente
+		if boosterEnabled == enabled then
+			return
+		end
 
-		-- Solo intenta usar setToggle si realmente existe
+		boosterEnabled = enabled
+
+		_Config.FPSBoosterUltraV2 = enabled
+
+		pcall(function()
+			_saveConfig()
+		end)
+
 		if type(setToggle) == "function" then
 			pcall(function()
-				setToggle("FPS Booster Ultra v2", enabled)
+				setToggle(
+					"FPS Booster Ultra v2",
+					enabled
+				)
 			end)
 		end
 
-		-- Desconectar lo anterior para evitar duplicados
-		for _, conn in ipairs(_ultraConnections) do
-			if typeof(conn) == "RBXScriptConnection" then
-				pcall(function()
-					conn:Disconnect()
-				end)
-			end
+		DisconnectEverything()
+		CancelEverything()
+
+		queueProcessing = false
+
+		if not enabled then
+			RestoreUltra()
+			return
 		end
 
-		_ultraConnections = {}
+		-- =================================================
+		-- AJUSTES DE RENDER / FÍSICA
+		-- =================================================
 
-		for _, thr in ipairs(_ultraThreads) do
-			pcall(function()
-				task.cancel(thr)
-			end)
+		pcall(function()
+			settings().Rendering.QualityLevel =
+				Enum.QualityLevel.Level01
+
+			settings().Rendering.MeshPartDetailLevel =
+				Enum.MeshPartDetailLevel.Level01
+
+			settings().Physics.AllowSleep = true
+			settings().Physics.PhysicsEnvironmentalThrottle = 1
+		end)
+
+		if type(setfpscap) == "function" then
+			pcall(setfpscap, 0)
 		end
 
-		_ultraThreads = {}
+		-- =================================================
+		-- LIGHTING / TERRAIN
+		-- =================================================
 
-		if enabled then
-			pcall(function()
-				settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-				settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
-				settings().Physics.AllowSleep = true
-				settings().Physics.PhysicsEnvironmentalThrottle = 1
+		OptimizeLightingUltra()
+		ApplyTerrainUltra()
+
+		-- =================================================
+		-- CARGA INICIAL
+		-- =================================================
+
+		AddUltraThread(
+			task.spawn(function()
+				ProcessInitialWorkspace()
 			end)
+		)
 
-			if type(setfpscap) == "function" then
-				pcall(setfpscap, 0)
-			end
+		-- =================================================
+		-- OBJETOS NUEVOS
+		--
+		-- Importante:
+		-- solo se encolan, no se procesa cada objeto
+		-- inmediatamente.
+		-- =================================================
 
-			OptimizeLightingUltra()
-			ApplyTerrainUltra()
+		AddUltraConnection(
+			WorkspaceService.DescendantAdded:Connect(function(obj)
+				if not boosterEnabled then
+					return
+				end
 
-			AddUltraThread(function()
-				local allDesc = WorkspaceService:GetDescendants()
-				local BATCH_SIZE = 200
+				QueueObject(obj)
 
-				for i = 1, #allDesc, BATCH_SIZE do
-					if not _Config.FPSBoosterUltraV2 then
-						break
-					end
-
-					local batchEnd = math.min(
-						i + BATCH_SIZE - 1,
-						#allDesc
-					)
-
-					for j = i, batchEnd do
-						local obj = allDesc[j]
-
-						if obj and obj.Parent then
-							if IsProtectedFromBoost(obj) then
-								-- Proteger Debris / overhead
-
-							elseif IsCharacterPart(obj) then
-								-- Proteger jugadores completamente
-
-							elseif IsClothing(obj) then
-								-- Proteger ropa y accesorios
-
-							elseif IsBase(obj) then
-								MakeTransparentUltra(obj)
-
-							elseif IsInBase(obj) then
-								-- No tocar elementos dentro de las bases
-
-							elseif IsOutOfRange(obj) then
-								SafeDestroyUltra(obj)
-
-							else
-								CleanObjectUltra(obj)
-								StripObjectUltra(obj)
-
-								if obj:IsA("Animator") then
-									StopAnimationsUltra(obj)
-								end
-							end
-						end
-					end
-
-					if i + BATCH_SIZE <= #allDesc then
-						task.wait()
-					end
+				if not queueProcessing then
+					StartNewObjectProcessor()
 				end
 			end)
+		)
 
-			AddUltraConnection(
-				WorkspaceService.DescendantAdded:Connect(function(obj)
-					task.defer(function()
-						if not _Config.FPSBoosterUltraV2 then
-							return
-						end
+		-- =================================================
+		-- LIGHTING DINÁMICO
+		-- =================================================
 
-						if not obj or not obj.Parent then
-							return
-						end
+		AddUltraConnection(
+			Lighting.DescendantAdded:Connect(function(obj)
+				if not boosterEnabled then
+					return
+				end
 
-						if IsProtectedFromBoost(obj) then
-							return
-						end
-
-						-- Protección total de personajes
-						if IsCharacterPart(obj) then
-							return
-						end
-
-						-- Protección de ropa/accesorios
-						if IsClothing(obj) then
-							return
-						end
-
-						if IsBase(obj) then
-							MakeTransparentUltra(obj)
-							return
-						end
-
-						if IsInBase(obj) then
-							return
-						end
-
-						if IsOutOfRange(obj) then
-							SafeDestroyUltra(obj)
-							return
-						end
-
-						CleanObjectUltra(obj)
-						StripObjectUltra(obj)
-
-						if obj:IsA("Animator") then
-							StopAnimationsUltra(obj)
-						end
+				if obj:IsA("PostEffect") then
+					pcall(function()
+						obj.Enabled = false
 					end)
-				end)
-			)
 
-			AddUltraConnection(
-				Lighting.DescendantAdded:Connect(function(obj)
-					if not _Config.FPSBoosterUltraV2 then
-						return
-					end
-
-					if obj:IsA("PostEffect") then
-						pcall(function()
-							obj.Enabled = false
-						end)
-
-					elseif obj:IsA("Atmosphere")
-						or obj:IsA("Clouds") then
-
-						SafeDestroyUltra(obj)
-					end
-				end)
-			)
-
-			AddUltraConnection(
-				MaterialService.DescendantAdded:Connect(function(obj)
-					if not _Config.FPSBoosterUltraV2 then
-						return
-					end
+				elseif obj:IsA("Atmosphere")
+					or obj:IsA("Clouds") then
 
 					SafeDestroyUltra(obj)
-				end)
-			)
+				end
+			end)
+		)
 
-			for _, plr in ipairs(Players:GetPlayers()) do
-				OptimizeCharacterUltra(plr.Character)
+		-- =================================================
+		-- MATERIAL SERVICE
+		-- =================================================
 
-				AddUltraConnection(
-					plr.CharacterAdded:Connect(function(char)
-						OptimizeCharacterUltra(char)
-					end)
-				)
+		AddUltraConnection(
+			MaterialService.DescendantAdded:Connect(function(obj)
+				if not boosterEnabled then
+					return
+				end
+
+				SafeDestroyUltra(obj)
+			end)
+		)
+
+		-- =================================================
+		-- JUGADORES
+		-- =================================================
+
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player.Character then
+				-- Deliberadamente no modificar personajes.
 			end
 
 			AddUltraConnection(
-				Players.PlayerAdded:Connect(function(plr)
-					AddUltraConnection(
-						plr.CharacterAdded:Connect(function(char)
-							OptimizeCharacterUltra(char)
-						end)
-					)
+				player.CharacterAdded:Connect(function()
+					-- Deliberadamente no modificar personajes.
 				end)
 			)
-
-			AddUltraThread(function()
-				while _Config.FPSBoosterUltraV2 do
-					task.wait(15)
-
-					pcall(function()
-						collectgarbage("collect")
-					end)
-				end
-			end)
-
-		else
-			-- Restaurar transparencias de las bases modificadas
-			pcall(function()
-				for part, data in pairs(OriginalTransparency) do
-					if part and part.Parent then
-						part.Transparency = data.trans
-						part.CastShadow = data.shadow
-					end
-				end
-			end)
-
-			table.clear(OriginalTransparency)
-
-			-- Restaurar ajustes gráficos principales
-			pcall(function()
-				settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-				settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Automatic
-
-				Lighting.GlobalShadows = true
-				Lighting.Brightness = 2
-				Lighting.FogEnd = 100000
-
-				WorkspaceService.Terrain.WaterWaveSize = 0.15
-				WorkspaceService.Terrain.WaterWaveSpeed = 1
-				WorkspaceService.Terrain.WaterReflectance = 0.5
-				WorkspaceService.Terrain.WaterTransparency = 0.3
-				WorkspaceService.Terrain.Decoration = true
-			end)
 		end
+
+		AddUltraConnection(
+			Players.PlayerAdded:Connect(function(player)
+				AddUltraConnection(
+					player.CharacterAdded:Connect(function()
+						-- Deliberadamente no modificar personajes.
+					end)
+				)
+			end)
+		)
 	end
 
+	-- =====================================================
 	-- TOGGLE
+	-- =====================================================
+
 	if type(createToggle) == "function" then
-		createToggle("FPS Booster Ultra v2", function(state)
-			pcall(function()
-				setFPSBoostUltra(state)
-			end)
-		end)
+		createToggle(
+			"FPS Booster Ultra v2",
+			function(state)
+				pcall(function()
+					setFPSBoostUltra(state)
+				end)
+			end
+		)
 	else
-		warn("[HUB] Asegúrate de que la función createToggle existe en este punto del script.")
+		warn(
+			"[HUB] Asegúrate de que la función createToggle existe en este punto del script."
+		)
 	end
 end
--- ================= END FPS BOOSTER ULTRA V2 =================
+
+-- ================= END FPS BOOSTER ULTRA V4 =================
 -- ============================================================
 -- ============================================================
 -- PREMIUM KICK PANEL V4
@@ -15017,7 +16012,306 @@ createToggle("Xray V2", function(state)
 		stopXRay()
 	end
 end)
+-- ================= XRAY OPTIMIZADO =================
 
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local xrayEnabled = false
+local XRayTransparency = 1 -- 1 = totalmente invisible
+
+-- Guarda los valores originales para restaurarlos correctamente
+local originalProperties = {}
+
+-- Conexiones activas
+local connections = {}
+
+-- Cola de piezas pendientes
+local pendingParts = {}
+local pendingSet = {}
+
+-- Cuántas piezas como máximo procesar por frame.
+-- Si las bases son MUY grandes, puedes bajarlo a 50-100.
+local MAX_PARTS_PER_FRAME = 100
+
+local plotsFolderConnection = nil
+
+
+-- =====================================================
+-- UTILIDADES
+-- =====================================================
+
+local function disconnectAll()
+	for _, connection in pairs(connections) do
+		if connection then
+			connection:Disconnect()
+		end
+	end
+
+	table.clear(connections)
+
+	if plotsFolderConnection then
+		plotsFolderConnection:Disconnect()
+		plotsFolderConnection = nil
+	end
+end
+
+
+local function saveOriginal(part)
+	if originalProperties[part] == nil then
+		originalProperties[part] = {
+			Transparency = part.Transparency,
+			CastShadow = part.CastShadow
+		}
+	end
+end
+
+
+local function applyXRay(part)
+	if not xrayEnabled then
+		return
+	end
+
+	if not part:IsA("BasePart") then
+		return
+	end
+
+	if not part:IsDescendantOf(Workspace) then
+		return
+	end
+
+	saveOriginal(part)
+
+	part.Transparency = XRayTransparency
+	part.CastShadow = false
+end
+
+
+local function queuePart(part)
+	if not xrayEnabled then
+		return
+	end
+
+	if not part:IsA("BasePart") then
+		return
+	end
+
+	if pendingSet[part] then
+		return
+	end
+
+	pendingSet[part] = true
+	pendingParts[#pendingParts + 1] = part
+end
+
+
+-- =====================================================
+-- PROCESAMIENTO POR LOTES
+-- =====================================================
+
+local heartbeatConnection = RunService.Heartbeat:Connect(function()
+	if not xrayEnabled then
+		return
+	end
+
+	local processed = 0
+
+	while processed < MAX_PARTS_PER_FRAME and #pendingParts > 0 do
+		local part = table.remove(pendingParts, 1)
+
+		pendingSet[part] = nil
+
+		if part and part.Parent then
+			applyXRay(part)
+		end
+
+		processed += 1
+	end
+end)
+
+table.insert(connections, heartbeatConnection)
+
+
+-- =====================================================
+-- DECORATIONS
+-- =====================================================
+
+local function processDecorations(decorations)
+	if not xrayEnabled then
+		return
+	end
+
+	if not decorations then
+		return
+	end
+
+	-- Procesar las piezas existentes
+	for _, obj in ipairs(decorations:GetDescendants()) do
+		if obj:IsA("BasePart") then
+			queuePart(obj)
+		end
+	end
+
+	-- Detectar piezas nuevas sin volver a recorrer todo
+	local connection = decorations.DescendantAdded:Connect(function(obj)
+		if xrayEnabled and obj:IsA("BasePart") then
+			queuePart(obj)
+		end
+	end)
+
+	table.insert(connections, connection)
+end
+
+
+-- =====================================================
+-- PLOTS
+-- =====================================================
+
+local function processPlot(plot)
+	if not xrayEnabled then
+		return
+	end
+
+	if not plot:IsA("Model") then
+		return
+	end
+
+	-- Si Decorations ya existe
+	local decorations = plot:FindFirstChild("Decorations")
+
+	if decorations then
+		processDecorations(decorations)
+	end
+
+	-- Por si Decorations aparece después
+	local childConnection
+
+	childConnection = plot.ChildAdded:Connect(function(child)
+		if not xrayEnabled then
+			return
+		end
+
+		if child.Name == "Decorations" then
+			processDecorations(child)
+		end
+	end)
+
+	table.insert(connections, childConnection)
+end
+
+
+-- =====================================================
+-- INICIALIZACIÓN DE PLOTS
+-- =====================================================
+
+local function setupPlots()
+	local plots = Workspace:FindFirstChild("Plots")
+
+	if not plots then
+		return
+	end
+
+	-- Procesar bases actuales
+	for _, plot in ipairs(plots:GetChildren()) do
+		processPlot(plot)
+	end
+
+	-- Detectar bases nuevas
+	plotsFolderConnection = plots.ChildAdded:Connect(function(plot)
+		if xrayEnabled then
+			processPlot(plot)
+		end
+	end)
+end
+
+
+-- =====================================================
+-- RESTAURAR
+-- =====================================================
+
+local function restoreAll()
+	for part, properties in pairs(originalProperties) do
+		if part and part.Parent then
+			part.Transparency = properties.Transparency
+			part.CastShadow = properties.CastShadow
+		end
+	end
+end
+
+
+-- =====================================================
+-- START
+-- =====================================================
+
+local function startXRay()
+	if xrayEnabled then
+		return
+	end
+
+	xrayEnabled = true
+
+	table.clear(pendingParts)
+	table.clear(pendingSet)
+
+	setupPlots()
+end
+
+
+-- =====================================================
+-- STOP
+-- =====================================================
+
+local function stopXRay()
+	if not xrayEnabled then
+		return
+	end
+
+	xrayEnabled = false
+
+	-- Vaciar cola
+	table.clear(pendingParts)
+	table.clear(pendingSet)
+
+	-- Restaurar propiedades originales
+	restoreAll()
+
+	-- Desconectar listeners
+	disconnectAll()
+end
+
+
+-- =====================================================
+-- SI "Plots" APARECE DESPUÉS
+-- =====================================================
+
+local workspaceConnection = Workspace.ChildAdded:Connect(function(child)
+	if not xrayEnabled then
+		return
+	end
+
+	if child.Name == "Plots" then
+		task.defer(function()
+			if xrayEnabled then
+				setupPlots()
+			end
+		end)
+	end
+end)
+
+table.insert(connections, workspaceConnection)
+
+
+-- =====================================================
+-- TOGGLE
+-- =====================================================
+
+createToggle("Xray V2 OPTIMIZADO", function(state)
+	if state then
+		startXRay()
+	else
+		stopXRay()
+	end
+end)
 -- ================= END =================
 -- ================= XRAY =================
 
