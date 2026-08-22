@@ -6628,6 +6628,7 @@ do
         SetAPCircle(state)
     end)
 end
+
 -- ============================================================
 --  CLONAR TOGGLE SYSTEM
 -- ============================================================
@@ -6656,7 +6657,196 @@ do
         SetClone(state)
     end)
 end
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+State = State or {}
+
+local fileName = "RayoPosition.txt"
+
+-- ============================================================
+-- CONFIGURACIÓN FLASH TP
+-- ============================================================
+
+local busy = false
+local DELAY = 0.03
+
+local function flash()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+    if not char or not backpack then
+        return
+    end
+
+    local tool =
+        char:FindFirstChild("Flash Teleport")
+        or backpack:FindFirstChild("Flash Teleport")
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+    if not tool or not humanoid then
+        return
+    end
+
+    pcall(function()
+        if tool.Parent ~= char then
+            humanoid:EquipTool(tool)
+            task.wait()
+        end
+
+        if tool.Parent == char then
+            tool:Activate()
+        end
+    end)
+end
+
+local function once()
+    -- No ejecutar si Rayo está desactivado
+    if not State.RayoEnabled then
+        return
+    end
+
+    if busy then
+        return
+    end
+
+    busy = true
+
+    task.spawn(function()
+        flash()
+        task.wait(DELAY)
+        busy = false
+    end)
+end
+
+-- ============================================================
+-- CARGAR POSICIÓN
+-- ============================================================
+
+local savedX, savedY = 30, 40
+
+if isfile and isfile(fileName) and readfile then
+    local data = readfile(fileName)
+    local x, y = data:match("([^,]+),([^,]+)")
+
+    if x and y then
+        savedX = tonumber(x) or savedX
+        savedY = tonumber(y) or savedY
+    end
+end
+
+-- ============================================================
+-- GUI
+-- ============================================================
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RayoUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local button = Instance.new("TextButton")
+button.Name = "RayoButton"
+button.Text = "Rayo"
+button.Size = UDim2.new(0, 60, 0, 30)
+button.Position = UDim2.new(1, savedX, 0.5, savedY)
+button.AnchorPoint = Vector2.new(1, 0.5)
+button.BackgroundColor3 = Color3.new(0, 0, 0)
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 14
+button.Parent = screenGui
+
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+
+-- ============================================================
+-- CLICK = FLASH TP
+-- ============================================================
+
+button.Activated:Connect(function()
+    once()
+end)
+
+-- ============================================================
+-- ARRASTRAR BOTÓN
+-- ============================================================
+
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+button.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPos = button.Position
+    end
+end)
+
+button.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+
+        button.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        if dragging then
+            dragging = false
+
+            local x = button.Position.X.Offset
+            local y = button.Position.Y.Offset
+
+            if writefile then
+                writefile(
+                    fileName,
+                    tostring(x) .. "," .. tostring(y)
+                )
+            end
+        end
+    end
+end)
+
+-- ============================================================
+-- RAYO TOGGLE SYSTEM
+-- ============================================================
+
+do
+    local function SetRayo(state)
+        State.RayoEnabled = state
+        getgenv().RayoEnabled = state
+
+        -- Mostrar / ocultar botón
+        button.Visible = state
+    end
+
+    createToggle("Rayo Rayito Rayoso", function(state)
+        SetRayo(state)
+    end)
+end
 -- ============================================================
 -- TOKITO HUB - INICIALIZACIÓN GLOBAL SEGURA
 -- ============================================================
@@ -16122,7 +16312,434 @@ task.spawn(function()
         end)
 
 
+-- ==========================================
+-- AP ESP SYSTEM - OPTIMIZADO
+-- SOLO MUESTRA JUGADORES CON AP
+-- ==========================================
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+State = State or {}
+Connections = Connections or {}
+SharedState = SharedState or {}
+
+local activeHighlights = {}
+local activeBillboards = {}
+local espConnections = {}
+
+local APESPEnabled = false
+
+-- ==========================================
+-- LIMPIAR ESP DE UN JUGADOR
+-- ==========================================
+
+local function removeESP(targetPlayer)
+    local char = targetPlayer.Character
+
+    if char then
+        local hl = char:FindFirstChild("AdminESP")
+        if hl then
+            hl:Destroy()
+        end
+
+        local head = char:FindFirstChild("Head")
+        if head then
+            local tag = head:FindFirstChild("AdminTag")
+            if tag then
+                tag:Destroy()
+            end
+        end
+    end
+
+    activeHighlights[targetPlayer] = nil
+    activeBillboards[targetPlayer] = nil
+end
+
+-- ==========================================
+-- DESCONECTAR EVENTOS
+-- ==========================================
+
+local function disconnectPlayerConnections(targetPlayer)
+    local connections = espConnections[targetPlayer]
+
+    if connections then
+        for _, connection in ipairs(connections) do
+            pcall(function()
+                connection:Disconnect()
+            end)
+        end
+
+        espConnections[targetPlayer] = nil
+    end
+end
+
+-- ==========================================
+-- DESACTIVAR TODO EL ESP
+-- ==========================================
+
+local function disableAPESP()
+    for player in pairs(activeHighlights) do
+        removeESP(player)
+    end
+
+    for player in pairs(activeBillboards) do
+        removeESP(player)
+    end
+
+    -- Limpieza adicional
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+
+            local hl = char:FindFirstChild("AdminESP")
+            if hl then
+                hl:Destroy()
+            end
+
+            local head = char:FindFirstChild("Head")
+            if head then
+                local tag = head:FindFirstChild("AdminTag")
+                if tag then
+                    tag:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- ==========================================
+-- CREAR ESP
+-- ==========================================
+
+local function createESP(targetPlayer)
+    if not APESPEnabled then
+        return
+    end
+
+    local char = targetPlayer.Character
+
+    if not char or targetPlayer == LocalPlayer then
+        return
+    end
+
+    -- Solo permitir AP
+    if targetPlayer:GetAttribute("AdminCommands") ~= true then
+        removeESP(targetPlayer)
+        return
+    end
+
+    -- Eliminar ESP anterior
+    removeESP(targetPlayer)
+
+    -- ==========================================
+    -- HIGHLIGHT
+    -- ==========================================
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "AdminESP"
+
+    hl.FillColor = Color3.fromRGB(80, 80, 80)
+    hl.OutlineColor = Color3.fromRGB(100, 100, 100)
+
+    hl.FillTransparency = 0.5
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+    hl.Parent = char
+
+    activeHighlights[targetPlayer] = hl
+
+    -- ==========================================
+    -- TAG
+    -- ==========================================
+
+    local head = char:FindFirstChild("Head")
+
+    if not head then
+        return
+    end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "AdminTag"
+    billboard.AlwaysOnTop = true
+
+    billboard.Size = UDim2.new(0, 45, 0, 16)
+    billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+
+    billboard.Parent = head
+
+    activeBillboards[targetPlayer] = billboard
+
+    -- ==========================================
+    -- FRAME
+    -- ==========================================
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+
+    frame.BackgroundTransparency = 0.15
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+
+    frame.Parent = billboard
+
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 4)
+    uiCorner.Parent = frame
+
+    -- ==========================================
+    -- GRADIENT
+    -- ==========================================
+
+    local gradient = Instance.new("UIGradient")
+
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(
+            0,
+            Color3.fromRGB(30, 30, 35)
+        ),
+
+        ColorSequenceKeypoint.new(
+            0.5,
+            Color3.fromRGB(40, 40, 45)
+        ),
+
+        ColorSequenceKeypoint.new(
+            1,
+            Color3.fromRGB(30, 30, 35)
+        )
+    }
+
+    gradient.Rotation = 90
+    gradient.Parent = frame
+
+    -- ==========================================
+    -- BORDE
+    -- ==========================================
+
+    local stroke = Instance.new("UIStroke")
+
+    stroke.Color = Color3.fromRGB(150, 150, 150)
+    stroke.Thickness = 0.7
+    stroke.Transparency = 0.35
+
+    stroke.Parent = frame
+
+    -- ==========================================
+    -- TEXTO
+    -- ==========================================
+
+    local label = Instance.new("TextLabel")
+
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+
+    -- SOLO AP
+    label.Text = "AP"
+
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+
+    label.TextStrokeTransparency = 0.4
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 7
+
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.TextYAlignment = Enum.TextYAlignment.Center
+
+    label.Parent = frame
+
+    -- ==========================================
+    -- GLOW
+    -- ==========================================
+
+    local glowStroke = Instance.new("UIStroke")
+
+    glowStroke.Color = Color3.fromRGB(150, 150, 150)
+    glowStroke.Thickness = 1
+    glowStroke.Transparency = 0.75
+    glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    glowStroke.Parent = frame
+end
+
+-- ==========================================
+-- COMPROBAR JUGADOR
+-- ==========================================
+
+local function checkPlayerESP(targetPlayer)
+    if targetPlayer == LocalPlayer then
+        return
+    end
+
+    -- Si el toggle está apagado
+    if not APESPEnabled then
+        removeESP(targetPlayer)
+        return
+    end
+
+    -- Si no tiene personaje
+    if not targetPlayer.Character then
+        removeESP(targetPlayer)
+        return
+    end
+
+    -- ==========================================
+    -- COMPROBAR AP
+    -- ==========================================
+
+    local isAdmin =
+        targetPlayer:GetAttribute("AdminCommands") == true
+
+    -- Si NO tiene AP, no hacer absolutamente nada
+    if not isAdmin then
+        removeESP(targetPlayer)
+        return
+    end
+
+    -- Si tiene AP, crear ESP
+    createESP(targetPlayer)
+end
+
+-- ==========================================
+-- CONFIGURAR JUGADOR
+-- ==========================================
+
+local function setupPlayerESP(targetPlayer)
+    if targetPlayer == LocalPlayer then
+        return
+    end
+
+    -- Evitar conexiones duplicadas
+    disconnectPlayerConnections(targetPlayer)
+
+    local connections = {}
+
+    -- ==========================================
+    -- CHARACTER ADDED
+    -- ==========================================
+
+    table.insert(
+        connections,
+        targetPlayer.CharacterAdded:Connect(function()
+            task.wait(0.5)
+
+            if APESPEnabled then
+                checkPlayerESP(targetPlayer)
+            end
+        end)
+    )
+
+    -- ==========================================
+    -- CHARACTER REMOVING
+    -- ==========================================
+
+    table.insert(
+        connections,
+        targetPlayer.CharacterRemoving:Connect(function()
+            removeESP(targetPlayer)
+        end)
+    )
+
+    -- ==========================================
+    -- AP ATTRIBUTE CAMBIADO
+    -- ==========================================
+
+    table.insert(
+        connections,
+        targetPlayer:GetAttributeChangedSignal("AdminCommands"):Connect(function()
+
+            -- Si pierde AP, se elimina inmediatamente
+            if not APESPEnabled then
+                removeESP(targetPlayer)
+                return
+            end
+
+            checkPlayerESP(targetPlayer)
+        end)
+    )
+
+    espConnections[targetPlayer] = connections
+
+    -- Comprobar si ya tiene personaje
+    if APESPEnabled and targetPlayer.Character then
+        checkPlayerESP(targetPlayer)
+    end
+end
+
+-- ==========================================
+-- PREPARAR JUGADORES ACTUALES
+-- ==========================================
+
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        setupPlayerESP(player)
+    end
+end
+
+-- ==========================================
+-- NUEVOS JUGADORES
+-- ==========================================
+
+Players.PlayerAdded:Connect(function(player)
+    if player == LocalPlayer then
+        return
+    end
+
+    setupPlayerESP(player)
+
+    if APESPEnabled then
+        task.spawn(function()
+            task.wait(0.5)
+            checkPlayerESP(player)
+        end)
+    end
+end)
+
+-- ==========================================
+-- JUGADOR SALE
+-- ==========================================
+
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+    disconnectPlayerConnections(player)
+
+    activeHighlights[player] = nil
+    activeBillboards[player] = nil
+end)
+
+-- ==========================================
+-- AP ESP TOGGLE
+-- ==========================================
+
+createToggle("AP ESP", function(state)
+
+    APESPEnabled = state
+    State.APESPEnabled = state
+
+    if state then
+
+        -- Activar para jugadores actuales
+        for _, player in ipairs(Players:GetPlayers()) do
+
+            if player ~= LocalPlayer then
+
+                task.spawn(function()
+                    checkPlayerESP(player)
+                end)
+
+            end
+
+        end
+
+    else
+
+        -- Apagar y limpiar todo
+        disableAPESP()
+
+    end
+end)
 -- ============================================================
         -- ==========================================
         -- 2. PLAYER ESP (Nombre Abajo - Offset 2.8)
