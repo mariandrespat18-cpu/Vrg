@@ -11,71 +11,176 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ==========================================
+-- CONFIGURACIÓN DE POSICIÓN
+-- ==========================================
+local CONFIG_FILE = "CloneUI_Position.txt"
+
+local DEFAULT_POSITION = {
+    XScale = 1,
+    XOffset = -30,
+    YScale = 0.5,
+    YOffset = -40
+}
+
+-- ==========================================
+-- GUARDAR POSICIÓN
+-- ==========================================
+local function savePosition(position)
+    if not writefile then
+        return
+    end
+
+    local data = table.concat({
+        tostring(position.X.Scale),
+        tostring(position.X.Offset),
+        tostring(position.Y.Scale),
+        tostring(position.Y.Offset)
+    }, "|")
+
+    pcall(function()
+        writefile(CONFIG_FILE, data)
+    end)
+end
+
+-- ==========================================
+-- CARGAR POSICIÓN
+-- ==========================================
+local function loadPosition()
+    if not readfile or not isfile then
+        return UDim2.new(
+            DEFAULT_POSITION.XScale,
+            DEFAULT_POSITION.XOffset,
+            DEFAULT_POSITION.YScale,
+            DEFAULT_POSITION.YOffset
+        )
+    end
+
+    local success, result = pcall(function()
+        if not isfile(CONFIG_FILE) then
+            return nil
+        end
+
+        return readfile(CONFIG_FILE)
+    end)
+
+    if not success or not result then
+        return UDim2.new(
+            DEFAULT_POSITION.XScale,
+            DEFAULT_POSITION.XOffset,
+            DEFAULT_POSITION.YScale,
+            DEFAULT_POSITION.YOffset
+        )
+    end
+
+    local values = {}
+
+    for value in string.gmatch(result, "([^|]+)") do
+        table.insert(values, tonumber(value))
+    end
+
+    if #values ~= 4 then
+        return UDim2.new(
+            DEFAULT_POSITION.XScale,
+            DEFAULT_POSITION.XOffset,
+            DEFAULT_POSITION.YScale,
+            DEFAULT_POSITION.YOffset
+        )
+    end
+
+    return UDim2.new(
+        values[1],
+        values[2],
+        values[3],
+        values[4]
+    )
+end
+
+-- ==========================================
 -- LÓGICA ÚNICA: CLONAR CON QUANTUM CLONER
 -- ==========================================
 local function instantClone()
-    if _G.isCloning then return end
+    if _G.isCloning then
+        return
+    end
+
     _G.isCloning = true
 
-    local toolName = "Quantum Cloner"  
-    local char = LocalPlayer.Character  
-    if not char then _G.isCloning = false return end  
-      
+    local toolName = "Quantum Cloner"
+    local char = LocalPlayer.Character
+
+    if not char then
+        _G.isCloning = false
+        return
+    end
+
     -- Buscar el Quantum Cloner en la mochila o equipado
-    local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or char:FindFirstChild(toolName)  
-    local hum = char:FindFirstChild("Humanoid")  
-      
-    if tool and hum then  
-        hum:EquipTool(tool)  
+    local tool =
+        LocalPlayer.Backpack:FindFirstChild(toolName)
+        or char:FindFirstChild(toolName)
+
+    local hum = char:FindFirstChild("Humanoid")
+
+    if tool and hum then
+        hum:EquipTool(tool)
+
         task.wait(0.2)
-          
-        tool:Activate()  
-          
+
+        tool:Activate()
+
         -- Esperar a que el clon aparezca en el mapa
-        local cloneName = ("%*_Clone"):format(LocalPlayer.UserId)  
-        local cloneAppeared = false  
-        local timeout = 5  
-        local startTime = tick()  
-          
-        while tick() - startTime < timeout do  
-            if Workspace:FindFirstChild(cloneName) then  
-                cloneAppeared = true  
-                break  
-            end  
-            task.wait(0.1)  
-        end  
-          
-        -- Si apareció el clon, presionar el botón de la interfaz para ir hacia él
-        if cloneAppeared then  
-            task.wait(0.2)  
-            local pGui = LocalPlayer:FindFirstChild("PlayerGui")  
-            local tf = pGui and pGui:FindFirstChild("ToolsFrames")  
-            local qc = tf and tf:FindFirstChild("QuantumCloner")  
-            local tpButton = qc and qc:FindFirstChild("TeleportToClone")  
-              
-            if tpButton and tpButton.Visible then  
-                local eventsToFire = {"Activated", "TouchTap", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up"}  
-                  
-                for _, eventName in ipairs(eventsToFire) do  
-                    pcall(function()  
-                        if getconnections and tpButton[eventName] then  
-                            for _, conn in pairs(getconnections(tpButton[eventName])) do  
-                                conn:Fire()  
-                            end  
-                        elseif firesignal and tpButton[eventName] then  
-                            firesignal(tpButton[eventName])  
-                        end  
-                    end)  
-                end  
-            end  
-        end  
-    end  
-    
+        local cloneName = ("%*_Clone"):format(LocalPlayer.UserId)
+        local cloneAppeared = false
+        local timeout = 5
+        local startTime = tick()
+
+        while tick() - startTime < timeout do
+            if Workspace:FindFirstChild(cloneName) then
+                cloneAppeared = true
+                break
+            end
+
+            task.wait(0.1)
+        end
+
+        -- Si apareció el clon, presionar el botón de la interfaz
+        if cloneAppeared then
+            task.wait(0.2)
+
+            local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+            local tf = pGui and pGui:FindFirstChild("ToolsFrames")
+            local qc = tf and tf:FindFirstChild("QuantumCloner")
+            local tpButton = qc and qc:FindFirstChild("TeleportToClone")
+
+            if tpButton and tpButton.Visible then
+                local eventsToFire = {
+                    "Activated",
+                    "TouchTap",
+                    "MouseButton1Click",
+                    "MouseButton1Down",
+                    "MouseButton1Up"
+                }
+
+                for _, eventName in ipairs(eventsToFire) do
+                    pcall(function()
+                        if getconnections and tpButton[eventName] then
+                            for _, conn in pairs(getconnections(tpButton[eventName])) do
+                                conn:Fire()
+                            end
+
+                        elseif firesignal and tpButton[eventName] then
+                            firesignal(tpButton[eventName])
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
     _G.isCloning = false
 end
 
 -- ==========================================
--- INTERFAZ (BOTÓN CLONAR)
+-- INTERFAZ
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CloneUI"
@@ -86,8 +191,10 @@ local button = Instance.new("TextButton")
 button.Name = "CloneButton"
 button.Text = "Clonar"
 button.Size = UDim2.new(0, 60, 0, 30)
--- AQUI ESTÁ EL CAMBIO: Se cambió -95 por -40 para bajar el botón
-button.Position = UDim2.new(1, -30, 0.5, -40)
+
+-- Cargar automáticamente la última posición
+button.Position = loadPosition()
+
 button.AnchorPoint = Vector2.new(1, 0.5)
 button.BackgroundColor3 = Color3.new(0, 0, 0)
 button.TextColor3 = Color3.new(1, 1, 1)
@@ -97,12 +204,18 @@ button.Parent = screenGui
 
 Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
 
--- Sistema para arrastrar el botón libremente por la pantalla
+-- ==========================================
+-- SISTEMA PARA ARRASTRAR
+-- ==========================================
 local dragging = false
-local dragInput, dragStart, startPos
+local dragInput
+local dragStart
+local startPos
 
 button.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
         dragging = true
         dragStart = input.Position
         startPos = button.Position
@@ -110,7 +223,9 @@ button.InputBegan:Connect(function(input)
 end)
 
 button.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
         dragInput = input
     end
 end)
@@ -118,26 +233,54 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
+
         button.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
         )
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
         dragging = false
+
+        -- Guardar inmediatamente al terminar de mover
+        savePosition(button.Position)
     end
 end)
 
--- Ejecutar clonación al hacer click
+-- ==========================================
+-- GUARDADO EXTRA
+-- ==========================================
+-- Guarda también periódicamente por seguridad
+task.spawn(function()
+    while task.wait(2) do
+        if button and button.Parent then
+            savePosition(button.Position)
+        end
+    end
+end)
+
+-- ==========================================
+-- EJECUTAR CLONACIÓN
+-- ==========================================
 button.MouseButton1Click:Connect(function()
-    if _G.isCloning then return end
-    
-    button.BackgroundColor3 = Color3.fromRGB(40, 200, 40) -- Se pone verde mientras procesa
-    
+    if _G.isCloning then
+        return
+    end
+
+    button.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+
     task.spawn(function()
         instantClone()
-        button.BackgroundColor3 = Color3.new(0, 0, 0) -- Vuelve a negro al terminar
+
+        if button and button.Parent then
+            button.BackgroundColor3 = Color3.new(0, 0, 0)
+        end
     end)
 end)
