@@ -6514,7 +6514,7 @@ do
                 ScriptLoaded = true
 
                 pcall(function()
-                    loadstring(game:HttpGet("https://pastefy.app/YkMRrI7t/raw"))()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/R"))()
                 end)
             end
         end
