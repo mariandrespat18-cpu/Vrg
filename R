@@ -2336,11 +2336,8 @@ local function flyToPrompt(
         return false
     end
 
-    -- Distancia de seguridad para ProximityPrompt.
     local desiredRange = 1.5
 
-    -- Mantener el personaje ligeramente
-    -- por encima del punto del prompt.
     local destination =
         position + Vector3.new(
             0,
@@ -2376,9 +2373,6 @@ local function flyToPrompt(
         and humanoid.Health > 0
         and os.clock() < deadline do
 
-        -- Recalcular la posición en cada iteración.
-        -- Esto evita perseguir una posición vieja
-        -- si el objeto se mueve.
         local freshPosition =
             promptPosition(prompt)
 
@@ -2431,7 +2425,6 @@ local function flyToPrompt(
 
     haltVelocity()
 
-    -- Último chequeo de distancia.
     if root
         and root.Parent
         and prompt.Parent then
@@ -2462,7 +2455,7 @@ local function flyToPrompt(
 end
 
 -- =========================================================
--- ACTIVAR PROMPT
+-- ACTIVAR PROMPT DE FORMA INSTANTÁNEA
 -- =========================================================
 
 local function firePrompt(
@@ -2513,9 +2506,9 @@ local function firePrompt(
         end
     end
 
-    if callbackFired then
-        task.wait(0.06)
-    end
+    -- =====================================================
+    -- ACTIVACIÓN INSTANTÁNEA
+    -- =====================================================
 
     local oldDuration =
         prompt.HoldDuration
@@ -2527,68 +2520,77 @@ local function firePrompt(
         prompt.RequiresLineOfSight
 
     local inputFired = false
+    local executorFired = false
 
-    if not triggered
-        and prompt.Parent
+    if prompt.Parent
         and prompt.Enabled then
 
+        pcall(function()
+            prompt.HoldDuration = 0
+        end)
+
+        pcall(function()
+            prompt.MaxActivationDistance =
+                math.max(
+                    oldDistance,
+                    25
+                )
+        end)
+
+        pcall(function()
+            prompt.RequiresLineOfSight = false
+        end)
+
+        -- Intento inmediato por InputHold.
         inputFired =
             pcall(function()
 
-                prompt.HoldDuration = 0
+                prompt:InputHoldBegin()
+                prompt:InputHoldEnd()
 
-                prompt.MaxActivationDistance =
-                    math.max(
-                        oldDistance,
-                        25
+            end)
+
+        -- Intento inmediato por fireproximityprompt.
+        if prompt.Parent
+            and prompt.Enabled
+            and type(
+                fireproximityprompt
+            ) == "function" then
+
+            executorFired =
+                pcall(function()
+
+                    fireproximityprompt(
+                        prompt,
+                        0
                     )
 
-                prompt.RequiresLineOfSight =
-                    false
-
-                prompt:InputHoldBegin()
-
-                RunService.Heartbeat:Wait()
-
-                prompt:InputHoldEnd()
-            end)
+                end)
+        end
     end
 
-    task.wait(0.1)
-
-    local executorFired = false
-
-    if not triggered
-        and prompt.Parent
-        and prompt.Enabled
-        and type(
-            fireproximityprompt
-        ) == "function" then
-
-        executorFired =
-            pcall(function()
-
-                fireproximityprompt(
-                    prompt,
-                    0
-                )
-            end)
-
-        task.wait(0.1)
-    end
+    -- No añadimos una espera larga.
+    -- Solo dejamos que Roblox procese un frame.
+    RunService.Heartbeat:Wait()
 
     triggerConnection:Disconnect()
 
     if prompt.Parent then
 
-        prompt.HoldDuration =
-            oldDuration
+        pcall(function()
+            prompt.HoldDuration =
+                oldDuration
+        end)
 
-        prompt.MaxActivationDistance =
-            oldDistance
+        pcall(function()
+            prompt.MaxActivationDistance =
+                oldDistance
+        end)
 
-        prompt.RequiresLineOfSight =
-            oldLineOfSight
+        pcall(function()
+            prompt.RequiresLineOfSight =
+                oldLineOfSight
+        end)
     end
 
     local changed =
@@ -2603,7 +2605,6 @@ local function firePrompt(
         or changed
 
     if activated then
-
         state.fired += 1
     end
 
@@ -2656,6 +2657,10 @@ local function runAutomation()
 
         local previousPurchase
 
+        -- =================================================
+        -- COMPRAR Y REINTENTAR HASTA QUE DESAPAREZCA
+        -- =================================================
+
         local function purchaseDisplay(
             prompt,
             brainrotName
@@ -2668,9 +2673,7 @@ local function runAutomation()
                 return false
             end
 
-            -- IMPORTANTE:
-            -- Primero va físicamente a la posición
-            -- REAL del prompt.
+            -- Ir físicamente al prompt.
             if not flyToPrompt(
                 prompt,
                 token,
@@ -2680,48 +2683,151 @@ local function runAutomation()
                 return false
             end
 
-            -- Comprobar otra vez que seguimos
-            -- cerca del prompt.
-            local _, _, root =
-                characterParts()
-
-            local target =
-                promptPosition(prompt)
-
-            if not root
-                or not target then
-
-                return false
-            end
-
-            local distance =
-                (
-                    target
-                    - root.Position
-                ).Magnitude
-
-            if distance
-                > math.max(
-                    3,
-                    prompt.MaxActivationDistance
-                ) then
-
-                return false
-            end
-
-            -- Segundo pequeño ajuste.
             haltVelocity()
 
-            task.wait(0.05)
+            -- =================================================
+            -- BUCLE DE COMPRA
+            -- Sigue intentando mientras el mismo prompt
+            -- de compra siga existiendo.
+            -- =================================================
 
-            local purchased =
-                firePrompt(
-                    prompt,
-                    "RNG display Purchase",
-                    true
-                )
+            local purchaseStarted =
+                os.clock()
 
-            if purchased then
+            while
+                state.enabled
+                and state.token == token
+                and prompt
+                and prompt.Parent
+                and prompt.Enabled do
+
+                -- Recalcular el objetivo cada intento.
+                local freshPosition =
+                    promptPosition(prompt)
+
+                if freshPosition then
+
+                    local character,
+                        humanoid,
+                        root =
+                        characterParts()
+
+                    if not root
+                        or not humanoid
+                        or humanoid.Health <= 0 then
+
+                        return false
+                    end
+
+                    local distance =
+                        (
+                            freshPosition
+                            - root.Position
+                        ).Magnitude
+
+                    -- Si se separó demasiado del prompt,
+                    -- volver al punto exacto antes de disparar.
+                    if distance
+                        > math.max(
+                            3,
+                            prompt.MaxActivationDistance
+                        ) then
+
+                        if not flyToPrompt(
+                            prompt,
+                            token,
+                            "reubicando compra"
+                        ) then
+
+                            task.wait()
+                            continue
+                        end
+
+                        haltVelocity()
+                    end
+                end
+
+                -- Intento INMEDIATO.
+                local attemptResult =
+                    firePrompt(
+                        prompt,
+                        "RNG display Purchase",
+                        true
+                    )
+
+                -- =================================================
+                -- COMPROBACIÓN FUERTE
+                -- =================================================
+                --
+                -- No damos por terminada la compra solo porque
+                -- firePrompt haya devuelto true.
+                --
+                -- Mientras el prompt siga existiendo y siga
+                -- habilitado, volvemos a intentarlo.
+                -- =================================================
+
+                if not prompt.Parent
+                    or not prompt.Enabled then
+
+                    state.cycles += 1
+
+                    CycleValue.Text =
+                        tostring(
+                            state.cycles
+                        )
+
+                    return true
+                end
+
+                -- Por si el juego reemplazó el objeto:
+                -- intentar encontrar nuevamente el purchase.
+                local currentPurchase,
+                    currentPurchaseName =
+                    findDisplayPurchase(nil)
+
+                if currentPurchase
+                    and currentPurchase ~= prompt then
+
+                    -- El prompt original quedó obsoleto.
+                    -- Continuamos con el nuevo.
+                    prompt =
+                        currentPurchase
+
+                    brainrotName =
+                        currentPurchaseName
+
+                    if not flyToPrompt(
+                        prompt,
+                        token,
+                        "siguiendo nuevo Purchase"
+                    ) then
+
+                        task.wait()
+                        continue
+                    end
+
+                    haltVelocity()
+
+                    continue
+                end
+
+                -- Evitar un bucle que monopolice un solo frame.
+                RunService.Heartbeat:Wait()
+
+                -- Mantener la variable usada por análisis/debug.
+                if attemptResult then
+                    purchaseStarted =
+                        purchaseStarted
+                end
+            end
+
+            -- =================================================
+            -- COMPROBACIÓN FINAL
+            -- =================================================
+
+            if not prompt
+                or not prompt.Parent
+                or not prompt.Enabled then
 
                 state.cycles += 1
 
@@ -2767,7 +2873,7 @@ local function runAutomation()
                 break
             end
 
-            task.wait(0.15)
+            task.wait()
 
             existing,
                 existingName,
@@ -2789,14 +2895,14 @@ local function runAutomation()
 
             if not rngPrompt then
 
-                task.wait(0.15)
+                task.wait(0.1)
 
                 continue
             end
 
             if not equipCarpetInactive() then
 
-                task.wait(0.5)
+                task.wait(0.25)
 
                 continue
             end
@@ -2808,22 +2914,21 @@ local function runAutomation()
                 "volando a la máquina RNG"
             ) then
 
-                task.wait(0.15)
+                task.wait()
 
                 continue
             end
 
             haltVelocity()
 
-            task.wait(0.05)
-
+            -- Activar el RNG inmediatamente.
             if not firePrompt(
                 rngPrompt,
                 "RNG prompt",
                 false
             ) then
 
-                task.wait(0.2)
+                task.wait(0.1)
 
                 continue
             end
@@ -2877,7 +2982,7 @@ local function runAutomation()
                     break
                 end
 
-                task.wait(0.05)
+                task.wait()
             end
 
             if not state.enabled
@@ -2908,7 +3013,9 @@ local function runAutomation()
                         break
                     end
 
-                    task.wait(0.15)
+                    -- El prompt puede haber cambiado.
+                    -- Buscar de nuevo inmediatamente.
+                    task.wait()
 
                     purchase,
                         purchaseName =
@@ -2919,10 +3026,10 @@ local function runAutomation()
             end
 
             if rejectedDisplay then
-                task.wait(0.15)
+                task.wait()
             end
 
-            task.wait(0.08)
+            task.wait()
         end
 
         haltVelocity()
