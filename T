@@ -1,11 +1,24 @@
+--==================================================
+-- TOKITO HUB
+-- GUI MEJORADA + FPS BOOSTER + AUTO BUY
+--==================================================
+
 if getgenv().TokitoHub then
     pcall(function()
-        local oldGui = game:GetService("CoreGui"):FindFirstChild("TokitoHub")
-        if oldGui then oldGui:Destroy() end
+        local old = game:GetService("CoreGui"):FindFirstChild("TokitoHub")
+        if old then
+            old:Destroy()
+        end
     end)
+
     getgenv().TokitoHub = nil
 end
+
 getgenv().TokitoHub = true
+
+--==================================================
+-- SERVICES
+--==================================================
 
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
@@ -14,360 +27,1444 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local MaterialService = game:GetService("MaterialService")
 
--- ==========================================
--- INTERFAZ GRÁFICA (GUI)
--- ==========================================
+--==================================================
+-- COLORS
+--==================================================
+
+local COLORS = {
+    Background = Color3.fromRGB(13, 15, 21),
+    Topbar = Color3.fromRGB(10, 12, 17),
+    Item = Color3.fromRGB(20, 23, 31),
+    ItemHover = Color3.fromRGB(27, 31, 41),
+    Blue = Color3.fromRGB(0, 170, 255),
+    BlueLight = Color3.fromRGB(50, 190, 255),
+    Text = Color3.fromRGB(235, 238, 245),
+    SubText = Color3.fromRGB(145, 153, 168),
+    Off = Color3.fromRGB(55, 61, 72),
+    Red = Color3.fromRGB(255, 70, 70),
+    Yellow = Color3.fromRGB(255, 175, 50)
+}
+
+--==================================================
+-- GUI
+--==================================================
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "TokitoHub"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = game:GetService("CoreGui")
 
--- Pantalla de Carga
+--==================================================
+-- LOADING
+--==================================================
+
 local loadFrame = Instance.new("Frame")
-loadFrame.Size = UDim2.new(0, 250, 0, 80)
-loadFrame.Position = UDim2.new(0.5, -125, 0.5, -40)
-loadFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+loadFrame.Size = UDim2.new(0, 280, 0, 105)
+loadFrame.Position = UDim2.new(0.5, -140, 0.5, -52)
+loadFrame.BackgroundColor3 = COLORS.Background
 loadFrame.Parent = gui
-Instance.new("UICorner", loadFrame).CornerRadius = UDim.new(0, 10)
-Instance.new("UIStroke", loadFrame).Color = Color3.fromRGB(0, 170, 255)
+
+Instance.new("UICorner", loadFrame).CornerRadius = UDim.new(0, 14)
+
+local loadStroke = Instance.new("UIStroke")
+loadStroke.Color = COLORS.Blue
+loadStroke.Thickness = 1.5
+loadStroke.Transparency = 0.15
+loadStroke.Parent = loadFrame
 
 local loadTitle = Instance.new("TextLabel")
-loadTitle.Size = UDim2.new(1, 0, 0, 30)
-loadTitle.Position = UDim2.new(0, 0, 0, 10)
+loadTitle.Size = UDim2.new(1, -30, 0, 28)
+loadTitle.Position = UDim2.new(0, 15, 0, 15)
 loadTitle.BackgroundTransparency = 1
-loadTitle.Text = "Cargando Tokito Hub..."
-loadTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadTitle.Text = "TOKITO HUB"
+loadTitle.TextColor3 = COLORS.Blue
 loadTitle.Font = Enum.Font.GothamBold
-loadTitle.TextSize = 14
+loadTitle.TextSize = 18
 loadTitle.Parent = loadFrame
 
+local loadSubtitle = Instance.new("TextLabel")
+loadSubtitle.Size = UDim2.new(1, -30, 0, 20)
+loadSubtitle.Position = UDim2.new(0, 15, 0, 40)
+loadSubtitle.BackgroundTransparency = 1
+loadSubtitle.Text = "Inicializando..."
+loadSubtitle.TextColor3 = COLORS.SubText
+loadSubtitle.Font = Enum.Font.Gotham
+loadSubtitle.TextSize = 12
+loadSubtitle.Parent = loadFrame
+
 local barBG = Instance.new("Frame")
-barBG.Size = UDim2.new(0, 210, 0, 6)
-barBG.Position = UDim2.new(0, 20, 0, 50)
-barBG.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+barBG.Size = UDim2.new(1, -30, 0, 7)
+barBG.Position = UDim2.new(0, 15, 1, -22)
+barBG.BackgroundColor3 = Color3.fromRGB(30, 34, 43)
 barBG.Parent = loadFrame
+
 Instance.new("UICorner", barBG).CornerRadius = UDim.new(1, 0)
 
 local barFill = Instance.new("Frame")
 barFill.Size = UDim2.new(0, 0, 1, 0)
-barFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+barFill.BackgroundColor3 = COLORS.Blue
 barFill.Parent = barBG
+
 Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
 
--- Animación de carga
-TweenService:Create(barFill, TweenInfo.new(1.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-task.wait(1.6)
-loadFrame:Destroy()
+TweenService:Create(
+    barFill,
+    TweenInfo.new(1.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    {Size = UDim2.new(1, 0, 1, 0)}
+):Play()
 
--- Marco Principal
+task.wait(1.4)
+
+if loadFrame then
+    loadFrame:Destroy()
+end
+
+--==================================================
+-- MAIN
+--==================================================
+
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 300, 0, 350)
-main.Position = UDim2.new(0.5, -150, 0.5, -175)
-main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+main.Name = "Main"
+main.Size = UDim2.new(0, 330, 0, 390)
+main.Position = UDim2.new(0.5, -165, 0.5, -195)
+main.BackgroundColor3 = COLORS.Background
+main.BorderSizePixel = 0
 main.ClipsDescendants = true
 main.Parent = gui
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
 
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(0, 170, 255)
+mainStroke.Color = COLORS.Blue
 mainStroke.Thickness = 1.5
-mainStroke.Transparency = 0.2
+mainStroke.Transparency = 0.18
 mainStroke.Parent = main
 
--- Topbar
-local topbar = Instance.new("Frame")
-topbar.Size = UDim2.new(1, 0, 0, 35)
-topbar.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-topbar.Parent = main
-Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 10)
+--==================================================
+-- TOPBAR
+--==================================================
 
-local topbarFix = Instance.new("Frame")
-topbarFix.Size = UDim2.new(1, 0, 0, 10)
-topbarFix.Position = UDim2.new(0, 0, 1, -10)
-topbarFix.BackgroundColor3 = topbar.BackgroundColor3
-topbarFix.BorderSizePixel = 0
-topbarFix.Parent = topbar
+local topbar = Instance.new("Frame")
+topbar.Size = UDim2.new(1, 0, 0, 48)
+topbar.BackgroundColor3 = COLORS.Topbar
+topbar.BorderSizePixel = 0
+topbar.Parent = main
+
+Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 14)
+
+local topFix = Instance.new("Frame")
+topFix.Size = UDim2.new(1, 0, 0, 14)
+topFix.Position = UDim2.new(0, 0, 1, -14)
+topFix.BackgroundColor3 = COLORS.Topbar
+topFix.BorderSizePixel = 0
+topFix.Parent = topbar
+
+local logo = Instance.new("Frame")
+logo.Size = UDim2.new(0, 30, 0, 30)
+logo.Position = UDim2.new(0, 10, 0, 9)
+logo.BackgroundColor3 = COLORS.Blue
+logo.Parent = topbar
+
+Instance.new("UICorner", logo).CornerRadius = UDim.new(0, 9)
+
+local logoText = Instance.new("TextLabel")
+logoText.Size = UDim2.new(1, 0, 1, 0)
+logoText.BackgroundTransparency = 1
+logoText.Text = "T"
+logoText.TextColor3 = Color3.new(1, 1, 1)
+logoText.Font = Enum.Font.GothamBold
+logoText.TextSize = 18
+logoText.Parent = logo
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 1, 0)
-title.Position = UDim2.new(0, 15, 0, 0)
+title.Size = UDim2.new(1, -125, 0, 23)
+title.Position = UDim2.new(0, 48, 0, 7)
 title.BackgroundTransparency = 1
-title.Text = "Tokito Hub | Compact"
-title.TextColor3 = Color3.fromRGB(0, 170, 255)
+title.Text = "TOKITO HUB"
+title.TextColor3 = COLORS.Text
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = topbar
 
--- Botón Cerrar
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1, -125, 0, 17)
+subtitle.Position = UDim2.new(0, 48, 0, 26)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "Compact Edition"
+subtitle.TextColor3 = COLORS.SubText
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextSize = 10
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.Parent = topbar
+
+--==================================================
+-- CLOSE
+--==================================================
+
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 24, 0, 24)
-closeBtn.Position = UDim2.new(1, -30, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-closeBtn.Text = "X"
-closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Size = UDim2.new(0, 28, 0, 28)
+closeBtn.Position = UDim2.new(1, -36, 0, 10)
+closeBtn.BackgroundColor3 = Color3.fromRGB(45, 27, 32)
+closeBtn.Text = "×"
+closeBtn.TextColor3 = COLORS.Red
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 12
+closeBtn.TextSize = 20
+closeBtn.AutoButtonColor = false
 closeBtn.Parent = topbar
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
 
--- Botón Minimizar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+
+closeBtn.MouseEnter:Connect(function()
+    TweenService:Create(
+        closeBtn,
+        TweenInfo.new(0.15),
+        {BackgroundColor3 = Color3.fromRGB(75, 30, 36)}
+    ):Play()
+end)
+
+closeBtn.MouseLeave:Connect(function()
+    TweenService:Create(
+        closeBtn,
+        TweenInfo.new(0.15),
+        {BackgroundColor3 = Color3.fromRGB(45, 27, 32)}
+    ):Play()
+end)
+
+--==================================================
+-- MINIMIZE
+--==================================================
+
 local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0, 24, 0, 24)
-minBtn.Position = UDim2.new(1, -60, 0, 5)
-minBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
-minBtn.Text = "-"
-minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Size = UDim2.new(0, 28, 0, 28)
+minBtn.Position = UDim2.new(1, -70, 0, 10)
+minBtn.BackgroundColor3 = Color3.fromRGB(42, 38, 25)
+minBtn.Text = "−"
+minBtn.TextColor3 = COLORS.Yellow
 minBtn.Font = Enum.Font.GothamBold
-minBtn.TextSize = 16
+minBtn.TextSize = 18
+minBtn.AutoButtonColor = false
 minBtn.Parent = topbar
-Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
 
--- Scroll de opciones
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 8)
+
+--==================================================
+-- SCROLL
+--==================================================
+
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -20, 1, -50)
-scroll.Position = UDim2.new(0, 10, 0, 45)
+scroll.Size = UDim2.new(1, -20, 1, -62)
+scroll.Position = UDim2.new(0, 10, 0, 54)
 scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 3
-scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 170, 255)
+scroll.ScrollBarImageColor3 = COLORS.Blue
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.Parent = main
 
--- Lógica de Minimizar
+local padding = Instance.new("UIPadding")
+padding.PaddingTop = UDim.new(0, 2)
+padding.PaddingBottom = UDim.new(0, 8)
+padding.Parent = scroll
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 8)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = scroll
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scroll.CanvasSize = UDim2.new(
+        0,
+        0,
+        0,
+        layout.AbsoluteContentSize.Y + 20
+    )
+end)
+
+--==================================================
+-- DRAG
+--==================================================
+
+local dragging = false
+local dragStart
+local startPos
+local dragInput
+
+topbar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+topbar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+
+        main.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+--==================================================
+-- MINIMIZE LOGIC
+--==================================================
+
 local minimized = false
+
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
+
     if minimized then
         scroll.Visible = false
-        TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 35)}):Play()
+
+        TweenService:Create(
+            main,
+            TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            {Size = UDim2.new(0, 330, 0, 48)}
+        ):Play()
     else
-        TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 350)}):Play()
-        task.wait(0.2)
+        TweenService:Create(
+            main,
+            TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            {Size = UDim2.new(0, 330, 0, 390)}
+        ):Play()
+
+        task.wait(0.18)
         scroll.Visible = true
     end
 end)
 
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 8)
-layout.Parent = scroll
+--==================================================
+-- CLOSE CLEANUP
+--==================================================
 
--- Sistema de Arrastre (Drag)
-local dragging, dragInput, dragStart, startPos
-topbar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = main.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-topbar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
+closeBtn.MouseButton1Click:Connect(function()
+    getgenv().TokitoHub = nil
+    gui:Destroy()
 end)
 
--- Función para crear Toggles Animados
+--==================================================
+-- TOGGLE CREATOR
+--==================================================
+
 local function createToggle(name, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+    btn.Size = UDim2.new(1, -8, 0, 48)
+    btn.BackgroundColor3 = COLORS.Item
     btn.Text = ""
+    btn.AutoButtonColor = false
     btn.Parent = scroll
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(35, 40, 50)
+    stroke.Transparency = 0.35
+    stroke.Parent = btn
+
+    local icon = Instance.new("Frame")
+    icon.Size = UDim2.new(0, 30, 0, 30)
+    icon.Position = UDim2.new(0, 9, 0.5, -15)
+    icon.BackgroundColor3 = Color3.fromRGB(29, 33, 43)
+    icon.Parent = btn
+
+    Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 8)
+
+    local iconText = Instance.new("TextLabel")
+    iconText.Size = UDim2.new(1, 0, 1, 0)
+    iconText.BackgroundTransparency = 1
+    iconText.Text = "•"
+    iconText.TextColor3 = COLORS.Blue
+    iconText.Font = Enum.Font.GothamBold
+    iconText.TextSize = 18
+    iconText.Parent = icon
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -50, 1, 0)
-    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.Size = UDim2.new(1, -100, 0, 22)
+    lbl.Position = UDim2.new(0, 48, 0, 7)
     lbl.BackgroundTransparency = 1
     lbl.Text = name
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    lbl.TextColor3 = COLORS.Text
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 13
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = btn
 
+    local stateLabel = Instance.new("TextLabel")
+    stateLabel.Size = UDim2.new(1, -100, 0, 15)
+    stateLabel.Position = UDim2.new(0, 48, 0, 28)
+    stateLabel.BackgroundTransparency = 1
+    stateLabel.Text = "DESACTIVADO"
+    stateLabel.TextColor3 = COLORS.SubText
+    stateLabel.Font = Enum.Font.Gotham
+    stateLabel.TextSize = 9
+    stateLabel.TextXAlignment = Enum.TextXAlignment.Left
+    stateLabel.Parent = btn
+
     local status = Instance.new("Frame")
-    status.Size = UDim2.new(0, 12, 0, 12)
-    status.Position = UDim2.new(1, -25, 0.5, -6)
-    status.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    status.Size = UDim2.new(0, 34, 0, 18)
+    status.Position = UDim2.new(1, -45, 0.5, -9)
+    status.BackgroundColor3 = COLORS.Off
     status.Parent = btn
+
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
 
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 12, 0, 12)
+    knob.Position = UDim2.new(0, 3, 0.5, -6)
+    knob.BackgroundColor3 = Color3.fromRGB(190, 195, 205)
+    knob.Parent = status
+
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
     local state = false
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(
+            btn,
+            TweenInfo.new(0.15),
+            {BackgroundColor3 = COLORS.ItemHover}
+        ):Play()
+    end)
+
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(
+            btn,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 = state
+                    and Color3.fromRGB(22, 34, 46)
+                    or COLORS.Item
+            }
+        ):Play()
+    end)
+
     btn.MouseButton1Click:Connect(function()
         state = not state
-        TweenService:Create(status, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(30, 35, 45) or Color3.fromRGB(25, 25, 32)}):Play()
-        pcall(callback, state)
+
+        if state then
+            stateLabel.Text = "ACTIVADO"
+            stateLabel.TextColor3 = COLORS.BlueLight
+
+            TweenService:Create(
+                status,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = COLORS.Blue}
+            ):Play()
+
+            TweenService:Create(
+                knob,
+                TweenInfo.new(0.2),
+                {Position = UDim2.new(1, -15, 0.5, -6)}
+            ):Play()
+
+            TweenService:Create(
+                btn,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = Color3.fromRGB(22, 34, 46)}
+            ):Play()
+
+            TweenService:Create(
+                icon,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = Color3.fromRGB(0, 55, 85)}
+            ):Play()
+        else
+            stateLabel.Text = "DESACTIVADO"
+            stateLabel.TextColor3 = COLORS.SubText
+
+            TweenService:Create(
+                status,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = COLORS.Off}
+            ):Play()
+
+            TweenService:Create(
+                knob,
+                TweenInfo.new(0.2),
+                {Position = UDim2.new(0, 3, 0.5, -6)}
+            ):Play()
+
+            TweenService:Create(
+                btn,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = COLORS.Item}
+            ):Play()
+
+            TweenService:Create(
+                icon,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = Color3.fromRGB(29, 33, 43)}
+            ):Play()
+        end
+
+        task.spawn(function()
+            pcall(callback, state)
+        end)
+    end)
+
+    return btn
+end
+
+--==================================================
+-- FPS BOOSTER
+--==================================================
+
+local boosterEnabled = false
+
+local OriginalTransparency = setmetatable({}, {
+    __mode = "k"
+})
+
+local ultraThreads = {}
+local ultraConnections = {}
+
+local INITIAL_BATCH_SIZE = 200
+local NEW_OBJECT_BATCH_SIZE = 30
+local NEW_OBJECT_DELAY = 0.10
+
+local pendingObjects = {}
+local pendingSet = setmetatable({}, {
+    __mode = "k"
+})
+
+local queueProcessing = false
+
+local function AddThread(thread)
+    if thread then
+        table.insert(ultraThreads, thread)
+    end
+end
+
+local function AddConnection(connection)
+    if connection then
+        table.insert(ultraConnections, connection)
+    end
+end
+
+local function DisconnectAll()
+    for i = #ultraConnections, 1, -1 do
+        local connection = ultraConnections[i]
+
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
+
+    table.clear(ultraConnections)
+end
+
+local function CancelAll()
+    for i = #ultraThreads, 1, -1 do
+        pcall(function()
+            task.cancel(ultraThreads[i])
+        end)
+    end
+
+    table.clear(ultraThreads)
+end
+
+local function ClearPending()
+    table.clear(pendingObjects)
+    table.clear(pendingSet)
+end
+
+local function QueueObject(obj)
+    if not boosterEnabled then
+        return
+    end
+
+    if not obj or not obj.Parent then
+        return
+    end
+
+    if pendingSet[obj] then
+        return
+    end
+
+    pendingSet[obj] = true
+    pendingObjects[#pendingObjects + 1] = obj
+end
+
+local function IsProtected(obj)
+    local parent = obj
+
+    while parent and parent ~= Workspace do
+        local n = parent.Name
+
+        if n == "Debris"
+            or n == "FastOverheadTemplate"
+            or n == "AnimalOverhead" then
+            return true
+        end
+
+        parent = parent.Parent
+    end
+
+    return false
+end
+
+local function IsClothing(obj)
+    return obj:IsA("Shirt")
+        or obj:IsA("Pants")
+        or obj:IsA("ShirtGraphic")
+        or obj:IsA("Accessory")
+end
+
+local function IsCharacterPart(obj)
+    local parent = obj
+
+    while parent and parent ~= Workspace do
+        if parent:IsA("Model")
+            and Players:GetPlayerFromCharacter(parent) then
+            return true
+        end
+
+        parent = parent.Parent
+    end
+
+    return false
+end
+
+local BASE_NAMES = {
+    ["baseplate"] = true,
+    ["spawnlocation"] = true,
+    ["spawn location"] = true,
+    ["spawn"] = true
+}
+
+local function IsBase(obj)
+    if not obj:IsA("BasePart") then
+        return false
+    end
+
+    local n = obj.Name:lower()
+
+    if BASE_NAMES[n] then
+        return true
+    end
+
+    for name in pairs(BASE_NAMES) do
+        if n:find(name, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function IsInBase(obj)
+    local parent = obj.Parent
+
+    while parent and parent ~= Workspace do
+        if IsBase(parent) then
+            return true
+        end
+
+        parent = parent.Parent
+    end
+
+    return false
+end
+
+local function IsOutOfRange(obj)
+    if not obj:IsA("BasePart") then
+        return false
+    end
+
+    local x = obj.Position.X
+
+    return x < -560 or x > -240
+end
+
+local function MakeTransparent(obj)
+    if not IsBase(obj) then
+        return
+    end
+
+    if IsCharacterPart(obj) then
+        return
+    end
+
+    pcall(function()
+        if OriginalTransparency[obj] == nil then
+            OriginalTransparency[obj] = {
+                transparency = obj.Transparency,
+                shadow = obj.CastShadow
+            }
+        end
+
+        obj.Transparency = 1
+        obj.CastShadow = false
     end)
 end
 
--- ==========================================
--- LÓGICA DE LAS FUNCIONES
--- ==========================================
+local function SafeDestroy(obj)
+    if not obj then
+        return
+    end
 
--- 1. FPS BOOSTER
-local savedLighting = nil
-local savedTerrainDecoration = nil
-createToggle("FPS Booster", function(state)
-    local terrain = Workspace:FindFirstChildOfClass("Terrain")
-    if state then
-        savedLighting = {
-            GlobalShadows = Lighting.GlobalShadows,
-            Brightness = Lighting.Brightness,
-            FogEnd = Lighting.FogEnd
-        }
-        Lighting.GlobalShadows = false
-        Lighting.Brightness = 1
-        Lighting.FogEnd = 100000
-        if terrain then
-            savedTerrainDecoration = terrain.Decoration
-            terrain.Decoration = false
+    local name = obj.Name
+
+    if name == "Overhead"
+        or name == "AnimalOverhead"
+        or name == "Generation"
+        or name == "DisplayName"
+        or name == "FastOverheadTemplate" then
+        return
+    end
+
+    pcall(function()
+        if obj.Parent then
+            obj:Destroy()
         end
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then obj.CastShadow = false end
-            if obj:IsA("Texture") or obj:IsA("Decal") then obj.Transparency = 1 end
-            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then obj.Enabled = false end
+    end)
+end
+
+local function OptimizeObject(obj)
+    if not boosterEnabled then
+        return
+    end
+
+    if not obj or not obj.Parent then
+        return
+    end
+
+    if IsProtected(obj) then
+        return
+    end
+
+    if IsCharacterPart(obj) then
+        return
+    end
+
+    if IsClothing(obj) then
+        return
+    end
+
+    if IsBase(obj) then
+        MakeTransparent(obj)
+        return
+    end
+
+    if IsInBase(obj) then
+        return
+    end
+
+    if IsOutOfRange(obj) then
+        SafeDestroy(obj)
+        return
+    end
+
+    if obj:IsA("SurfaceAppearance")
+        or obj:IsA("SpecialMesh")
+        or obj:IsA("Texture") then
+
+        SafeDestroy(obj)
+        return
+    end
+
+    if obj:IsA("Decal") then
+        if obj.Name == "face"
+            and obj.Parent
+            and obj.Parent.Name == "Head" then
+            return
         end
-    else
-        if savedLighting then
-            Lighting.GlobalShadows = savedLighting.GlobalShadows
-            Lighting.Brightness = savedLighting.Brightness
-            Lighting.FogEnd = savedLighting.FogEnd
+
+        SafeDestroy(obj)
+        return
+    end
+
+    if obj:IsA("ParticleEmitter")
+        or obj:IsA("Trail")
+        or obj:IsA("Beam")
+        or obj:IsA("Smoke")
+        or obj:IsA("Fire")
+        or obj:IsA("Sparkles") then
+
+        SafeDestroy(obj)
+        return
+    end
+
+    if obj:IsA("PointLight")
+        or obj:IsA("SpotLight")
+        or obj:IsA("SurfaceLight") then
+
+        SafeDestroy(obj)
+        return
+    end
+
+    if obj:IsA("Explosion")
+        or obj:IsA("Animation")
+        or obj:IsA("AnimationController") then
+
+        SafeDestroy(obj)
+        return
+    end
+
+    if obj:IsA("BasePart") then
+        pcall(function()
+            obj.CastShadow = false
+            obj.Material = Enum.Material.Plastic
+            obj.MaterialVariant = ""
+            obj.Reflectance = 0
+        end)
+    end
+end
+
+local function ProcessQueue()
+    if queueProcessing then
+        return
+    end
+
+    queueProcessing = true
+
+    local thread = task.spawn(function()
+        while boosterEnabled do
+            local processed = 0
+
+            while processed < NEW_OBJECT_BATCH_SIZE
+                and #pendingObjects > 0
+                and boosterEnabled do
+
+                local obj = table.remove(pendingObjects, 1)
+
+                if obj then
+                    pendingSet[obj] = nil
+
+                    if obj.Parent then
+                        OptimizeObject(obj)
+                    end
+                end
+
+                processed += 1
+            end
+
+            if #pendingObjects > 0 then
+                task.wait(NEW_OBJECT_DELAY)
+            else
+                task.wait(0.25)
+            end
         end
-        if terrain and savedTerrainDecoration ~= nil then
-            terrain.Decoration = savedTerrainDecoration
+
+        queueProcessing = false
+    end)
+
+    AddThread(thread)
+end
+
+local function ProcessInitial()
+    local objects = Workspace:GetDescendants()
+    local total = #objects
+
+    for start = 1, total, INITIAL_BATCH_SIZE do
+        if not boosterEnabled then
+            break
+        end
+
+        local finish = math.min(
+            start + INITIAL_BATCH_SIZE - 1,
+            total
+        )
+
+        for i = start, finish do
+            local obj = objects[i]
+
+            if obj and obj.Parent then
+                OptimizeObject(obj)
+            end
+        end
+
+        if finish < total then
+            task.wait()
         end
     end
+
+    table.clear(objects)
+end
+
+local function ApplyGreySky()
+    pcall(function()
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            if obj:IsA("Sky") then
+                obj:Destroy()
+            end
+        end
+
+        local sky = Instance.new("Sky")
+        sky.SkyboxBk = ""
+        sky.SkyboxDn = ""
+        sky.SkyboxFt = ""
+        sky.SkyboxLf = ""
+        sky.SkyboxRt = ""
+        sky.SkyboxUp = ""
+        sky.CelestialBodiesShown = false
+        sky.Parent = Lighting
+    end)
+end
+
+local function OptimizeLighting()
+    pcall(function()
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 9e9
+        Lighting.FogStart = 9e9
+
+        Lighting.EnvironmentDiffuseScale = 0
+        Lighting.EnvironmentSpecularScale = 0
+
+        Lighting.Brightness = 1.5
+        Lighting.Ambient = Color3.fromRGB(60, 60, 60)
+    end)
+
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("PostEffect") then
+            pcall(function()
+                obj.Enabled = false
+            end)
+        elseif obj:IsA("Atmosphere")
+            or obj:IsA("Clouds") then
+            SafeDestroy(obj)
+        end
+    end
+
+    ApplyGreySky()
+end
+
+local function OptimizeTerrain()
+    pcall(function()
+        local terrain = Workspace.Terrain
+
+        terrain.Decoration = false
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 1
+    end)
+end
+
+local function RestoreFPS()
+    ClearPending()
+
+    pcall(function()
+        for part, data in pairs(OriginalTransparency) do
+            if part and part.Parent then
+                part.Transparency = data.transparency
+                part.CastShadow = data.shadow
+            end
+        end
+    end)
+
+    table.clear(OriginalTransparency)
+
+    pcall(function()
+        settings().Rendering.QualityLevel =
+            Enum.QualityLevel.Automatic
+
+        settings().Rendering.MeshPartDetailLevel =
+            Enum.MeshPartDetailLevel.Automatic
+    end)
+
+    pcall(function()
+        Lighting.GlobalShadows = true
+        Lighting.Brightness = 2
+        Lighting.FogEnd = 100000
+        Lighting.FogStart = 0
+
+        Lighting.EnvironmentDiffuseScale = 1
+        Lighting.EnvironmentSpecularScale = 1
+    end)
+
+    pcall(function()
+        local terrain = Workspace.Terrain
+
+        terrain.WaterWaveSize = 0.15
+        terrain.WaterWaveSpeed = 1
+        terrain.WaterReflectance = 0.5
+        terrain.WaterTransparency = 0.3
+        terrain.Decoration = true
+    end)
+end
+
+local function SetFPSBoost(enabled)
+    if boosterEnabled == enabled then
+        return
+    end
+
+    boosterEnabled = enabled
+
+    DisconnectAll()
+    CancelAll()
+
+    queueProcessing = false
+
+    if not enabled then
+        RestoreFPS()
+        return
+    end
+
+    pcall(function()
+        settings().Rendering.QualityLevel =
+            Enum.QualityLevel.Level01
+
+        settings().Rendering.MeshPartDetailLevel =
+            Enum.MeshPartDetailLevel.Level01
+
+        settings().Physics.AllowSleep = true
+        settings().Physics.PhysicsEnvironmentalThrottle = 1
+    end)
+
+    if type(setfpscap) == "function" then
+        pcall(setfpscap, 0)
+    end
+
+    OptimizeLighting()
+    OptimizeTerrain()
+
+    AddThread(
+        task.spawn(ProcessInitial)
+    )
+
+    AddConnection(
+        Workspace.DescendantAdded:Connect(function(obj)
+            if not boosterEnabled then
+                return
+            end
+
+            QueueObject(obj)
+
+            if not queueProcessing then
+                ProcessQueue()
+            end
+        end)
+    )
+
+    AddConnection(
+        Lighting.DescendantAdded:Connect(function(obj)
+            if not boosterEnabled then
+                return
+            end
+
+            if obj:IsA("PostEffect") then
+                pcall(function()
+                    obj.Enabled = false
+                end)
+            elseif obj:IsA("Atmosphere")
+                or obj:IsA("Clouds") then
+                SafeDestroy(obj)
+            end
+        end)
+    )
+
+    AddConnection(
+        MaterialService.DescendantAdded:Connect(function(obj)
+            if boosterEnabled then
+                SafeDestroy(obj)
+            end
+        end)
+    )
+end
+
+createToggle("FPS Booster", function(state)
+    pcall(function()
+        SetFPSBoost(state)
+    end)
 end)
 
--- 2. ANTI-RAGDOLL V1
+--==================================================
+-- ANTI-RAGDOLL V1
+--==================================================
+
 local v1Loop
+
 local function isRagdolled(hum)
     local state = hum:GetState()
-    return state == Enum.HumanoidStateType.Physics or state == Enum.HumanoidStateType.Ragdoll or state == Enum.HumanoidStateType.FallingDown
+
+    return state == Enum.HumanoidStateType.Physics
+        or state == Enum.HumanoidStateType.Ragdoll
+        or state == Enum.HumanoidStateType.FallingDown
 end
 
 createToggle("Anti-Ragdoll V1", function(state)
     if state then
+        if v1Loop then
+            v1Loop:Disconnect()
+        end
+
         v1Loop = RunService.Heartbeat:Connect(function()
             local char = LP.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             local root = char and char:FindFirstChild("HumanoidRootPart")
+
             if hum and root and isRagdolled(hum) then
-                hum:ChangeState(Enum.HumanoidStateType.Running)
+                pcall(function()
+                    hum:ChangeState(Enum.HumanoidStateType.Running)
+                end)
+
                 root.Anchored = false
-                for _, desc in ipairs(char:GetDescendants()) do
-                    if desc:IsA("BallSocketConstraint") or (desc:IsA("Attachment") and desc.Name:find("RagdollAttachment")) then
-                        desc:Destroy()
+
+                for _, obj in ipairs(char:GetDescendants()) do
+                    if obj:IsA("BallSocketConstraint")
+                        or (
+                            obj:IsA("Attachment")
+                            and obj.Name:find("RagdollAttachment")
+                        ) then
+
+                        pcall(function()
+                            obj:Destroy()
+                        end)
                     end
                 end
             end
         end)
     else
-        if v1Loop then v1Loop:Disconnect() v1Loop = nil end
+        if v1Loop then
+            v1Loop:Disconnect()
+            v1Loop = nil
+        end
     end
 end)
 
--- 3. ANTI-RAGDOLL V2
+--==================================================
+-- ANTI-RAGDOLL V2
+--==================================================
+
 local scriptLoaded = false
+
 createToggle("Anti-Ragdoll V2", function(state)
     if state and not scriptLoaded then
         scriptLoaded = true
-        pcall(function() loadstring(game:HttpGet("https://pastefy.app/ZqWdbCDe/raw"))() end)
+
+        pcall(function()
+            loadstring(
+                game:HttpGet(
+                    "https://pastefy.app/ZqWdbCDe/raw"
+                )
+            )()
+        end)
     end
 end)
 
--- 4. COMPRAR AL INSTANTE
-local instantConn
-createToggle("Comprar al instante", function(state)
-    if instantConn then instantConn:Disconnect() instantConn = nil end
-    if state then
-        local function applyInst(v) if v:IsA("ProximityPrompt") then v.HoldDuration = 0 end end
-        for _, v in ipairs(Workspace:GetDescendants()) do applyInst(v) end
-        instantConn = Workspace.DescendantAdded:Connect(applyInst)
-    end
-end)
+--==================================================
+-- BUY SYSTEM
+--==================================================
 
--- 5. AUTO COMPRAR
-local autoClickEnabled = false
-local autoClickConns = {}
+local instantEnabled = false
+local autoBuyEnabled = false
+local buyLoop = nil
+
+-- SOLO ESTAS PALABRAS
+local BUY_WORDS = {
+    "comprar",
+    "purchase",
+    "purch",
+    "compr",
+    "buy"
+}
+
+local function isAllowedBuyText(text)
+    if not text then
+        return false
+    end
+
+    text = string.lower(tostring(text))
+
+    for _, word in ipairs(BUY_WORDS) do
+        if text:find(word, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
 
 local function isBuyPrompt(prompt)
-    local action = string.lower(prompt.ActionText or "")
-    local objText = string.lower(prompt.ObjectText or "")
-    return action:find("compr") or action:find("buy") or objText:find("compr") or objText:find("buy")
+    if not prompt
+        or not prompt:IsA("ProximityPrompt") then
+        return false
+    end
+
+    -- Solo ActionText, ObjectText y Name.
+    return isAllowedBuyText(prompt.ActionText)
+        or isAllowedBuyText(prompt.ObjectText)
+        or isAllowedBuyText(prompt.Name)
 end
 
-local function connectPrompt(prompt)
-    if prompt:IsA("ProximityPrompt") then
-        local conn = prompt.PromptShown:Connect(function()
-            if autoClickEnabled and isBuyPrompt(prompt) then
-                task.spawn(function()
-                    while autoClickEnabled and prompt and prompt.Parent and prompt.Enabled do
-                        pcall(function() fireproximityprompt(prompt) end)
-                        task.wait(0.1)
-                    end
-                end)
-            end
+local function makePromptInstant(prompt)
+    if not prompt
+        or not prompt:IsA("ProximityPrompt") then
+        return
+    end
+
+    pcall(function()
+        prompt.HoldDuration = 0
+    end)
+end
+
+local function firePrompt(prompt)
+    if not prompt
+        or not prompt.Parent
+        or not prompt.Enabled
+        or not isBuyPrompt(prompt) then
+
+        return false
+    end
+
+    if typeof(fireproximityprompt) ~= "function" then
+        return false
+    end
+
+    local success = pcall(function()
+        fireproximityprompt(prompt)
+    end)
+
+    if not success then
+        pcall(function()
+            fireproximityprompt(prompt, 0)
         end)
-        table.insert(autoClickConns, conn)
+    end
+
+    return success
+end
+
+local function processBuyPrompt(prompt)
+    if not isBuyPrompt(prompt) then
+        return
+    end
+
+    if instantEnabled then
+        makePromptInstant(prompt)
+    end
+
+    if autoBuyEnabled then
+        firePrompt(prompt)
     end
 end
 
-createToggle("Auto Comprar", function(state)
-    autoClickEnabled = state
-    for _, c in ipairs(autoClickConns) do c:Disconnect() end
-    autoClickConns = {}
+local function startBuyLoop()
+    if buyLoop then
+        return
+    end
+
+    buyLoop = RunService.Heartbeat:Connect(function()
+        if not instantEnabled and not autoBuyEnabled then
+            return
+        end
+
+        for _, prompt in ipairs(Workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                processBuyPrompt(prompt)
+            end
+        end
+    end)
+end
+
+local function stopBuyLoop()
+    if buyLoop then
+        buyLoop:Disconnect()
+        buyLoop = nil
+    end
+end
+
+--==================================================
+-- COMPRAR AL INSTANTE
+--==================================================
+
+createToggle("Comprar al instante", function(state)
+    instantEnabled = state
 
     if state then
-        for _, v in ipairs(Workspace:GetDescendants()) do connectPrompt(v) end
-        table.insert(autoClickConns, Workspace.DescendantAdded:Connect(connectPrompt))
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt")
+                and isBuyPrompt(obj) then
+
+                makePromptInstant(obj)
+            end
+        end
+
+        startBuyLoop()
+    elseif not autoBuyEnabled then
+        stopBuyLoop()
     end
 end)
 
--- 6. FREEZE
+--==================================================
+-- AUTO COMPRAR
+--==================================================
+
+createToggle("Auto Comprar", function(state)
+    autoBuyEnabled = state
+
+    if state then
+        startBuyLoop()
+
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                processBuyPrompt(obj)
+            end
+        end
+    elseif not instantEnabled then
+        stopBuyLoop()
+    end
+end)
+
+--==================================================
+-- NUEVOS PROMPTS
+--==================================================
+
+local promptAddedConnection
+
+promptAddedConnection = Workspace.DescendantAdded:Connect(function(obj)
+    if not obj:IsA("ProximityPrompt") then
+        return
+    end
+
+    task.defer(function()
+        if not obj or not obj.Parent then
+            return
+        end
+
+        if not isBuyPrompt(obj) then
+            return
+        end
+
+        if instantEnabled then
+            makePromptInstant(obj)
+        end
+
+        if autoBuyEnabled then
+            firePrompt(obj)
+
+            task.spawn(function()
+                for _ = 1, 15 do
+                    if not autoBuyEnabled
+                        or not obj
+                        or not obj.Parent
+                        or not obj.Enabled then
+                        break
+                    end
+
+                    -- Comprobar nuevamente por seguridad
+                    if not isBuyPrompt(obj) then
+                        break
+                    end
+
+                    firePrompt(obj)
+                    task.wait(0.08)
+                end
+            end)
+        end
+    end)
+end)
+
+--==================================================
+-- FREEZE
+--==================================================
+
 local freezeConn
 local savedSpeed = 16
+local savedJumpPower = 50
+
 createToggle("Freeze", function(state)
     local char = LP.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
 
-    if not hum or not root then return end
+    if not hum or not root then
+        return
+    end
 
     if state then
         savedSpeed = hum.WalkSpeed
+        savedJumpPower = hum.JumpPower
+
         hum.WalkSpeed = 0
         hum.JumpPower = 0
+
         root.Anchored = true
+
+        if freezeConn then
+            freezeConn:Disconnect()
+        end
+
         freezeConn = RunService.Heartbeat:Connect(function()
             if root and root.Parent then
-                root.Velocity = Vector3.zero
-                root.RotVelocity = Vector3.zero
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
             end
         end)
     else
         hum.WalkSpeed = savedSpeed
-        hum.JumpPower = 50
+        hum.JumpPower = savedJumpPower
         root.Anchored = false
-        if freezeConn then freezeConn:Disconnect() freezeConn = nil end
+
+        if freezeConn then
+            freezeConn:Disconnect()
+            freezeConn = nil
+        end
     end
 end)
 
--- Ajuste automático del scroll
-scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+--==================================================
+-- CLEANUP
+--==================================================
+
+gui.Destroying:Connect(function()
+    getgenv().TokitoHub = nil
+
+    if v1Loop then
+        v1Loop:Disconnect()
+        v1Loop = nil
+    end
+
+    if freezeConn then
+        freezeConn:Disconnect()
+        freezeConn = nil
+    end
+
+    stopBuyLoop()
+
+    if promptAddedConnection then
+        promptAddedConnection:Disconnect()
+        promptAddedConnection = nil
+    end
+
+    boosterEnabled = false
+
+    DisconnectAll()
+    CancelAll()
+    ClearPending()
 end)
+
+--==================================================
+-- FIN
+--==================================================
+
+print("[TokitoHub] Hub cargado correctamente.")
+print("[TokitoHub] FPS Booster listo.")
+print("[TokitoHub] Auto Comprar: Comprar / Purchase / Purch / Compr / Buy")
