@@ -1,4 +1,5 @@
 local cloneref = cloneref or function(object) return object end
+
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
@@ -11,136 +12,154 @@ local playerGui = player:WaitForChild("PlayerGui")
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local CARPET_TOOLS = {
-	["Flying Carpet"] = true,
-	["Cupid's Wings"] = true,
-	["Santa's Sleigh"] = true,
-	["Witch's Broom"] = true,
-	["Waverider"] = true,
+    ["Flying Carpet"] = true,
+    ["Cupid's Wings"] = true,
+    ["Santa's Sleigh"] = true,
+    ["Witch's Broom"] = true,
+    ["Waverider"] = true,
 }
 
 local BRAINROT_LIST = {
-	"Job Job Job Sahur",
-	"Bandito Axolito",
-	"Pi pi Watermelon",
-	"Los Noobinis",
-	"Toiletto Focaccino",
-	"Tic Tic Ribbit",
-	"Brainrot God Lucky Block",
-	"Matteo",
-	"Espresso Signora",
-	"Pakrahmatmamat",
-	"Pakrahmatmatina",
-	"Quackalena",
-	"Brasilini Berimbini",
-	"Secret Lucky Block",
-	"La Vacca Saturno Saturnita",
-	"Dul Dul Dul",
-	"Guerriro Digitale",
-	"Fishboard",
-	"Gelatina Volatina",
-	"Rocketini Frostini",
-	"Chicleteira Bicicleteira",
-	"Chicleteirina Bicicleteirina",
-	"Pogo Pogo Penguin",
-	"Peschito Machito",
-	"Money Money Puggy",
-	"Ketupat Kepat",
-	"Scorpino Coasterino",
-	"Garama and Madundung",
-	"Candini Fluffini",
-	"Yetimatic",
-	"La Fuse Machine",
-	"La Breakfast Combinasion",
-	"Dragon Cannelloni"
+    "Job Job Job Sahur",
+    "Bandito Axolito",
+    "Pi pi Watermelon",
+    "Los Noobinis",
+    "Toiletto Focaccino",
+    "Tic Tic Ribbit",
+    "Brainrot God Lucky Block",
+    "Matteo",
+    "Espresso Signora",
+    "Pakrahmatmamat",
+    "Pakrahmatmatina",
+    "Quackalena",
+    "Brasilini Berimbini",
+    "Secret Lucky Block",
+    "La Vacca Saturno Saturnita",
+    "Dul Dul Dul",
+    "Guerriro Digitale",
+    "Fishboard",
+    "Gelatina Volatina",
+    "Rocketini Frostini",
+    "Chicleteira Bicicleteira",
+    "Chicleteirina Bicicleteirina",
+    "Pogo Pogo Penguin",
+    "Peschito Machito",
+    "Money Money Puggy",
+    "Ketupat Kepat",
+    "Scorpino Coasterino",
+    "Garama and Madundung",
+    "Candini Fluffini",
+    "Yetimatic",
+    "La Fuse Machine",
+    "La Breakfast Combinasion",
+    "Dragon Cannelloni"
 }
 
 local DEFAULT_WHITELIST = table.concat({
-	"Job Job Job Sahur",
-	"Money Money Puggy",
-	"Ketupat Kepat",
-	"Scorpino Coasterino",
-	"Garama and Madundung",
-	"Candini Fluffini",
-	"Yetimatic",
-	"La Fuse Machine",
-	"La Breakfast Combinasion",
-	"Dragon Cannelloni"
+    "Job Job Job Sahur",
+    "Money Money Puggy",
+    "Ketupat Kepat",
+    "Scorpino Coasterino",
+    "Garama and Madundung",
+    "Candini Fluffini",
+    "Yetimatic",
+    "La Fuse Machine",
+    "La Breakfast Combinasion",
+    "Dragon Cannelloni"
 }, "\n")
 
 if env.TokitoAutoRNGShutdown then
-	pcall(env.TokitoAutoRNGShutdown)
+    pcall(env.TokitoAutoRNGShutdown)
 end
 
 local CONFIG_FILE = "TokitoAutoRNGConfig.json"
 
 local config = {
-	enabled = true,
-	speed = 100,
-	whitelist = DEFAULT_WHITELIST
+    enabled = true,
+    speed = 100,
+    whitelist = DEFAULT_WHITELIST
 }
 
 pcall(function()
-	if type(isfile) == "function" and type(readfile) == "function" and isfile(CONFIG_FILE) then
-		local loaded = HttpService:JSONDecode(readfile(CONFIG_FILE))
+    if type(isfile) == "function"
+        and type(readfile) == "function"
+        and isfile(CONFIG_FILE) then
 
-		if type(loaded) == "table" then
-			if type(loaded.enabled) == "boolean" then
-				config.enabled = loaded.enabled
-			end
+        local loaded = HttpService:JSONDecode(readfile(CONFIG_FILE))
 
-			if type(loaded.speed) == "number" then
-				config.speed = math.clamp(math.floor(loaded.speed), 10, 500)
-			end
+        if type(loaded) == "table" then
+            if type(loaded.enabled) == "boolean" then
+                config.enabled = loaded.enabled
+            end
 
-			if type(loaded.whitelist) == "string" then
-				config.whitelist = loaded.whitelist
-			end
-		end
-	end
+            if type(loaded.speed) == "number" then
+                config.speed = math.clamp(
+                    math.floor(loaded.speed),
+                    10,
+                    500
+                )
+            end
+
+            if type(loaded.whitelist) == "string" then
+                config.whitelist = loaded.whitelist
+            end
+        end
+    end
 end)
 
 local function saveConfig()
-	if type(writefile) ~= "function" then
-		return
-	end
+    if type(writefile) ~= "function" then
+        return
+    end
 
-	pcall(function()
-		writefile(CONFIG_FILE, HttpService:JSONEncode(config))
-	end)
+    pcall(function()
+        writefile(
+            CONFIG_FILE,
+            HttpService:JSONEncode(config)
+        )
+    end)
 end
 
 local function normalizeKey(value)
-	return tostring(value or ""):lower():match("^%s*(.-)%s*$") or ""
+    return tostring(value or "")
+        :lower()
+        :match("^%s*(.-)%s*$") or ""
 end
 
 local brainrotKeys = {}
 
 for _, name in ipairs(BRAINROT_LIST) do
-	brainrotKeys[normalizeKey(name)] = true
+    brainrotKeys[normalizeKey(name)] = true
 end
 
 local whitelistSet = {}
 
 do
-	local seenExtra = {}
+    for entry in tostring(config.whitelist):gmatch("[^,;\n\r]+") do
+        local trimmed =
+            entry:match("^%s*(.-)%s*$")
 
-	for entry in tostring(config.whitelist):gmatch("[^,;\n\r]+") do
-		local trimmed = entry:match("^%s*(.-)%s*$")
-		local key = normalizeKey(trimmed)
+        local key =
+            normalizeKey(trimmed)
 
-		if key ~= "" then
-			if not brainrotKeys[key] then
-				brainrotKeys[key] = true
-				table.insert(BRAINROT_LIST, trimmed)
-			end
+        if key ~= "" then
 
-			whitelistSet[key] = true
-		end
-	end
+            if not brainrotKeys[key] then
+                brainrotKeys[key] = true
+
+                table.insert(
+                    BRAINROT_LIST,
+                    trimmed
+                )
+            end
+
+            whitelistSet[key] = true
+        end
+    end
 end
 
 -- =========================================================
--- JOB JOB JOB SAHUR SIEMPRE ACTIVO POR DEFECTO
+-- JOB JOB JOB SAHUR SIEMPRE ACTIVO
 -- =========================================================
 
 local JOB_SAHUR_NAME = "Job Job Job Sahur"
@@ -150,198 +169,298 @@ brainrotKeys[JOB_SAHUR_KEY] = true
 whitelistSet[JOB_SAHUR_KEY] = true
 
 local function rebuildWhitelist()
-	local parts = {}
+    local parts = {}
 
-	for _, name in ipairs(BRAINROT_LIST) do
-		if whitelistSet[normalizeKey(name)] then
-			parts[#parts + 1] = name
-		end
-	end
+    for _, name in ipairs(BRAINROT_LIST) do
+        if whitelistSet[normalizeKey(name)] then
+            parts[#parts + 1] = name
+        end
+    end
 
-	config.whitelist = table.concat(parts, "\n")
+    config.whitelist = table.concat(
+        parts,
+        "\n"
+    )
 end
 
--- Asegura que Job Job Job Sahur quede guardado incluso
--- si existía una configuración anterior.
 rebuildWhitelist()
 saveConfig()
 
 local function isBrainrotEnabled(name)
-	return whitelistSet[normalizeKey(name)] == true
+    return whitelistSet[
+        normalizeKey(name)
+    ] == true
 end
 
-local function setBrainrotEnabled(name, enabled)
-	local key = normalizeKey(name)
+local function setBrainrotEnabled(
+    name,
+    enabled
+)
+    local key = normalizeKey(name)
 
-	-- Job Sahur nunca se desactiva.
-	if key == JOB_SAHUR_KEY then
-		whitelistSet[key] = true
-	else
-		if enabled then
-			whitelistSet[key] = true
-		else
-			whitelistSet[key] = nil
-		end
-	end
+    if key == JOB_SAHUR_KEY then
+        whitelistSet[key] = true
+    else
+        if enabled then
+            whitelistSet[key] = true
+        else
+            whitelistSet[key] = nil
+        end
+    end
 
-	rebuildWhitelist()
-	saveConfig()
+    rebuildWhitelist()
+    saveConfig()
 end
 
 local state = {
-	enabled = false,
-	alive = true,
-	token = 0,
-	fired = 0,
-	cycles = 0,
-	movingRoot = nil,
-	connections = {}
+    enabled = false,
+    alive = true,
+    token = 0,
+    fired = 0,
+    cycles = 0,
+    movingRoot = nil,
+    connections = {}
 }
 
 -- =========================================================
--- TEMA AZUL RGB
+-- COLORES
 -- =========================================================
 
 local COLORS = {
-	Window = Color3.fromRGB(8, 14, 30),
-	Row = Color3.fromRGB(15, 24, 45),
-	Control = Color3.fromRGB(30, 50, 95),
-	Log = Color3.fromRGB(10, 18, 38),
-	White = Color3.fromRGB(220, 235, 255),
-	Text = Color3.fromRGB(180, 205, 245),
-	Dim = Color3.fromRGB(90, 120, 175),
-	Green = Color3.fromRGB(85, 200, 155),
-	Red = Color3.fromRGB(225, 95, 115),
-	Amber = Color3.fromRGB(230, 175, 100),
-	Cyan = Color3.fromRGB(90, 190, 225)
+    Window = Color3.fromRGB(8, 14, 30),
+    Row = Color3.fromRGB(15, 24, 45),
+    Control = Color3.fromRGB(30, 50, 95),
+    Log = Color3.fromRGB(10, 18, 38),
+    White = Color3.fromRGB(220, 235, 255),
+    Text = Color3.fromRGB(180, 205, 245),
+    Dim = Color3.fromRGB(90, 120, 175),
+    Green = Color3.fromRGB(85, 200, 155),
+    Red = Color3.fromRGB(225, 95, 115),
+    Amber = Color3.fromRGB(230, 175, 100),
+    Cyan = Color3.fromRGB(90, 190, 225)
 }
 
 local function addCorner(parent, radius)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, radius)
-	corner.Parent = parent
-	return corner
+    local corner = Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(0, radius)
+
+    corner.Parent = parent
+
+    return corner
 end
 
-local function addStroke(parent, color, thickness, transparency)
-	local stroke = Instance.new("UIStroke")
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Color = color
-	stroke.Thickness = thickness or 1
-	stroke.Transparency = transparency or 0
-	stroke.Parent = parent
-	return stroke
+local function addStroke(
+    parent,
+    color,
+    thickness,
+    transparency
+)
+    local stroke = Instance.new("UIStroke")
+
+    stroke.ApplyStrokeMode =
+        Enum.ApplyStrokeMode.Border
+
+    stroke.Color = color
+    stroke.Thickness = thickness or 1
+    stroke.Transparency =
+        transparency or 0
+
+    stroke.Parent = parent
+
+    return stroke
 end
 
-local function makeLabel(parent, name, text, size, position, textSize, color, font)
-	local label = Instance.new("TextLabel")
-	label.Name = name
-	label.Size = size
-	label.Position = position
-	label.BackgroundTransparency = 1
-	label.Text = text
-	label.TextSize = textSize
-	label.TextColor3 = color
-	label.Font = font or Enum.Font.GothamMedium
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.TextYAlignment = Enum.TextYAlignment.Center
-	label.Parent = parent
-	return label
+local function makeLabel(
+    parent,
+    name,
+    text,
+    size,
+    position,
+    textSize,
+    color,
+    font
+)
+    local label = Instance.new("TextLabel")
+
+    label.Name = name
+    label.Size = size
+    label.Position = position
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextSize = textSize
+    label.TextColor3 = color
+
+    label.Font =
+        font or Enum.Font.GothamMedium
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.TextYAlignment =
+        Enum.TextYAlignment.Center
+
+    label.Parent = parent
+
+    return label
 end
 
-local oldGui = CoreGui:FindFirstChild("TokitoAutoRNG")
-	or playerGui:FindFirstChild("TokitoAutoRNG")
+-- =========================================================
+-- GUI
+-- =========================================================
+
+local oldGui =
+    CoreGui:FindFirstChild("TokitoAutoRNG")
+    or playerGui:FindFirstChild("TokitoAutoRNG")
 
 if oldGui then
-	oldGui:Destroy()
+    oldGui:Destroy()
 end
 
 local GUI = Instance.new("ScreenGui")
+
 GUI.Name = "TokitoAutoRNG"
 GUI.ResetOnSpawn = false
 GUI.IgnoreGuiInset = true
 GUI.DisplayOrder = 999
 
 if not pcall(function()
-	GUI.Parent = CoreGui
+    GUI.Parent = CoreGui
 end) then
-	GUI.Parent = playerGui
+    GUI.Parent = playerGui
 end
 
 local WINDOW_WIDTH = 310
 local MAIN_HEIGHT = 260
-local WHITELIST_HEIGHT = 260
 
 local Window = Instance.new("Frame")
+
 Window.Name = "Window"
-Window.Size = UDim2.fromOffset(WINDOW_WIDTH, MAIN_HEIGHT)
-Window.AnchorPoint = Vector2.new(0.5, 0.5)
-Window.Position = UDim2.fromScale(0.5, 0.5)
-Window.BackgroundColor3 = COLORS.Window
+Window.Size =
+    UDim2.fromOffset(
+        WINDOW_WIDTH,
+        MAIN_HEIGHT
+    )
+
+Window.AnchorPoint =
+    Vector2.new(0.5, 0.5)
+
+Window.Position =
+    UDim2.fromScale(
+        0.5,
+        0.5
+    )
+
+Window.BackgroundColor3 =
+    COLORS.Window
+
 Window.BorderSizePixel = 0
 Window.ClipsDescendants = true
 Window.Parent = GUI
 
 addCorner(Window, 14)
-addStroke(Window, COLORS.White, 1, 0.58)
 
-local InterfaceScale = Instance.new("UIScale")
+addStroke(
+    Window,
+    COLORS.White,
+    1,
+    0.58
+)
+
+local InterfaceScale =
+    Instance.new("UIScale")
+
 InterfaceScale.Scale = 0.92
 InterfaceScale.Parent = Window
 
 local viewportConnection
 
 local function updateScale()
-	local camera = workspace.CurrentCamera
-	if not camera then
-		return
-	end
+    local camera =
+        workspace.CurrentCamera
 
-	local viewport = camera.ViewportSize
+    if not camera then
+        return
+    end
 
-	local fit = math.min(
-		(viewport.X - 16) / WINDOW_WIDTH,
-		(viewport.Y - 16) / MAIN_HEIGHT
-	)
+    local viewport =
+        camera.ViewportSize
 
-	InterfaceScale.Scale =
-		UserInputService.TouchEnabled
-		and math.max(0.45, math.min(0.72, fit))
-		or math.max(0.65, math.min(0.92, fit))
+    local fit =
+        math.min(
+            (viewport.X - 16)
+                / WINDOW_WIDTH,
+            (viewport.Y - 16)
+                / MAIN_HEIGHT
+        )
+
+    InterfaceScale.Scale =
+        UserInputService.TouchEnabled
+        and math.max(
+            0.45,
+            math.min(0.72, fit)
+        )
+        or math.max(
+            0.65,
+            math.min(0.92, fit)
+        )
 end
 
 local function watchCamera()
-	if viewportConnection then
-		viewportConnection:Disconnect()
-	end
+    if viewportConnection then
+        viewportConnection:Disconnect()
+    end
 
-	local camera = workspace.CurrentCamera
+    local camera =
+        workspace.CurrentCamera
 
-	if camera then
-		viewportConnection =
-			camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
-	end
+    if camera then
+        viewportConnection =
+            camera:GetPropertyChangedSignal(
+                "ViewportSize"
+            ):Connect(updateScale)
+    end
 
-	updateScale()
+    updateScale()
 end
 
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+workspace:GetPropertyChangedSignal(
+    "CurrentCamera"
+):Connect(watchCamera)
+
 watchCamera()
 
-local BackgroundImage = Instance.new("ImageLabel")
-BackgroundImage.Size = UDim2.fromScale(1, 1)
+local BackgroundImage =
+    Instance.new("ImageLabel")
+
+BackgroundImage.Size =
+    UDim2.fromScale(1, 1)
+
 BackgroundImage.BackgroundTransparency = 1
-BackgroundImage.Image = "rbxassetid://120663379122080"
+
+BackgroundImage.Image =
+    "rbxassetid://120663379122080"
+
 BackgroundImage.ImageTransparency = 0
-BackgroundImage.ScaleType = Enum.ScaleType.Stretch
+
+BackgroundImage.ScaleType =
+    Enum.ScaleType.Stretch
+
 BackgroundImage.ZIndex = 1
 BackgroundImage.Parent = Window
 
 addCorner(BackgroundImage, 14)
 
-local Shade = Instance.new("Frame")
-Shade.Size = UDim2.fromScale(1, 1)
-Shade.BackgroundColor3 = COLORS.Window
+local Shade =
+    Instance.new("Frame")
+
+Shade.Size =
+    UDim2.fromScale(1, 1)
+
+Shade.BackgroundColor3 =
+    COLORS.Window
+
 Shade.BackgroundTransparency = 0.22
 Shade.BorderSizePixel = 0
 Shade.ZIndex = 2
@@ -349,44 +468,66 @@ Shade.Parent = Window
 
 addCorner(Shade, 14)
 
--- =========================================================
--- ANIMACIÓN AZUL RGB
--- =========================================================
+local AnimatedGradient =
+    Instance.new("UIGradient")
 
-local AnimatedGradient = Instance.new("UIGradient")
-
-AnimatedGradient.Color = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 10, 30)),
-	ColorSequenceKeypoint.new(0.35, Color3.fromRGB(10, 40, 120)),
-	ColorSequenceKeypoint.new(0.68, Color3.fromRGB(5, 20, 60)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 60, 160))
-})
+AnimatedGradient.Color =
+    ColorSequence.new({
+        ColorSequenceKeypoint.new(
+            0,
+            Color3.fromRGB(0, 10, 30)
+        ),
+        ColorSequenceKeypoint.new(
+            0.35,
+            Color3.fromRGB(10, 40, 120)
+        ),
+        ColorSequenceKeypoint.new(
+            0.68,
+            Color3.fromRGB(5, 20, 60)
+        ),
+        ColorSequenceKeypoint.new(
+            1,
+            Color3.fromRGB(20, 60, 160)
+        )
+    })
 
 AnimatedGradient.Rotation = 32
 AnimatedGradient.Parent = Shade
 
-local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 64)
+local Header =
+    Instance.new("Frame")
+
+Header.Size =
+    UDim2.new(1, 0, 0, 64)
+
 Header.BackgroundTransparency = 1
 Header.Active = true
 Header.ZIndex = 3
 Header.Parent = Window
 
 makeLabel(
-	Header,
-	"Title",
-	"TOKITO AUTO RNG",
-	UDim2.fromOffset(210, 25),
-	UDim2.fromOffset(17, 17),
-	15,
-	COLORS.White,
-	Enum.Font.GothamBold
+    Header,
+    "Title",
+    "TOKITO AUTO RNG",
+    UDim2.fromOffset(210, 25),
+    UDim2.fromOffset(17, 17),
+    15,
+    COLORS.White,
+    Enum.Font.GothamBold
 ).ZIndex = 4
 
-local MasterToggle = Instance.new("TextButton")
-MasterToggle.Size = UDim2.fromOffset(50, 26)
-MasterToggle.Position = UDim2.new(1, -66, 0, 19)
-MasterToggle.BackgroundColor3 = COLORS.Control
+local MasterToggle =
+    Instance.new("TextButton")
+
+MasterToggle.Size =
+    UDim2.fromOffset(50, 26)
+
+MasterToggle.Position =
+    UDim2.new(1, -66, 0, 19)
+
+MasterToggle.BackgroundColor3 =
+    COLORS.Control
+
 MasterToggle.BorderSizePixel = 0
 MasterToggle.AutoButtonColor = false
 MasterToggle.Text = ""
@@ -395,276 +536,485 @@ MasterToggle.Parent = Header
 
 addCorner(MasterToggle, 13)
 
-local MasterStroke = addStroke(
-	MasterToggle,
-	COLORS.White,
-	1,
-	0.88
-)
+local MasterStroke =
+    addStroke(
+        MasterToggle,
+        COLORS.White,
+        1,
+        0.88
+    )
 
-local MasterKnob = Instance.new("Frame")
-MasterKnob.Size = UDim2.fromOffset(22, 22)
-MasterKnob.Position = UDim2.new(0, 2, 0.5, -11)
-MasterKnob.BackgroundColor3 = COLORS.White
+local MasterKnob =
+    Instance.new("Frame")
+
+MasterKnob.Size =
+    UDim2.fromOffset(22, 22)
+
+MasterKnob.Position =
+    UDim2.new(
+        0,
+        2,
+        0.5,
+        -11
+    )
+
+MasterKnob.BackgroundColor3 =
+    COLORS.White
+
 MasterKnob.BorderSizePixel = 0
 MasterKnob.ZIndex = 6
 MasterKnob.Parent = MasterToggle
 
 addCorner(MasterKnob, 11)
 
-local HeaderAccent = Instance.new("Frame")
-HeaderAccent.Size = UDim2.new(1, -34, 0, 1)
-HeaderAccent.Position = UDim2.fromOffset(17, 54)
-HeaderAccent.BackgroundColor3 = COLORS.White
+local HeaderAccent =
+    Instance.new("Frame")
+
+HeaderAccent.Size =
+    UDim2.new(1, -34, 0, 1)
+
+HeaderAccent.Position =
+    UDim2.fromOffset(17, 54)
+
+HeaderAccent.BackgroundColor3 =
+    COLORS.White
+
 HeaderAccent.BackgroundTransparency = 0.72
 HeaderAccent.BorderSizePixel = 0
 HeaderAccent.ZIndex = 4
 HeaderAccent.Parent = Header
 
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -34, 0, 28)
-TabBar.Position = UDim2.fromOffset(17, 65)
-TabBar.BackgroundColor3 = COLORS.Log
+local TabBar =
+    Instance.new("Frame")
+
+TabBar.Size =
+    UDim2.new(1, -34, 0, 28)
+
+TabBar.Position =
+    UDim2.fromOffset(17, 65)
+
+TabBar.BackgroundColor3 =
+    COLORS.Log
+
 TabBar.BackgroundTransparency = 0.15
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 4
 TabBar.Parent = Window
 
 addCorner(TabBar, 8)
-addStroke(TabBar, COLORS.White, 1, 0.86)
 
-local function makeTab(text, position)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(0.5, -3, 1, -4)
-	button.Position = position
-	button.BackgroundColor3 = COLORS.Control
-	button.BorderSizePixel = 0
-	button.AutoButtonColor = false
-	button.Text = text
-	button.TextSize = 9
-	button.TextColor3 = COLORS.Dim
-	button.Font = Enum.Font.GothamBold
-	button.ZIndex = 5
-	button.Parent = TabBar
+addStroke(
+    TabBar,
+    COLORS.White,
+    1,
+    0.86
+)
 
-	addCorner(button, 6)
+local function makeTab(
+    text,
+    position
+)
+    local button =
+        Instance.new("TextButton")
 
-	return button
+    button.Size =
+        UDim2.new(
+            0.5,
+            -3,
+            1,
+            -4
+        )
+
+    button.Position = position
+
+    button.BackgroundColor3 =
+        COLORS.Control
+
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Text = text
+    button.TextSize = 9
+
+    button.TextColor3 =
+        COLORS.Dim
+
+    button.Font =
+        Enum.Font.GothamBold
+
+    button.ZIndex = 5
+    button.Parent = TabBar
+
+    addCorner(button, 6)
+
+    return button
 end
 
 local MainTabButton =
-	makeTab("PRINCIPAL", UDim2.fromOffset(2, 2))
+    makeTab(
+        "PRINCIPAL",
+        UDim2.fromOffset(2, 2)
+    )
 
 local WhitelistTabButton =
-	makeTab("LISTA BLANCA", UDim2.new(0.5, 1, 0, 2))
+    makeTab(
+        "LISTA BLANCA",
+        UDim2.new(
+            0.5,
+            1,
+            0,
+            2
+        )
+    )
 
-local Settings = Instance.new("Frame")
-Settings.Size = UDim2.new(1, 0, 0, 126)
-Settings.Position = UDim2.fromOffset(0, 102)
+local Settings =
+    Instance.new("Frame")
+
+Settings.Size =
+    UDim2.new(1, 0, 0, 126)
+
+Settings.Position =
+    UDim2.fromOffset(0, 102)
+
 Settings.BackgroundTransparency = 1
 Settings.ZIndex = 3
 Settings.Parent = Window
 
-local function makeCard(name, position, size)
-	local card = Instance.new("Frame")
+local function makeCard(
+    name,
+    position,
+    size
+)
+    local card =
+        Instance.new("Frame")
 
-	card.Name = name
-	card.Position = position
-	card.Size = size
-	card.BackgroundColor3 = COLORS.Row
-	card.BackgroundTransparency = 0.58
-	card.BorderSizePixel = 0
-	card.ZIndex = 3
-	card.Parent = Settings
+    card.Name = name
+    card.Position = position
+    card.Size = size
 
-	addCorner(card, 9)
-	addStroke(card, COLORS.White, 1, 0.76)
+    card.BackgroundColor3 =
+        COLORS.Row
 
-	return card
+    card.BackgroundTransparency = 0.58
+    card.BorderSizePixel = 0
+    card.ZIndex = 3
+    card.Parent = Settings
+
+    addCorner(card, 9)
+
+    addStroke(
+        card,
+        COLORS.White,
+        1,
+        0.76
+    )
+
+    return card
 end
 
 local SpeedCard =
-	makeCard(
-		"Speed",
-		UDim2.fromOffset(17, 0),
-		UDim2.fromOffset(276, 58)
-	)
+    makeCard(
+        "Speed",
+        UDim2.fromOffset(17, 0),
+        UDim2.fromOffset(276, 58)
+    )
 
 makeLabel(
-	SpeedCard,
-	"Title",
-	"Velocidad",
-	UDim2.fromOffset(150, 58),
-	UDim2.fromOffset(14, 0),
-	12,
-	COLORS.White
+    SpeedCard,
+    "Title",
+    "Velocidad",
+    UDim2.fromOffset(150, 58),
+    UDim2.fromOffset(14, 0),
+    12,
+    COLORS.White
 ).ZIndex = 4
 
-local SpeedShell = Instance.new("Frame")
-SpeedShell.Size = UDim2.fromOffset(110, 38)
-SpeedShell.Position = UDim2.new(1, -122, 0.5, -19)
-SpeedShell.BackgroundColor3 = COLORS.Window
+local SpeedShell =
+    Instance.new("Frame")
+
+SpeedShell.Size =
+    UDim2.fromOffset(110, 38)
+
+SpeedShell.Position =
+    UDim2.new(
+        1,
+        -122,
+        0.5,
+        -19
+    )
+
+SpeedShell.BackgroundColor3 =
+    COLORS.Window
+
 SpeedShell.BackgroundTransparency = 0.05
 SpeedShell.BorderSizePixel = 0
 SpeedShell.ZIndex = 4
 SpeedShell.Parent = SpeedCard
 
 addCorner(SpeedShell, 8)
-addStroke(SpeedShell, COLORS.White, 1, 0.86)
 
-local function makeCounterButton(parent, text, position)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.fromOffset(30, 30)
-	button.Position = position
-	button.BackgroundColor3 = COLORS.Control
-	button.BorderSizePixel = 0
-	button.AutoButtonColor = false
-	button.Text = text
-	button.TextSize = 17
-	button.TextColor3 = COLORS.Text
-	button.Font = Enum.Font.GothamBold
-	button.ZIndex = 5
-	button.Parent = parent
+addStroke(
+    SpeedShell,
+    COLORS.White,
+    1,
+    0.86
+)
 
-	addCorner(button, 6)
+local function makeCounterButton(
+    parent,
+    text,
+    position
+)
+    local button =
+        Instance.new("TextButton")
 
-	return button
+    button.Size =
+        UDim2.fromOffset(30, 30)
+
+    button.Position = position
+
+    button.BackgroundColor3 =
+        COLORS.Control
+
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Text = text
+    button.TextSize = 17
+
+    button.TextColor3 =
+        COLORS.Text
+
+    button.Font =
+        Enum.Font.GothamBold
+
+    button.ZIndex = 5
+    button.Parent = parent
+
+    addCorner(button, 6)
+
+    return button
 end
 
 local Minus =
-	makeCounterButton(
-		SpeedShell,
-		"-",
-		UDim2.fromOffset(4, 4)
-	)
+    makeCounterButton(
+        SpeedShell,
+        "-",
+        UDim2.fromOffset(4, 4)
+    )
 
 local SpeedValue =
-	makeLabel(
-		SpeedShell,
-		"Value",
-		tostring(config.speed),
-		UDim2.fromOffset(38, 30),
-		UDim2.fromOffset(36, 4),
-		15,
-		COLORS.White,
-		Enum.Font.GothamBold
-	)
+    makeLabel(
+        SpeedShell,
+        "Value",
+        tostring(config.speed),
+        UDim2.fromOffset(38, 30),
+        UDim2.fromOffset(36, 4),
+        15,
+        COLORS.White,
+        Enum.Font.GothamBold
+    )
 
-SpeedValue.TextXAlignment = Enum.TextXAlignment.Center
+SpeedValue.TextXAlignment =
+    Enum.TextXAlignment.Center
+
 SpeedValue.ZIndex = 5
 
 local Plus =
-	makeCounterButton(
-		SpeedShell,
-		"+",
-		UDim2.fromOffset(76, 4)
-	)
+    makeCounterButton(
+        SpeedShell,
+        "+",
+        UDim2.fromOffset(76, 4)
+    )
 
 local CycleCard =
-	makeCard(
-		"Cycles",
-		UDim2.fromOffset(17, 68),
-		UDim2.fromOffset(276, 58)
-	)
+    makeCard(
+        "Cycles",
+        UDim2.fromOffset(17, 68),
+        UDim2.fromOffset(276, 58)
+    )
 
 makeLabel(
-	CycleCard,
-	"Title",
-	"Ciclos",
-	UDim2.fromOffset(120, 58),
-	UDim2.fromOffset(14, 0),
-	12,
-	COLORS.White
+    CycleCard,
+    "Title",
+    "Ciclos",
+    UDim2.fromOffset(120, 58),
+    UDim2.fromOffset(14, 0),
+    12,
+    COLORS.White
 ).ZIndex = 4
 
 local CycleValue =
-	makeLabel(
-		CycleCard,
-		"Value",
-		"0",
-		UDim2.fromOffset(140, 58),
-		UDim2.new(1, -154, 0, 0),
-		17,
-		COLORS.White,
-		Enum.Font.GothamBold
-	)
+    makeLabel(
+        CycleCard,
+        "Value",
+        "0",
+        UDim2.fromOffset(140, 58),
+        UDim2.new(
+            1,
+            -154,
+            0,
+            0
+        ),
+        17,
+        COLORS.White,
+        Enum.Font.GothamBold
+    )
 
-CycleValue.TextXAlignment = Enum.TextXAlignment.Right
+CycleValue.TextXAlignment =
+    Enum.TextXAlignment.Right
+
 CycleValue.ZIndex = 4
 
-local WhitelistPage = Instance.new("Frame")
-WhitelistPage.Size = UDim2.fromOffset(276, 142)
-WhitelistPage.Position = UDim2.fromOffset(17, 102)
+-- =========================================================
+-- WHITELIST
+-- =========================================================
+
+local WhitelistPage =
+    Instance.new("Frame")
+
+WhitelistPage.Size =
+    UDim2.fromOffset(276, 142)
+
+WhitelistPage.Position =
+    UDim2.fromOffset(17, 102)
+
 WhitelistPage.BackgroundTransparency = 1
 WhitelistPage.Visible = false
 WhitelistPage.ZIndex = 3
 WhitelistPage.Parent = Window
 
-local OpenWhitelist = Instance.new("TextButton")
-OpenWhitelist.Size = UDim2.fromOffset(276, 40)
-OpenWhitelist.Position = UDim2.fromOffset(0, 0)
-OpenWhitelist.BackgroundColor3 = COLORS.White
+local OpenWhitelist =
+    Instance.new("TextButton")
+
+OpenWhitelist.Size =
+    UDim2.fromOffset(276, 40)
+
+OpenWhitelist.Position =
+    UDim2.fromOffset(0, 0)
+
+OpenWhitelist.BackgroundColor3 =
+    COLORS.White
+
 OpenWhitelist.BorderSizePixel = 0
 OpenWhitelist.AutoButtonColor = false
-OpenWhitelist.Text = "ABRIR MENÚ DE LISTA BLANCA"
-OpenWhitelist.TextColor3 = COLORS.Window
+
+OpenWhitelist.Text =
+    "ABRIR MENÚ DE LISTA BLANCA"
+
+OpenWhitelist.TextColor3 =
+    COLORS.Window
+
 OpenWhitelist.TextSize = 11
-OpenWhitelist.Font = Enum.Font.GothamBold
+
+OpenWhitelist.Font =
+    Enum.Font.GothamBold
+
 OpenWhitelist.ZIndex = 4
 OpenWhitelist.Parent = WhitelistPage
 
 addCorner(OpenWhitelist, 10)
 
-local AddBrainrotBox = Instance.new("TextBox")
-AddBrainrotBox.Size = UDim2.fromOffset(176, 36)
-AddBrainrotBox.Position = UDim2.fromOffset(0, 48)
-AddBrainrotBox.BackgroundColor3 = COLORS.Row
-AddBrainrotBox.TextColor3 = COLORS.White
-AddBrainrotBox.PlaceholderText = "Escribe el brainrot aquí..."
-AddBrainrotBox.PlaceholderColor3 = COLORS.Dim
+local AddBrainrotBox =
+    Instance.new("TextBox")
+
+AddBrainrotBox.Size =
+    UDim2.fromOffset(176, 36)
+
+AddBrainrotBox.Position =
+    UDim2.fromOffset(0, 48)
+
+AddBrainrotBox.BackgroundColor3 =
+    COLORS.Row
+
+AddBrainrotBox.TextColor3 =
+    COLORS.White
+
+AddBrainrotBox.PlaceholderText =
+    "Escribe el brainrot aquí..."
+
+AddBrainrotBox.PlaceholderColor3 =
+    COLORS.Dim
+
 AddBrainrotBox.Text = ""
-AddBrainrotBox.Font = Enum.Font.GothamMedium
+
+AddBrainrotBox.Font =
+    Enum.Font.GothamMedium
+
 AddBrainrotBox.TextSize = 11
 AddBrainrotBox.ZIndex = 4
 AddBrainrotBox.ClearTextOnFocus = false
 AddBrainrotBox.Parent = WhitelistPage
 
 addCorner(AddBrainrotBox, 8)
-addStroke(AddBrainrotBox, COLORS.White, 1, 0.7)
 
-local AddBrainrotBtn = Instance.new("TextButton")
-AddBrainrotBtn.Size = UDim2.fromOffset(92, 36)
-AddBrainrotBtn.Position = UDim2.fromOffset(184, 48)
-AddBrainrotBtn.BackgroundColor3 = COLORS.Control
-AddBrainrotBtn.TextColor3 = COLORS.White
+addStroke(
+    AddBrainrotBox,
+    COLORS.White,
+    1,
+    0.7
+)
+
+local AddBrainrotBtn =
+    Instance.new("TextButton")
+
+AddBrainrotBtn.Size =
+    UDim2.fromOffset(92, 36)
+
+AddBrainrotBtn.Position =
+    UDim2.fromOffset(184, 48)
+
+AddBrainrotBtn.BackgroundColor3 =
+    COLORS.Control
+
+AddBrainrotBtn.TextColor3 =
+    COLORS.White
+
 AddBrainrotBtn.Text = "AGREGAR"
-AddBrainrotBtn.Font = Enum.Font.GothamBold
+
+AddBrainrotBtn.Font =
+    Enum.Font.GothamBold
+
 AddBrainrotBtn.TextSize = 11
 AddBrainrotBtn.ZIndex = 4
 AddBrainrotBtn.Parent = WhitelistPage
 
 addCorner(AddBrainrotBtn, 8)
-addStroke(AddBrainrotBtn, COLORS.White, 1, 0.7)
+
+addStroke(
+    AddBrainrotBtn,
+    COLORS.White,
+    1,
+    0.7
+)
 
 local WhitelistCount =
-	makeLabel(
-		WhitelistPage,
-		"Count",
-		"",
-		UDim2.fromOffset(276, 20),
-		UDim2.fromOffset(0, 96),
-		9,
-		COLORS.Dim,
-		Enum.Font.GothamBold
-	)
+    makeLabel(
+        WhitelistPage,
+        "Count",
+        "",
+        UDim2.fromOffset(276, 20),
+        UDim2.fromOffset(0, 96),
+        9,
+        COLORS.Dim,
+        Enum.Font.GothamBold
+    )
 
-WhitelistCount.TextXAlignment = Enum.TextXAlignment.Center
+WhitelistCount.TextXAlignment =
+    Enum.TextXAlignment.Center
+
 WhitelistCount.ZIndex = 4
 
-local WhitelistOverlay = Instance.new("TextButton")
-WhitelistOverlay.Name = "WhitelistOverlay"
-WhitelistOverlay.Size = UDim2.fromScale(1, 1)
-WhitelistOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+local WhitelistOverlay =
+    Instance.new("TextButton")
+
+WhitelistOverlay.Name =
+    "WhitelistOverlay"
+
+WhitelistOverlay.Size =
+    UDim2.fromScale(1, 1)
+
+WhitelistOverlay.BackgroundColor3 =
+    Color3.fromRGB(0, 0, 0)
+
 WhitelistOverlay.BackgroundTransparency = 0.45
 WhitelistOverlay.BorderSizePixel = 0
 WhitelistOverlay.AutoButtonColor = false
@@ -673,1460 +1023,2083 @@ WhitelistOverlay.Visible = false
 WhitelistOverlay.ZIndex = 20
 WhitelistOverlay.Parent = GUI
 
-local WhitelistModal = Instance.new("Frame")
-WhitelistModal.Name = "WhitelistModal"
-WhitelistModal.Size = UDim2.fromOffset(280, 340)
-WhitelistModal.AnchorPoint = Vector2.new(0.5, 0.5)
-WhitelistModal.Position = UDim2.fromScale(0.5, 0.5)
-WhitelistModal.BackgroundColor3 = COLORS.Window
+local WhitelistModal =
+    Instance.new("Frame")
+
+WhitelistModal.Name =
+    "WhitelistModal"
+
+WhitelistModal.Size =
+    UDim2.fromOffset(280, 340)
+
+WhitelistModal.AnchorPoint =
+    Vector2.new(0.5, 0.5)
+
+WhitelistModal.Position =
+    UDim2.fromScale(
+        0.5,
+        0.5
+    )
+
+WhitelistModal.BackgroundColor3 =
+    COLORS.Window
+
 WhitelistModal.BorderSizePixel = 0
 WhitelistModal.Active = true
 WhitelistModal.ZIndex = 21
 WhitelistModal.Parent = WhitelistOverlay
 
 addCorner(WhitelistModal, 14)
-addStroke(WhitelistModal, COLORS.White, 1, 0.58)
+
+addStroke(
+    WhitelistModal,
+    COLORS.White,
+    1,
+    0.58
+)
 
 makeLabel(
-	WhitelistModal,
-	"Title",
-	"LISTA BLANCA DE BRAINROTS",
-	UDim2.fromOffset(190, 22),
-	UDim2.fromOffset(16, 14),
-	11,
-	COLORS.White,
-	Enum.Font.GothamBold
+    WhitelistModal,
+    "Title",
+    "LISTA BLANCA DE BRAINROTS",
+    UDim2.fromOffset(190, 22),
+    UDim2.fromOffset(16, 14),
+    11,
+    COLORS.White,
+    Enum.Font.GothamBold
 ).ZIndex = 22
 
 makeLabel(
-	WhitelistModal,
-	"Hint",
-	"Toca una fila para activarla o desactivarla",
-	UDim2.fromOffset(190, 16),
-	UDim2.fromOffset(16, 34),
-	9,
-	COLORS.Dim,
-	Enum.Font.GothamMedium
+    WhitelistModal,
+    "Hint",
+    "Toca una fila para activarla o desactivarla",
+    UDim2.fromOffset(190, 16),
+    UDim2.fromOffset(16, 34),
+    9,
+    COLORS.Dim,
+    Enum.Font.GothamMedium
 ).ZIndex = 22
 
-local ModalClose = Instance.new("TextButton")
-ModalClose.Size = UDim2.fromOffset(28, 28)
-ModalClose.Position = UDim2.new(1, -40, 0, 12)
-ModalClose.BackgroundColor3 = COLORS.Control
+local ModalClose =
+    Instance.new("TextButton")
+
+ModalClose.Size =
+    UDim2.fromOffset(28, 28)
+
+ModalClose.Position =
+    UDim2.new(
+        1,
+        -40,
+        0,
+        12
+    )
+
+ModalClose.BackgroundColor3 =
+    COLORS.Control
+
 ModalClose.BorderSizePixel = 0
 ModalClose.AutoButtonColor = false
 ModalClose.Text = "X"
 ModalClose.TextSize = 11
 ModalClose.TextColor3 = COLORS.Text
-ModalClose.Font = Enum.Font.GothamBold
+
+ModalClose.Font =
+    Enum.Font.GothamBold
+
 ModalClose.ZIndex = 22
 ModalClose.Parent = WhitelistModal
 
 addCorner(ModalClose, 8)
 
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -24, 1, -108)
-Scroll.Position = UDim2.fromOffset(12, 56)
+local Scroll =
+    Instance.new("ScrollingFrame")
+
+Scroll.Size =
+    UDim2.new(1, -24, 1, -108)
+
+Scroll.Position =
+    UDim2.fromOffset(12, 56)
+
 Scroll.BackgroundTransparency = 1
 Scroll.BorderSizePixel = 0
 Scroll.ScrollBarThickness = 3
-Scroll.ScrollBarImageColor3 = COLORS.Dim
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+Scroll.ScrollBarImageColor3 =
+    COLORS.Dim
+
+Scroll.CanvasSize =
+    UDim2.new(0, 0, 0, 0)
+
+Scroll.AutomaticCanvasSize =
+    Enum.AutomaticSize.Y
+
 Scroll.ZIndex = 22
 Scroll.Parent = WhitelistModal
 
-local ScrollLayout = Instance.new("UIListLayout")
-ScrollLayout.Padding = UDim.new(0, 6)
-ScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+local ScrollLayout =
+    Instance.new("UIListLayout")
+
+ScrollLayout.Padding =
+    UDim.new(0, 6)
+
+ScrollLayout.SortOrder =
+    Enum.SortOrder.LayoutOrder
+
 ScrollLayout.Parent = Scroll
 
 local rowRefreshers = {}
 
 local function updateWhitelistCount()
-	local count = 0
+    local count = 0
 
-	for _, name in ipairs(BRAINROT_LIST) do
-		if isBrainrotEnabled(name) then
-			count += 1
-		end
-	end
+    for _, name in ipairs(BRAINROT_LIST) do
+        if isBrainrotEnabled(name) then
+            count += 1
+        end
+    end
 
-	WhitelistCount.Text =
-		string.format(
-			"%d / %d BRAINROTS SELECCIONADOS",
-			count,
-			#BRAINROT_LIST
-		)
+    WhitelistCount.Text =
+        string.format(
+            "%d / %d BRAINROTS SELECCIONADOS",
+            count,
+            #BRAINROT_LIST
+        )
 end
 
-local function createRow(name, index)
-	local row = Instance.new("TextButton")
-	row.Name = "Row" .. index
-	row.Size = UDim2.new(1, -6, 0, 32)
-	row.BackgroundColor3 = COLORS.Row
-	row.BackgroundTransparency = 0.35
-	row.BorderSizePixel = 0
-	row.AutoButtonColor = false
-	row.Text = ""
-	row.LayoutOrder = index
-	row.ZIndex = 23
-	row.Parent = Scroll
+local function createRow(
+    name,
+    index
+)
+    local row =
+        Instance.new("TextButton")
 
-	addCorner(row, 8)
+    row.Name =
+        "Row" .. index
 
-	local nameLabel =
-		makeLabel(
-			row,
-			"Name",
-			name,
-			UDim2.new(1, -56, 1, 0),
-			UDim2.fromOffset(10, 0),
-			11,
-			COLORS.Text,
-			Enum.Font.GothamMedium
-		)
+    row.Size =
+        UDim2.new(
+            1,
+            -6,
+            0,
+            32
+        )
 
-	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	nameLabel.ZIndex = 24
+    row.BackgroundColor3 =
+        COLORS.Row
 
-	local pill = Instance.new("Frame")
-	pill.Size = UDim2.fromOffset(36, 18)
-	pill.Position = UDim2.new(1, -46, 0.5, -9)
-	pill.BackgroundColor3 = COLORS.Control
-	pill.BorderSizePixel = 0
-	pill.ZIndex = 24
-	pill.Parent = row
+    row.BackgroundTransparency = 0.35
+    row.BorderSizePixel = 0
+    row.AutoButtonColor = false
+    row.Text = ""
+    row.LayoutOrder = index
+    row.ZIndex = 23
+    row.Parent = Scroll
 
-	addCorner(pill, 9)
+    addCorner(row, 8)
 
-	local knob = Instance.new("Frame")
-	knob.Size = UDim2.fromOffset(14, 14)
-	knob.Position = UDim2.new(0, 2, 0.5, -7)
-	knob.BackgroundColor3 = COLORS.White
-	knob.BorderSizePixel = 0
-	knob.ZIndex = 25
-	knob.Parent = pill
+    local nameLabel =
+        makeLabel(
+            row,
+            "Name",
+            name,
+            UDim2.new(1, -56, 1, 0),
+            UDim2.fromOffset(10, 0),
+            11,
+            COLORS.Text,
+            Enum.Font.GothamMedium
+        )
 
-	addCorner(knob, 7)
+    nameLabel.TextTruncate =
+        Enum.TextTruncate.AtEnd
 
-	local brainrotName = name
+    nameLabel.ZIndex = 24
 
-	local function refresh(animate)
-		local on = isBrainrotEnabled(brainrotName)
+    local pill =
+        Instance.new("Frame")
 
-		-- Job Sahur siempre aparece activado visualmente.
-		if normalizeKey(brainrotName) == JOB_SAHUR_KEY then
-			on = true
-		end
+    pill.Size =
+        UDim2.fromOffset(36, 18)
 
-		pill.BackgroundColor3 =
-			on and COLORS.White or COLORS.Control
+    pill.Position =
+        UDim2.new(
+            1,
+            -46,
+            0.5,
+            -9
+        )
 
-		knob.BackgroundColor3 =
-			on and COLORS.Window or COLORS.White
+    pill.BackgroundColor3 =
+        COLORS.Control
 
-		nameLabel.TextColor3 =
-			on and COLORS.White or COLORS.Dim
+    pill.BorderSizePixel = 0
+    pill.ZIndex = 24
+    pill.Parent = row
 
-		local target =
-			on
-			and UDim2.new(1, -16, 0.5, -7)
-			or UDim2.new(0, 2, 0.5, -7)
+    addCorner(pill, 9)
 
-		if animate then
-			TweenService:Create(
-				knob,
-				TweenInfo.new(
-					0.14,
-					Enum.EasingStyle.Quad
-				),
-				{
-					Position = target
-				}
-			):Play()
-		else
-			knob.Position = target
-		end
-	end
+    local knob =
+        Instance.new("Frame")
 
-	row.Activated:Connect(function()
-		local key = normalizeKey(brainrotName)
+    knob.Size =
+        UDim2.fromOffset(14, 14)
 
-		-- Impedir desactivar Job Sahur.
-		if key == JOB_SAHUR_KEY then
-			whitelistSet[JOB_SAHUR_KEY] = true
-			rebuildWhitelist()
-			saveConfig()
-			refresh(true)
-			updateWhitelistCount()
-			return
-		end
+    knob.Position =
+        UDim2.new(
+            0,
+            2,
+            0.5,
+            -7
+        )
 
-		setBrainrotEnabled(
-			brainrotName,
-			not isBrainrotEnabled(brainrotName)
-		)
+    knob.BackgroundColor3 =
+        COLORS.White
 
-		refresh(true)
-		updateWhitelistCount()
-	end)
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 25
+    knob.Parent = pill
 
-	refresh(false)
+    addCorner(knob, 7)
 
-	return refresh
+    local brainrotName = name
+
+    local function refresh(animate)
+
+        local on =
+            isBrainrotEnabled(
+                brainrotName
+            )
+
+        if normalizeKey(brainrotName)
+            == JOB_SAHUR_KEY then
+
+            on = true
+        end
+
+        pill.BackgroundColor3 =
+            on
+            and COLORS.White
+            or COLORS.Control
+
+        knob.BackgroundColor3 =
+            on
+            and COLORS.Window
+            or COLORS.White
+
+        nameLabel.TextColor3 =
+            on
+            and COLORS.White
+            or COLORS.Dim
+
+        local target =
+            on
+            and UDim2.new(
+                1,
+                -16,
+                0.5,
+                -7
+            )
+            or UDim2.new(
+                0,
+                2,
+                0.5,
+                -7
+            )
+
+        if animate then
+
+            TweenService:Create(
+                knob,
+                TweenInfo.new(
+                    0.14,
+                    Enum.EasingStyle.Quad
+                ),
+                {
+                    Position = target
+                }
+            ):Play()
+
+        else
+
+            knob.Position = target
+
+        end
+    end
+
+    row.Activated:Connect(function()
+
+        local key =
+            normalizeKey(
+                brainrotName
+            )
+
+        if key == JOB_SAHUR_KEY then
+
+            whitelistSet[
+                JOB_SAHUR_KEY
+            ] = true
+
+            rebuildWhitelist()
+            saveConfig()
+
+            refresh(true)
+            updateWhitelistCount()
+
+            return
+        end
+
+        setBrainrotEnabled(
+            brainrotName,
+            not isBrainrotEnabled(
+                brainrotName
+            )
+        )
+
+        refresh(true)
+        updateWhitelistCount()
+    end)
+
+    refresh(false)
+
+    return refresh
 end
 
 for index, name in ipairs(BRAINROT_LIST) do
-	rowRefreshers[#rowRefreshers + 1] =
-		createRow(name, index)
+    rowRefreshers[#rowRefreshers + 1] =
+        createRow(
+            name,
+            index
+        )
 end
 
 AddBrainrotBtn.Activated:Connect(function()
-	pcall(function()
-		game:GetService("StarterGui"):SetCore("SendNotification", {
-			Title = "Aviso Importante",
-			Text = "Tienes que agregar el brainrot exactamente como aparezca en el idioma de juego que usas o no se comprará",
-			Duration = 8
-		})
-	end)
 
-	local newName =
-		AddBrainrotBox.Text:match("^%s*(.-)%s*$")
+    pcall(function()
+        game:GetService("StarterGui")
+            :SetCore(
+                "SendNotification",
+                {
+                    Title =
+                        "Aviso Importante",
 
-	if newName ~= "" then
-		local key = normalizeKey(newName)
+                    Text =
+                        "Tienes que agregar el brainrot exactamente como aparezca en el idioma de juego que usas o no se comprará",
 
-		if not brainrotKeys[key] then
-			brainrotKeys[key] = true
+                    Duration = 8
+                }
+            )
+    end)
 
-			table.insert(
-				BRAINROT_LIST,
-				newName
-			)
+    local newName =
+        AddBrainrotBox.Text:match(
+            "^%s*(.-)%s*$"
+        )
 
-			setBrainrotEnabled(
-				newName,
-				true
-			)
+    if newName ~= "" then
 
-			rowRefreshers[#rowRefreshers + 1] =
-				createRow(
-					newName,
-					#BRAINROT_LIST
-				)
+        local key =
+            normalizeKey(newName)
 
-			updateWhitelistCount()
-		else
-			if not isBrainrotEnabled(newName) then
-				setBrainrotEnabled(
-					newName,
-					true
-				)
+        if not brainrotKeys[key] then
 
-				for _, refresh in ipairs(rowRefreshers) do
-					refresh(false)
-				end
+            brainrotKeys[key] = true
 
-				updateWhitelistCount()
-			end
-		end
+            table.insert(
+                BRAINROT_LIST,
+                newName
+            )
 
-		AddBrainrotBox.Text = ""
-	end
+            setBrainrotEnabled(
+                newName,
+                true
+            )
+
+            rowRefreshers[#rowRefreshers + 1] =
+                createRow(
+                    newName,
+                    #BRAINROT_LIST
+                )
+
+            updateWhitelistCount()
+
+        else
+
+            if not isBrainrotEnabled(
+                newName
+            ) then
+
+                setBrainrotEnabled(
+                    newName,
+                    true
+                )
+
+                for _, refresh in ipairs(
+                    rowRefreshers
+                ) do
+                    refresh(false)
+                end
+
+                updateWhitelistCount()
+            end
+        end
+
+        AddBrainrotBox.Text = ""
+    end
 end)
 
-local function makeFooterButton(text, position)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.fromOffset(124, 34)
-	button.Position = position
-	button.BackgroundColor3 = COLORS.Control
-	button.BorderSizePixel = 0
-	button.AutoButtonColor = false
-	button.Text = text
-	button.TextSize = 9
-	button.TextColor3 = COLORS.Text
-	button.Font = Enum.Font.GothamBold
-	button.ZIndex = 22
-	button.Parent = WhitelistModal
+local function makeFooterButton(
+    text,
+    position
+)
+    local button =
+        Instance.new("TextButton")
 
-	addCorner(button, 8)
-	addStroke(button, COLORS.White, 1, 0.86)
+    button.Size =
+        UDim2.fromOffset(
+            124,
+            34
+        )
 
-	return button
+    button.Position = position
+
+    button.BackgroundColor3 =
+        COLORS.Control
+
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Text = text
+    button.TextSize = 9
+    button.TextColor3 = COLORS.Text
+
+    button.Font =
+        Enum.Font.GothamBold
+
+    button.ZIndex = 22
+    button.Parent = WhitelistModal
+
+    addCorner(button, 8)
+
+    addStroke(
+        button,
+        COLORS.White,
+        1,
+        0.86
+    )
+
+    return button
 end
 
 local SelectAllButton =
-	makeFooterButton(
-		"SELECCIONAR TODO",
-		UDim2.fromOffset(12, 294)
-	)
+    makeFooterButton(
+        "SELECCIONAR TODO",
+        UDim2.fromOffset(12, 294)
+    )
 
 local ClearButton =
-	makeFooterButton(
-		"LIMPIAR",
-		UDim2.fromOffset(144, 294)
-	)
+    makeFooterButton(
+        "LIMPIAR",
+        UDim2.fromOffset(144, 294)
+    )
 
 SelectAllButton.Activated:Connect(function()
-	for _, name in ipairs(BRAINROT_LIST) do
-		whitelistSet[normalizeKey(name)] = true
-	end
 
-	-- Job Sahur queda asegurado.
-	whitelistSet[JOB_SAHUR_KEY] = true
+    for _, name in ipairs(
+        BRAINROT_LIST
+    ) do
 
-	rebuildWhitelist()
-	saveConfig()
-	updateWhitelistCount()
+        whitelistSet[
+            normalizeKey(name)
+        ] = true
+    end
 
-	for _, refresh in ipairs(rowRefreshers) do
-		refresh(true)
-	end
+    whitelistSet[
+        JOB_SAHUR_KEY
+    ] = true
+
+    rebuildWhitelist()
+    saveConfig()
+    updateWhitelistCount()
+
+    for _, refresh in ipairs(
+        rowRefreshers
+    ) do
+        refresh(true)
+    end
 end)
 
 ClearButton.Activated:Connect(function()
-	for _, name in ipairs(BRAINROT_LIST) do
-		local key = normalizeKey(name)
 
-		if key ~= JOB_SAHUR_KEY then
-			whitelistSet[key] = nil
-		end
-	end
+    for _, name in ipairs(
+        BRAINROT_LIST
+    ) do
 
-	-- Job Sahur nunca se elimina.
-	whitelistSet[JOB_SAHUR_KEY] = true
+        local key =
+            normalizeKey(name)
 
-	rebuildWhitelist()
-	saveConfig()
-	updateWhitelistCount()
+        if key ~= JOB_SAHUR_KEY then
+            whitelistSet[key] = nil
+        end
+    end
 
-	for _, refresh in ipairs(rowRefreshers) do
-		refresh(true)
-	end
+    whitelistSet[
+        JOB_SAHUR_KEY
+    ] = true
+
+    rebuildWhitelist()
+    saveConfig()
+    updateWhitelistCount()
+
+    for _, refresh in ipairs(
+        rowRefreshers
+    ) do
+        refresh(true)
+    end
 end)
 
 OpenWhitelist.Activated:Connect(function()
-	WhitelistOverlay.Visible = true
+    WhitelistOverlay.Visible = true
 end)
 
 ModalClose.Activated:Connect(function()
-	WhitelistOverlay.Visible = false
+    WhitelistOverlay.Visible = false
 end)
 
 WhitelistOverlay.Activated:Connect(function()
-	WhitelistOverlay.Visible = false
+    WhitelistOverlay.Visible = false
 end)
 
 updateWhitelistCount()
 
 local function setTab(name)
-	local main = name == "PRINCIPAL"
 
-	Settings.Visible = main
-	WhitelistPage.Visible = not main
+    local main =
+        name == "PRINCIPAL"
 
-	MainTabButton.BackgroundColor3 =
-		main and COLORS.White or COLORS.Control
+    Settings.Visible = main
+    WhitelistPage.Visible = not main
 
-	MainTabButton.TextColor3 =
-		main and COLORS.Window or COLORS.Dim
+    MainTabButton.BackgroundColor3 =
+        main
+        and COLORS.White
+        or COLORS.Control
 
-	WhitelistTabButton.BackgroundColor3 =
-		main and COLORS.Control or COLORS.White
+    MainTabButton.TextColor3 =
+        main
+        and COLORS.Window
+        or COLORS.Dim
 
-	WhitelistTabButton.TextColor3 =
-		main and COLORS.Dim or COLORS.Window
+    WhitelistTabButton.BackgroundColor3 =
+        main
+        and COLORS.Control
+        or COLORS.White
 
-	TweenService:Create(
-		Window,
-		TweenInfo.new(
-			0.28,
-			Enum.EasingStyle.Quad,
-			Enum.EasingDirection.Out
-		),
-		{
-			Size = UDim2.fromOffset(
-				WINDOW_WIDTH,
-				MAIN_HEIGHT
-			)
-		}
-	):Play()
+    WhitelistTabButton.TextColor3 =
+        main
+        and COLORS.Dim
+        or COLORS.Window
 end
 
 MainTabButton.Activated:Connect(function()
-	setTab("PRINCIPAL")
+    setTab("PRINCIPAL")
 end)
 
 WhitelistTabButton.Activated:Connect(function()
-	setTab("LISTA BLANCA")
+    setTab("LISTA BLANCA")
 end)
 
 setTab("PRINCIPAL")
 
-Window.Size =
-	UDim2.fromOffset(
-		WINDOW_WIDTH,
-		MAIN_HEIGHT
-	)
+-- =========================================================
+-- TOGGLE
+-- =========================================================
 
 local function setToggleVisual(enabled)
-	MasterToggle.BackgroundColor3 =
-		enabled and COLORS.White or COLORS.Control
 
-	MasterStroke.Transparency =
-		enabled and 0.62 or 0.88
+    MasterToggle.BackgroundColor3 =
+        enabled
+        and COLORS.White
+        or COLORS.Control
 
-	MasterKnob.BackgroundColor3 =
-		enabled and COLORS.Window or COLORS.White
+    MasterStroke.Transparency =
+        enabled
+        and 0.62
+        or 0.88
 
-	TweenService:Create(
-		MasterKnob,
-		TweenInfo.new(
-			0.16,
-			Enum.EasingStyle.Quad
-		),
-		{
-			Position =
-				enabled
-				and UDim2.new(
-					1,
-					-24,
-					0.5,
-					-11
-				)
-				or UDim2.new(
-					0,
-					2,
-					0.5,
-					-11
-				)
-		}
-	):Play()
+    MasterKnob.BackgroundColor3 =
+        enabled
+        and COLORS.Window
+        or COLORS.White
+
+    TweenService:Create(
+        MasterKnob,
+        TweenInfo.new(
+            0.16,
+            Enum.EasingStyle.Quad
+        ),
+        {
+            Position =
+                enabled
+                and UDim2.new(
+                    1,
+                    -24,
+                    0.5,
+                    -11
+                )
+                or UDim2.new(
+                    0,
+                    2,
+                    0.5,
+                    -11
+                )
+        }
+    ):Play()
 end
+
+-- =========================================================
+-- PERSONAJE
+-- =========================================================
 
 local function characterParts()
-	local character =
-		player.Character
-		or player.CharacterAdded:Wait()
 
-	local humanoid =
-		character:FindFirstChildOfClass("Humanoid")
-		or character:WaitForChild(
-			"Humanoid",
-			5
-		)
+    local character =
+        player.Character
+        or player.CharacterAdded:Wait()
 
-	local root =
-		character:FindFirstChild(
-			"HumanoidRootPart"
-		)
-		or character:WaitForChild(
-			"HumanoidRootPart",
-			5
-		)
+    local humanoid =
+        character:FindFirstChildOfClass(
+            "Humanoid"
+        )
 
-	return character, humanoid, root
+        or character:WaitForChild(
+            "Humanoid",
+            5
+        )
+
+    local root =
+        character:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+        or character:WaitForChild(
+            "HumanoidRootPart",
+            5
+        )
+
+    return character, humanoid, root
 end
 
+-- =========================================================
+-- CARPET
+-- =========================================================
+
 local function equipCarpetInactive()
-	local character, humanoid = characterParts()
-	local backpack =
-		player:FindFirstChildOfClass("Backpack")
 
-	if not character
-		or not humanoid
-		or not backpack then
-		return false
-	end
+    local character,
+        humanoid,
+        root =
+        characterParts()
 
-	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Tool")
-			and CARPET_TOOLS[child.Name] then
-			return true
-		end
-	end
+    local backpack =
+        player:FindFirstChildOfClass(
+            "Backpack"
+        )
 
-	for _, child in ipairs(backpack:GetChildren()) do
-		if child:IsA("Tool")
-			and CARPET_TOOLS[child.Name] then
+    if not character
+        or not humanoid
+        or not root
+        or not backpack then
 
-			local tool = child
+        return false
+    end
 
-			tool.ManualActivationOnly = true
+    for _, child in ipairs(
+        character:GetChildren()
+    ) do
 
-			humanoid:EquipTool(tool)
+        if child:IsA("Tool")
+            and CARPET_TOOLS[child.Name] then
 
-			task.wait(0.12)
+            return true
+        end
+    end
 
-			return tool.Parent == character
-		end
-	end
+    for _, child in ipairs(
+        backpack:GetChildren()
+    ) do
 
-	return false
+        if child:IsA("Tool")
+            and CARPET_TOOLS[child.Name] then
+
+            local tool = child
+
+            pcall(function()
+                tool.ManualActivationOnly = true
+            end)
+
+            pcall(function()
+                humanoid:EquipTool(tool)
+            end)
+
+            task.wait(0.15)
+
+            return tool.Parent == character
+        end
+    end
+
+    return false
+end
+
+-- =========================================================
+-- NUEVO SISTEMA ROBUSTO DE POSICIÓN
+-- =========================================================
+
+local function getPromptAdornee(prompt)
+
+    if not prompt then
+        return nil
+    end
+
+    local ok, adornee =
+        pcall(function()
+            return prompt.Adornee
+        end)
+
+    if ok and adornee then
+        return adornee
+    end
+
+    return nil
 end
 
 local function promptPosition(prompt)
-	if not prompt or not prompt.Parent then
-		return nil
-	end
 
-	local parent = prompt.Parent
+    if not prompt
+        or not prompt.Parent then
 
-	if parent:IsA("Attachment") then
-		return parent.WorldPosition
-	end
+        return nil
+    end
 
-	if parent:IsA("BasePart") then
-		return parent.Position
-	end
+    -- 1. Adornee real del ProximityPrompt
+    local adornee =
+        getPromptAdornee(prompt)
 
-	local part =
-		parent:FindFirstChildWhichIsA(
-			"BasePart",
-			true
-		)
+    if adornee then
 
-	if part then
-		return part.Position
-	end
+        if adornee:IsA("Attachment") then
+            return adornee.WorldPosition
+        end
 
-	local model =
-		prompt:FindFirstAncestorOfClass("Model")
+        if adornee:IsA("BasePart") then
+            return adornee.Position
+        end
 
-	local modelPart =
-		model
-		and (
-			model.PrimaryPart
-			or model:FindFirstChildWhichIsA(
-				"BasePart",
-				true
-			)
-		)
+        if adornee:IsA("Model") then
+            local pp =
+                adornee.PrimaryPart
 
-	return modelPart
-		and modelPart.Position
+            if pp then
+                return pp.Position
+            end
+
+            local ok, pivot =
+                pcall(function()
+                    return adornee:GetPivot()
+                end)
+
+            if ok then
+                return pivot.Position
+            end
+        end
+    end
+
+    -- 2. Prompt directamente en Attachment
+    if prompt.Parent:IsA("Attachment") then
+        return prompt.Parent.WorldPosition
+    end
+
+    -- 3. Prompt directamente en BasePart
+    if prompt.Parent:IsA("BasePart") then
+        return prompt.Parent.Position
+    end
+
+    -- 4. Buscar BasePart directa
+    local parent =
+        prompt.Parent
+
+    local directPart =
+        parent:FindFirstChildWhichIsA(
+            "BasePart"
+        )
+
+    if directPart then
+        return directPart.Position
+    end
+
+    -- 5. Buscar Attachment
+    local attachment =
+        parent:FindFirstChildWhichIsA(
+            "Attachment",
+            true
+        )
+
+    if attachment then
+        return attachment.WorldPosition
+    end
+
+    -- 6. Buscar el Model contenedor
+    local model =
+        prompt:FindFirstAncestorOfClass(
+            "Model"
+        )
+
+    if model then
+
+        if model.PrimaryPart then
+            return model.PrimaryPart.Position
+        end
+
+        local ok, pivot =
+            pcall(function()
+                return model:GetPivot()
+            end)
+
+        if ok then
+            return pivot.Position
+        end
+
+        local modelPart =
+            model:FindFirstChildWhichIsA(
+                "BasePart",
+                true
+            )
+
+        if modelPart then
+            return modelPart.Position
+        end
+    end
+
+    return nil
 end
+
+-- =========================================================
+-- RNG MACHINE
+-- =========================================================
 
 local function findRNGPrompt()
-	local machine =
-		workspace:FindFirstChild(
-			"RNGMachine"
-		)
 
-	local folder =
-		machine
-		and machine:FindFirstChild(
-			"Prompt"
-		)
+    local machine =
+        workspace:FindFirstChild(
+            "RNGMachine"
+        )
 
-	local prompt =
-		folder
-		and folder:FindFirstChild(
-			"RNGMachinePrompt"
-		)
+    local folder =
+        machine
+        and machine:FindFirstChild(
+            "Prompt"
+        )
 
-	if prompt
-		and prompt:IsA("ProximityPrompt") then
-		return prompt, machine
-	end
+    local prompt =
+        folder
+        and folder:FindFirstChild(
+            "RNGMachinePrompt"
+        )
+
+    if prompt
+        and prompt:IsA(
+            "ProximityPrompt"
+        ) then
+
+        return prompt, machine
+    end
+
+    return nil, nil
 end
 
-local function machinePosition(machine, rngPrompt)
-	local promptOrigin =
-		promptPosition(rngPrompt)
+local function machinePosition(
+    machine,
+    rngPrompt
+)
+    local promptOrigin =
+        promptPosition(rngPrompt)
 
-	if promptOrigin then
-		return promptOrigin
-	end
+    if promptOrigin then
+        return promptOrigin
+    end
 
-	if machine
-		and machine:IsA("BasePart") then
-		return machine.Position
-	end
+    if machine
+        and machine:IsA("BasePart") then
 
-	if machine then
-		local part =
-			machine:IsA("Model")
-			and (
-				machine.PrimaryPart
-				or machine:FindFirstChildWhichIsA(
-					"BasePart",
-					true
-				)
-			)
-			or machine:FindFirstChildWhichIsA(
-				"BasePart",
-				true
-			)
+        return machine.Position
+    end
 
-		if part then
-			return part.Position
-		end
-	end
+    if machine then
 
-	return nil
+        if machine:IsA("Model") then
+
+            if machine.PrimaryPart then
+                return machine.PrimaryPart.Position
+            end
+
+            local ok, pivot =
+                pcall(function()
+                    return machine:GetPivot()
+                end)
+
+            if ok then
+                return pivot.Position
+            end
+        end
+
+        local part =
+            machine:FindFirstChildWhichIsA(
+                "BasePart",
+                true
+            )
+
+        if part then
+            return part.Position
+        end
+    end
+
+    return nil
 end
 
-local function promptAttachmentPosition(attachment)
-	if attachment:IsA("Attachment") then
-		return attachment.WorldPosition
-	end
-
-	local spawn = attachment.Parent
-
-	if spawn and spawn:IsA("BasePart") then
-		return spawn.Position
-	end
-
-	return nil
-end
+-- =========================================================
+-- IDENTIFICACIÓN
+-- =========================================================
 
 local function normalizeNameForMatch(value)
-	return tostring(value or "")
-		:lower()
-		:match("^%s*(.-)%s*$") or ""
+
+    return tostring(value or "")
+        :lower()
+        :match("^%s*(.-)%s*$")
+        or ""
 end
 
 local function whitelistEntries()
-	local entries = {}
 
-	for entry in tostring(config.whitelist)
-		:gmatch("[^,;\n\r]+") do
+    local entries = {}
 
-		local normalized =
-			normalizeNameForMatch(entry)
+    for entry in tostring(
+        config.whitelist
+    ):gmatch("[^,;\n\r]+") do
 
-		if normalized ~= "" then
-			entries[#entries + 1] = normalized
-		end
-	end
+        local normalized =
+            normalizeNameForMatch(entry)
 
-	return entries
+        if normalized ~= "" then
+            entries[#entries + 1] =
+                normalized
+        end
+    end
+
+    return entries
 end
 
-local function displayBrainrotIdentity(prompt, display)
-	local names = {}
+local function displayBrainrotIdentity(
+    prompt,
+    display
+)
 
-	if prompt.ObjectText ~= "" then
-		names[#names + 1] = prompt.ObjectText
-	end
+    local names = {}
 
-	local current = prompt.Parent
+    if prompt.ObjectText ~= "" then
+        names[#names + 1] =
+            prompt.ObjectText
+    end
 
-	while current and current ~= display do
-		names[#names + 1] = current.Name
+    if prompt.ActionText ~= "" then
+        names[#names + 1] =
+            prompt.ActionText
+    end
 
-		for _, attribute in ipairs({
-			"Index",
-			"AnimalName",
-			"DisplayName",
-			"BrainrotName"
-		}) do
-			local value =
-				current:GetAttribute(attribute)
+    local current = prompt.Parent
 
-			if value then
-				names[#names + 1] =
-					tostring(value)
-			end
-		end
+    while current
+        and current ~= display do
 
-		current = current.Parent
-	end
+        names[#names + 1] =
+            current.Name
 
-	return table.concat(names, " ")
+        for _, attribute in ipairs({
+            "Index",
+            "AnimalName",
+            "DisplayName",
+            "BrainrotName"
+        }) do
+
+            local value =
+                current:GetAttribute(
+                    attribute
+                )
+
+            if value then
+                names[#names + 1] =
+                    tostring(value)
+            end
+        end
+
+        current = current.Parent
+    end
+
+    return table.concat(
+        names,
+        " "
+    )
 end
 
-local function isWhitelistedBrainrot(identity)
-	local normalizedIdentity =
-		normalizeNameForMatch(identity)
+local function isWhitelistedBrainrot(
+    identity
+)
 
-	if normalizedIdentity == "" then
-		return false
-	end
+    local normalizedIdentity =
+        normalizeNameForMatch(
+            identity
+        )
 
-	for _, entry in ipairs(whitelistEntries()) do
-		if normalizedIdentity:find(
-			entry,
-			1,
-			true
-		)
-		or entry:find(
-			normalizedIdentity,
-			1,
-			true
-		) then
-			return true
-		end
-	end
+    if normalizedIdentity == "" then
+        return false
+    end
 
-	return false
+    for _, entry in ipairs(
+        whitelistEntries()
+    ) do
+
+        if normalizedIdentity:find(
+            entry,
+            1,
+            true
+        )
+
+        or entry:find(
+            normalizedIdentity,
+            1,
+            true
+        ) then
+
+            return true
+        end
+    end
+
+    return false
 end
 
 -- =========================================================
--- BUSCA DE COMPRA
--- Job Job Job Sahur tiene prioridad absoluta.
+-- BUSCAR PROMPT DE COMPRA
 -- =========================================================
 
-local function findDisplayPurchase(excluded)
-	local display =
-		game.Workspace:FindFirstChild(
-			"RNGMachineDisplay"
-		)
+local function findDisplayPurchase(
+    excluded
+)
 
-	if not display then
-		return nil, nil, false
-	end
+    local display =
+        workspace:FindFirstChild(
+            "RNGMachineDisplay"
+        )
 
-	local blockedName
-	local occupied = false
+    if not display then
+        return nil, nil, false
+    end
 
-	local normalCandidate
-	local normalCandidateName
+    local blockedName
+    local occupied = false
 
-	local sahurCandidate
-	local sahurCandidateName
+    local normalCandidate
+    local normalCandidateName
 
-	for _, item in ipairs(display:GetDescendants()) do
-		if item:IsA("ProximityPrompt")
-			and item.Enabled
-			and item ~= excluded then
+    local sahurCandidate
+    local sahurCandidateName
 
-			local identity =
-				(
-					item.Name
-					.. " "
-					.. item.ActionText
-					.. " "
-					.. item.ObjectText
-				):lower()
+    for _, item in ipairs(
+        display:GetDescendants()
+    ) do
 
-			if identity:find(
-				"purchase",
-				1,
-				true
-			)
-			or identity:find(
-				"buy",
-				1,
-				true
-			) then
+        if item:IsA(
+            "ProximityPrompt"
+        )
 
-				occupied = true
+        and item.Enabled
+        and item ~= excluded then
 
-				local brainrotIdentity =
-					displayBrainrotIdentity(
-						item,
-						display
-					)
+            local identity =
+                (
+                    item.Name
+                    .. " "
+                    .. item.ActionText
+                    .. " "
+                    .. item.ObjectText
+                ):lower()
 
-				local normalizedIdentity =
-					normalizeNameForMatch(
-						brainrotIdentity
-					)
+            if identity:find(
+                "purchase",
+                1,
+                true
+            )
 
-				-- PRIORIDAD MÁXIMA:
-				-- Job Job Job Sahur
-				if normalizedIdentity:find(
-					JOB_SAHUR_KEY,
-					1,
-					true
-				) then
+            or identity:find(
+                "buy",
+                1,
+                true
+            ) then
 
-					sahurCandidate = item
-					sahurCandidateName =
-						brainrotIdentity
+                occupied = true
 
-				elseif isWhitelistedBrainrot(
-					brainrotIdentity
-				) then
+                local brainrotIdentity =
+                    displayBrainrotIdentity(
+                        item,
+                        display
+                    )
 
-					normalCandidate = item
-					normalCandidateName =
-						brainrotIdentity
+                local normalizedIdentity =
+                    normalizeNameForMatch(
+                        brainrotIdentity
+                    )
 
-				else
-					blockedName =
-						blockedName
-						or brainrotIdentity
-				end
-			end
-		end
-	end
+                if normalizedIdentity:find(
+                    JOB_SAHUR_KEY,
+                    1,
+                    true
+                ) then
 
-	-- Job Sahur siempre gana.
-	if sahurCandidate then
-		return sahurCandidate,
-			sahurCandidateName,
-			true
-	end
+                    sahurCandidate = item
+                    sahurCandidateName =
+                        brainrotIdentity
 
-	if normalCandidate then
-		return normalCandidate,
-			normalCandidateName,
-			true
-	end
+                elseif isWhitelistedBrainrot(
+                    brainrotIdentity
+                ) then
 
-	return nil, blockedName, occupied
+                    normalCandidate = item
+                    normalCandidateName =
+                        brainrotIdentity
+
+                else
+
+                    blockedName =
+                        blockedName
+                        or brainrotIdentity
+                end
+            end
+        end
+    end
+
+    if sahurCandidate then
+
+        return sahurCandidate,
+            sahurCandidateName,
+            true
+    end
+
+    if normalCandidate then
+
+        return normalCandidate,
+            normalCandidateName,
+            true
+    end
+
+    return nil,
+        blockedName,
+        occupied
 end
+
+-- =========================================================
+-- CALLBACKS
+-- =========================================================
 
 local getConnections =
-	getconnections
-	or (
-		debug
-		and debug.getconnections
-	)
+    getconnections
+    or (
+        debug
+        and debug.getconnections
+    )
 
 local promptCallbackCache =
-	setmetatable({}, {
-		__mode = "k"
-	})
+    setmetatable(
+        {},
+        {
+            __mode = "k"
+        }
+    )
 
-local function promptCallbacks(prompt)
-	local cached =
-		promptCallbackCache[prompt]
+local function promptCallbacks(
+    prompt
+)
 
-	if cached then
-		return cached
-	end
+    local cached =
+        promptCallbackCache[prompt]
 
-	local data = {
-		hold = {},
-		trigger = {}
-	}
+    if cached then
+        return cached
+    end
 
-	if type(getConnections) == "function" then
-		pcall(function()
+    local data = {
+        hold = {},
+        trigger = {}
+    }
 
-			for _, connection in ipairs(
-				getConnections(
-					prompt.PromptButtonHoldBegan
-				)
-			) do
+    if type(getConnections)
+        == "function" then
 
-				if type(connection.Function)
-					== "function" then
+        pcall(function()
 
-					data.hold[#data.hold + 1] =
-						connection.Function
-				end
-			end
+            for _, connection in ipairs(
+                getConnections(
+                    prompt.PromptButtonHoldBegan
+                )
+            ) do
 
-			for _, connection in ipairs(
-				getConnections(
-					prompt.Triggered
-				)
-			) do
+                if type(connection.Function)
+                    == "function" then
 
-				if type(connection.Function)
-					== "function" then
+                    data.hold[#data.hold + 1] =
+                        connection.Function
+                end
+            end
 
-					data.trigger[#data.trigger + 1] =
-						connection.Function
-				end
-			end
-		end)
-	end
+            for _, connection in ipairs(
+                getConnections(
+                    prompt.Triggered
+                )
+            ) do
 
-	promptCallbackCache[prompt] = data
+                if type(connection.Function)
+                    == "function" then
 
-	return data
+                    data.trigger[#data.trigger + 1] =
+                        connection.Function
+                end
+            end
+        end)
+    end
+
+    promptCallbackCache[prompt] =
+        data
+
+    return data
 end
+
+-- =========================================================
+-- PARAR VELOCIDAD
+-- =========================================================
 
 local function haltVelocity()
-	local root = state.movingRoot
 
-	if root and root.Parent then
-		root.AssemblyLinearVelocity =
-			Vector3.zero
+    local root =
+        state.movingRoot
 
-		root.AssemblyAngularVelocity =
-			Vector3.zero
-	end
+    if root
+        and root.Parent then
 
-	state.movingRoot = nil
+        root.AssemblyLinearVelocity =
+            Vector3.zero
+
+        root.AssemblyAngularVelocity =
+            Vector3.zero
+    end
+
+    state.movingRoot = nil
 end
 
-local function flyToPrompt(prompt, token, label)
-	local _, humanoid, root =
-		characterParts()
+-- =========================================================
+-- MOVIMIENTO CORREGIDO
+-- =========================================================
 
-	local position =
-		promptPosition(prompt)
+local function flyToPrompt(
+    prompt,
+    token,
+    label
+)
 
-	if not humanoid
-		or not root
-		or humanoid.Health <= 0
-		or not position then
-		return false
-	end
+    if not prompt
+        or not prompt.Parent
+        or not prompt.Enabled then
 
-	local destination =
-		position + Vector3.new(
-			0,
-			2.5,
-			0
-		)
+        return false
+    end
 
-	local range = 1.25
+    local character,
+        humanoid,
+        root =
+        characterParts()
 
-	local startingDistance =
-		(
-			destination
-			- root.Position
-		).Magnitude
+    if not character
+        or not humanoid
+        or not root
+        or humanoid.Health <= 0 then
 
-	local deadline =
-		os.clock()
-		+ math.max(
-			startingDistance
-				/ config.speed * 3
-				+ 2,
-			5
-		)
+        return false
+    end
 
-	state.movingRoot = root
+    local position =
+        promptPosition(prompt)
 
-	while state.enabled
-		and state.token == token
-		and prompt.Parent
-		and humanoid.Health > 0
-		and os.clock() < deadline do
+    if not position then
+        return false
+    end
 
-		local displacement =
-			destination
-			- root.Position
+    -- Distancia de seguridad para ProximityPrompt.
+    local desiredRange = 1.5
 
-		if displacement.Magnitude <= range then
-			haltVelocity()
-			return true
-		end
+    -- Mantener el personaje ligeramente
+    -- por encima del punto del prompt.
+    local destination =
+        position + Vector3.new(
+            0,
+            1.8,
+            0
+        )
 
-		root.AssemblyLinearVelocity =
-			displacement.Unit
-			* config.speed
+    local startingDistance =
+        (
+            destination
+            - root.Position
+        ).Magnitude
 
-		root.AssemblyAngularVelocity =
-			Vector3.zero
+    local deadline =
+        os.clock()
+        + math.max(
+            startingDistance
+                / math.max(
+                    config.speed,
+                    10
+                )
+                * 4,
+            6
+        )
 
-		RunService.Heartbeat:Wait()
-	end
+    state.movingRoot = root
 
-	haltVelocity()
+    while
+        state.enabled
+        and state.token == token
+        and prompt.Parent
+        and prompt.Enabled
+        and humanoid.Health > 0
+        and os.clock() < deadline do
 
-	return false
+        -- Recalcular la posición en cada iteración.
+        -- Esto evita perseguir una posición vieja
+        -- si el objeto se mueve.
+        local freshPosition =
+            promptPosition(prompt)
+
+        if freshPosition then
+
+            destination =
+                freshPosition
+                + Vector3.new(
+                    0,
+                    1.8,
+                    0
+                )
+        end
+
+        local displacement =
+            destination
+            - root.Position
+
+        local distance =
+            displacement.Magnitude
+
+        if distance <= desiredRange then
+
+            root.AssemblyLinearVelocity =
+                Vector3.zero
+
+            root.AssemblyAngularVelocity =
+                Vector3.zero
+
+            state.movingRoot = root
+
+            return true
+        end
+
+        if displacement.Magnitude > 0.01 then
+
+            local direction =
+                displacement.Unit
+
+            root.AssemblyLinearVelocity =
+                direction
+                * config.speed
+
+            root.AssemblyAngularVelocity =
+                Vector3.zero
+        end
+
+        RunService.Heartbeat:Wait()
+    end
+
+    haltVelocity()
+
+    -- Último chequeo de distancia.
+    if root
+        and root.Parent
+        and prompt.Parent then
+
+        local finalPosition =
+            promptPosition(prompt)
+
+        if finalPosition then
+
+            local finalDistance =
+                (
+                    finalPosition
+                    - root.Position
+                ).Magnitude
+
+            if finalDistance
+                <= math.max(
+                    desiredRange,
+                    prompt.MaxActivationDistance
+                ) then
+
+                return true
+            end
+        end
+    end
+
+    return false
 end
 
-local function firePrompt(prompt, name, useCallbacks)
-	if not prompt
-		or not prompt.Parent
-		or not prompt.Enabled then
-		return false
-	end
+-- =========================================================
+-- ACTIVAR PROMPT
+-- =========================================================
 
-	local triggered = false
+local function firePrompt(
+    prompt,
+    name,
+    useCallbacks
+)
 
-	local triggerConnection =
-		prompt.Triggered:Connect(
-			function()
-				triggered = true
-			end
-		)
+    if not prompt
+        or not prompt.Parent
+        or not prompt.Enabled then
 
-	local callbackFired = false
+        return false
+    end
 
-	if useCallbacks then
-		local callbacks =
-			promptCallbacks(prompt)
+    local triggered = false
 
-		for _, fn in ipairs(
-			callbacks.hold
-		) do
-			if pcall(fn) then
-				callbackFired = true
-			end
-		end
+    local triggerConnection =
+        prompt.Triggered:Connect(
+            function()
+                triggered = true
+            end
+        )
 
-		for _, fn in ipairs(
-			callbacks.trigger
-		) do
-			if pcall(fn) then
-				callbackFired = true
-			end
-		end
-	end
+    local callbackFired = false
 
-	if callbackFired then
-		task.wait(0.04)
-	end
+    if useCallbacks then
 
-	local oldDuration =
-		prompt.HoldDuration
+        local callbacks =
+            promptCallbacks(prompt)
 
-	local oldDistance =
-		prompt.MaxActivationDistance
+        for _, fn in ipairs(
+            callbacks.hold
+        ) do
 
-	local oldLineOfSight =
-		prompt.RequiresLineOfSight
+            if pcall(fn) then
+                callbackFired = true
+            end
+        end
 
-	local inputFired = false
+        for _, fn in ipairs(
+            callbacks.trigger
+        ) do
 
-	if not triggered
-		and prompt.Parent
-		and prompt.Enabled then
+            if pcall(fn) then
+                callbackFired = true
+            end
+        end
+    end
 
-		inputFired =
-			pcall(function()
+    if callbackFired then
+        task.wait(0.06)
+    end
 
-				prompt.HoldDuration = 0
-				prompt.MaxActivationDistance =
-					math.max(
-						oldDistance,
-						20
-					)
+    local oldDuration =
+        prompt.HoldDuration
 
-				prompt.RequiresLineOfSight =
-					false
+    local oldDistance =
+        prompt.MaxActivationDistance
 
-				prompt:InputHoldBegin()
+    local oldLineOfSight =
+        prompt.RequiresLineOfSight
 
-				RunService.Heartbeat:Wait()
+    local inputFired = false
 
-				prompt:InputHoldEnd()
-			end)
-	end
+    if not triggered
+        and prompt.Parent
+        and prompt.Enabled then
 
-	task.wait(0.08)
+        inputFired =
+            pcall(function()
 
-	local executorFired = false
+                prompt.HoldDuration = 0
 
-	if not triggered
-		and prompt.Parent
-		and prompt.Enabled
-		and type(fireproximityprompt)
-			== "function" then
+                prompt.MaxActivationDistance =
+                    math.max(
+                        oldDistance,
+                        25
+                    )
 
-		executorFired =
-			pcall(function()
-				fireproximityprompt(
-					prompt,
-					0
-				)
-			end)
+                prompt.RequiresLineOfSight =
+                    false
 
-		task.wait(0.08)
-	end
+                prompt:InputHoldBegin()
 
-	triggerConnection:Disconnect()
+                RunService.Heartbeat:Wait()
 
-	if prompt.Parent then
-		prompt.HoldDuration =
-			oldDuration
+                prompt:InputHoldEnd()
+            end)
+    end
 
-		prompt.MaxActivationDistance =
-			oldDistance
+    task.wait(0.1)
 
-		prompt.RequiresLineOfSight =
-			oldLineOfSight
-	end
+    local executorFired = false
 
-	local changed =
-		not prompt.Parent
-		or not prompt.Enabled
+    if not triggered
+        and prompt.Parent
+        and prompt.Enabled
+        and type(
+            fireproximityprompt
+        ) == "function" then
 
-	local activated =
-		callbackFired
-		or inputFired
-		or executorFired
-		or triggered
-		or changed
+        executorFired =
+            pcall(function()
 
-	if activated then
-		state.fired += 1
-	end
+                fireproximityprompt(
+                    prompt,
+                    0
+                )
+            end)
 
-	return activated
+        task.wait(0.1)
+    end
+
+    triggerConnection:Disconnect()
+
+    if prompt.Parent then
+
+        prompt.HoldDuration =
+            oldDuration
+
+        prompt.MaxActivationDistance =
+            oldDistance
+
+        prompt.RequiresLineOfSight =
+            oldLineOfSight
+    end
+
+    local changed =
+        not prompt.Parent
+        or not prompt.Enabled
+
+    local activated =
+        callbackFired
+        or inputFired
+        or executorFired
+        or triggered
+        or changed
+
+    if activated then
+
+        state.fired += 1
+    end
+
+    return activated
 end
 
-local function stopAutomation(message)
-	state.enabled = false
-	state.token += 1
-	config.enabled = false
+-- =========================================================
+-- STOP
+-- =========================================================
 
-	haltVelocity()
-	setToggleVisual(false)
-	saveConfig()
+local function stopAutomation(
+    message
+)
+
+    state.enabled = false
+    state.token += 1
+
+    config.enabled = false
+
+    haltVelocity()
+
+    setToggleVisual(false)
+
+    saveConfig()
 end
+
+-- =========================================================
+-- AUTOMATIZACIÓN
+-- =========================================================
 
 local function runAutomation()
-	if state.enabled then
-		return
-	end
 
-	state.enabled = true
-	state.token += 1
-	config.enabled = true
+    if state.enabled then
+        return
+    end
 
-	local token = state.token
+    state.enabled = true
+    state.token += 1
 
-	setToggleVisual(true)
-	saveConfig()
+    config.enabled = true
 
-	task.spawn(function()
+    local token =
+        state.token
 
-		local previousPurchase
+    setToggleVisual(true)
 
-		local function purchaseDisplay(
-			prompt,
-			brainrotName
-		)
-			if not prompt
-				or not prompt.Parent then
-				return false
-			end
+    saveConfig()
 
-			if not flyToPrompt(
-				prompt,
-				token,
-				"volando para comprar en display"
-			) then
-				return false
-			end
+    task.spawn(function()
 
-			local purchased =
-				firePrompt(
-					prompt,
-					"RNG display Purchase",
-					true
-				)
+        local previousPurchase
 
-			if purchased then
-				state.cycles += 1
-				CycleValue.Text =
-					tostring(
-						state.cycles
-					)
-			end
+        local function purchaseDisplay(
+            prompt,
+            brainrotName
+        )
 
-			return purchased
-		end
+            if not prompt
+                or not prompt.Parent
+                or not prompt.Enabled then
 
-		-- =====================================================
-		-- PRIMERA COMPROBACIÓN:
-		-- si Job Sahur ya está en el display, va directamente.
-		-- =====================================================
+                return false
+            end
 
-		local existing,
-			existingName,
-			displayOccupied =
-			findDisplayPurchase(nil)
+            -- IMPORTANTE:
+            -- Primero va físicamente a la posición
+            -- REAL del prompt.
+            if not flyToPrompt(
+                prompt,
+                token,
+                "volando para comprar"
+            ) then
 
-		while displayOccupied
-			and state.enabled
-			and state.token == token do
+                return false
+            end
 
-			if existing
-				and equipCarpetInactive()
-				and purchaseDisplay(
-					existing,
-					existingName
-				) then
+            -- Comprobar otra vez que seguimos
+            -- cerca del prompt.
+            local _, _, root =
+                characterParts()
 
-				previousPurchase =
-					existing
+            local target =
+                promptPosition(prompt)
 
-				break
-			end
+            if not root
+                or not target then
 
-			if not existing then
-				break
-			end
+                return false
+            end
 
-			task.wait(0.15)
+            local distance =
+                (
+                    target
+                    - root.Position
+                ).Magnitude
 
-			existing,
-			existingName,
-			displayOccupied =
-				findDisplayPurchase(nil)
-		end
+            if distance
+                > math.max(
+                    3,
+                    prompt.MaxActivationDistance
+                ) then
 
-		-- =====================================================
-		-- LOOP PRINCIPAL
-		-- =====================================================
+                return false
+            end
 
-		while state.enabled
-			and state.token == token do
+            -- Segundo pequeño ajuste.
+            haltVelocity()
 
-			local rngPrompt, machine =
-				findRNGPrompt()
+            task.wait(0.05)
 
-			if not rngPrompt then
-				task.wait(0.15)
-				continue
-			end
+            local purchased =
+                firePrompt(
+                    prompt,
+                    "RNG display Purchase",
+                    true
+                )
 
-			if not equipCarpetInactive() then
-				task.wait(0.5)
-				continue
-			end
+            if purchased then
 
-			if not flyToPrompt(
-				rngPrompt,
-				token,
-				"volando a la máquina RNG"
-			) then
+                state.cycles += 1
 
-				task.wait(0.15)
-				continue
-			end
+                CycleValue.Text =
+                    tostring(
+                        state.cycles
+                    )
 
-			if not firePrompt(
-				rngPrompt,
-				"RNG prompt",
-				false
-			) then
+                return true
+            end
 
-				task.wait(0.2)
-				continue
-			end
+            return false
+        end
 
-			local purchase
-			local purchaseName
-			local rejectedDisplay = false
+        -- =================================================
+        -- PRIMERA REVISIÓN
+        -- =================================================
 
-			local waitStarted =
-				os.clock()
+        local existing,
+            existingName,
+            displayOccupied =
+            findDisplayPurchase(nil)
 
-			while state.enabled
-				and state.token == token
-				and rngPrompt.Parent do
+        while
+            displayOccupied
+            and state.enabled
+            and state.token == token do
 
-				local excluded =
-					os.clock()
-						- waitStarted
-						< 1.25
-					and previousPurchase
-					or nil
+            if existing
+                and equipCarpetInactive()
+                and purchaseDisplay(
+                    existing,
+                    existingName
+                ) then
 
-				local occupied
+                previousPurchase =
+                    existing
 
-				purchase,
-				purchaseName,
-				occupied =
-					findDisplayPurchase(
-						excluded
-					)
+                break
+            end
 
-				if purchase then
-					break
-				end
+            if not existing then
+                break
+            end
 
-				if occupied then
-					rejectedDisplay = true
-					break
-				end
+            task.wait(0.15)
 
-				task.wait(0.05)
-			end
+            existing,
+                existingName,
+                displayOccupied =
+                findDisplayPurchase(nil)
+        end
 
-			if not state.enabled
-				or state.token ~= token then
-				break
-			end
+        -- =================================================
+        -- LOOP PRINCIPAL
+        -- =================================================
 
-			if purchase then
-				while purchase
-					and state.enabled
-					and state.token == token do
+        while
+            state.enabled
+            and state.token == token do
 
-					-- purchaseDisplay ya está usando la prioridad
-					-- de Job Job Job Sahur desde findDisplayPurchase.
-					if purchaseDisplay(
-						purchase,
-						purchaseName
-					) then
+            local rngPrompt,
+                machine =
+                findRNGPrompt()
 
-						previousPurchase =
-							purchase
+            if not rngPrompt then
 
-						break
-					end
+                task.wait(0.15)
 
-					task.wait(0.15)
+                continue
+            end
 
-					purchase,
-					purchaseName =
-						findDisplayPurchase(nil)
-				end
-			end
+            if not equipCarpetInactive() then
 
-			if rejectedDisplay then
-				task.wait(0.15)
-			end
+                task.wait(0.5)
 
-			task.wait(0.08)
-		end
+                continue
+            end
 
-		haltVelocity()
-	end)
+            -- Ir al prompt exacto de la máquina.
+            if not flyToPrompt(
+                rngPrompt,
+                token,
+                "volando a la máquina RNG"
+            ) then
+
+                task.wait(0.15)
+
+                continue
+            end
+
+            haltVelocity()
+
+            task.wait(0.05)
+
+            if not firePrompt(
+                rngPrompt,
+                "RNG prompt",
+                false
+            ) then
+
+                task.wait(0.2)
+
+                continue
+            end
+
+            -- =================================================
+            -- ESPERAR A QUE APAREZCA LA COMPRA
+            -- =================================================
+
+            local purchase
+            local purchaseName
+            local rejectedDisplay = false
+
+            local waitStarted =
+                os.clock()
+
+            while
+                state.enabled
+                and state.token == token
+                and rngPrompt.Parent do
+
+                local excluded
+
+                if
+                    os.clock()
+                    - waitStarted
+                    < 1.25
+                then
+
+                    excluded =
+                        previousPurchase
+                end
+
+                local occupied
+
+                purchase,
+                    purchaseName,
+                    occupied =
+                    findDisplayPurchase(
+                        excluded
+                    )
+
+                if purchase then
+                    break
+                end
+
+                if occupied then
+
+                    rejectedDisplay =
+                        true
+
+                    break
+                end
+
+                task.wait(0.05)
+            end
+
+            if not state.enabled
+                or state.token ~= token then
+
+                break
+            end
+
+            -- =================================================
+            -- COMPRAR
+            -- =================================================
+
+            if purchase then
+
+                while
+                    purchase
+                    and state.enabled
+                    and state.token == token do
+
+                    if purchaseDisplay(
+                        purchase,
+                        purchaseName
+                    ) then
+
+                        previousPurchase =
+                            purchase
+
+                        break
+                    end
+
+                    task.wait(0.15)
+
+                    purchase,
+                        purchaseName =
+                        findDisplayPurchase(
+                            nil
+                        )
+                end
+            end
+
+            if rejectedDisplay then
+                task.wait(0.15)
+            end
+
+            task.wait(0.08)
+        end
+
+        haltVelocity()
+    end)
 end
 
 local function toggleAutomation()
-	if state.enabled then
-		stopAutomation(
-			"auto RNG pausado"
-		)
-	else
-		runAutomation()
-	end
+
+    if state.enabled then
+
+        stopAutomation(
+            "auto RNG pausado"
+        )
+
+    else
+
+        runAutomation()
+    end
 end
 
 MasterToggle.Activated:Connect(
-	toggleAutomation
+    toggleAutomation
 )
 
 Minus.Activated:Connect(function()
-	config.speed =
-		math.max(
-			10,
-			config.speed - 10
-		)
 
-	SpeedValue.Text =
-		tostring(
-			config.speed
-		)
+    config.speed =
+        math.max(
+            10,
+            config.speed - 10
+        )
 
-	saveConfig()
+    SpeedValue.Text =
+        tostring(
+            config.speed
+        )
+
+    saveConfig()
 end)
 
 Plus.Activated:Connect(function()
-	config.speed =
-		math.min(
-			500,
-			config.speed + 10
-		)
 
-	SpeedValue.Text =
-		tostring(
-			config.speed
-		)
+    config.speed =
+        math.min(
+            500,
+            config.speed + 10
+        )
 
-	saveConfig()
+    SpeedValue.Text =
+        tostring(
+            config.speed
+        )
+
+    saveConfig()
 end)
 
 -- =========================================================
--- DRAG DE LA VENTANA
+-- DRAG
 -- =========================================================
 
 do
-	local dragging = false
-	local activeInput
-	local dragStart
-	local startPosition
 
-	Header.InputBegan:Connect(
-		function(input)
+    local dragging = false
+    local activeInput
+    local dragStart
+    local startPosition
 
-			if input.UserInputType
-				~= Enum.UserInputType.MouseButton1
-				and input.UserInputType
-				~= Enum.UserInputType.Touch then
-				return
-			end
+    Header.InputBegan:Connect(
+        function(input)
 
-			local position =
-				input.Position
+            if input.UserInputType
+                ~= Enum.UserInputType.MouseButton1
 
-			local togglePosition =
-				MasterToggle.AbsolutePosition
+                and input.UserInputType
+                ~= Enum.UserInputType.Touch then
 
-			local toggleSize =
-				MasterToggle.AbsoluteSize
+                return
+            end
 
-			if position.X
-				>= togglePosition.X - 8
-				and position.X
-				<= togglePosition.X
-					+ toggleSize.X
-					+ 8 then
-				return
-			end
+            local position =
+                input.Position
 
-			dragging = true
-			activeInput = input
+            local togglePosition =
+                MasterToggle.AbsolutePosition
 
-			dragStart =
-				Vector2.new(
-					position.X,
-					position.Y
-				)
+            local toggleSize =
+                MasterToggle.AbsoluteSize
 
-			startPosition =
-				Window.Position
+            if position.X
+                >= togglePosition.X - 8
 
-			input.Changed:Connect(
-				function()
+                and position.X
+                <= togglePosition.X
+                    + toggleSize.X
+                    + 8 then
 
-					if input.UserInputState
-						== Enum.UserInputState.End
-						or input.UserInputState
-						== Enum.UserInputState.Cancel then
+                return
+            end
 
-						dragging = false
-						activeInput = nil
-					end
-				end
-			)
-		end
-	)
+            dragging = true
 
-	UserInputService.InputChanged:Connect(
-		function(input)
+            activeInput = input
 
-			if not dragging
-				or not activeInput then
-				return
-			end
+            dragStart =
+                Vector2.new(
+                    position.X,
+                    position.Y
+                )
 
-			local validTouch =
-				activeInput.UserInputType
-					== Enum.UserInputType.Touch
-				and input == activeInput
+            startPosition =
+                Window.Position
 
-			local validMouse =
-				activeInput.UserInputType
-					== Enum.UserInputType.MouseButton1
-				and input.UserInputType
-					== Enum.UserInputType.MouseMovement
+            input.Changed:Connect(
+                function()
 
-			if not validTouch
-				and not validMouse then
-				return
-			end
+                    if input.UserInputState
+                        == Enum.UserInputState.End
 
-			local current =
-				Vector2.new(
-					input.Position.X,
-					input.Position.Y
-				)
+                        or input.UserInputState
+                        == Enum.UserInputState.Cancel then
 
-			local delta =
-				current - dragStart
+                        dragging = false
+                        activeInput = nil
+                    end
+                end
+            )
+        end
+    )
 
-			Window.Position =
-				UDim2.new(
-					startPosition.X.Scale,
-					startPosition.X.Offset
-						+ delta.X,
+    UserInputService.InputChanged:Connect(
+        function(input)
 
-					startPosition.Y.Scale,
-					startPosition.Y.Offset
-						+ delta.Y
-				)
-		end
-	)
+            if not dragging
+                or not activeInput then
+
+                return
+            end
+
+            local validTouch =
+                activeInput.UserInputType
+                    == Enum.UserInputType.Touch
+                and input == activeInput
+
+            local validMouse =
+                activeInput.UserInputType
+                    == Enum.UserInputType.MouseButton1
+                and input.UserInputType
+                    == Enum.UserInputType.MouseMovement
+
+            if not validTouch
+                and not validMouse then
+
+                return
+            end
+
+            local current =
+                Vector2.new(
+                    input.Position.X,
+                    input.Position.Y
+                )
+
+            local delta =
+                current
+                - dragStart
+
+            Window.Position =
+                UDim2.new(
+                    startPosition.X.Scale,
+                    startPosition.X.Offset
+                        + delta.X,
+
+                    startPosition.Y.Scale,
+                    startPosition.Y.Offset
+                        + delta.Y
+                )
+        end
+    )
 end
 
 -- =========================================================
@@ -2134,52 +3107,59 @@ end
 -- =========================================================
 
 table.insert(
-	state.connections,
+    state.connections,
 
-	RunService.RenderStepped:Connect(
-		function()
+    RunService.RenderStepped:Connect(
+        function()
 
-			AnimatedGradient.Offset =
-				Vector2.new(
-					math.sin(
-						os.clock() * 0.55
-					) * 0.3,
+            AnimatedGradient.Offset =
+                Vector2.new(
+                    math.sin(
+                        os.clock()
+                        * 0.55
+                    ) * 0.3,
 
-					math.cos(
-						os.clock() * 0.38
-					) * 0.08
-				)
-		end
-	)
+                    math.cos(
+                        os.clock()
+                        * 0.38
+                    ) * 0.08
+                )
+        end
+    )
 )
 
+-- =========================================================
+-- SHUTDOWN
+-- =========================================================
+
 local function shutdown()
-	state.alive = false
-	state.enabled = false
-	state.token += 1
 
-	haltVelocity()
+    state.alive = false
+    state.enabled = false
+    state.token += 1
 
-	for _, connection in ipairs(
-		state.connections
-	) do
+    haltVelocity()
 
-		pcall(function()
-			connection:Disconnect()
-		end)
-	end
+    for _, connection in ipairs(
+        state.connections
+    ) do
 
-	if viewportConnection then
-		viewportConnection:Disconnect()
-	end
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
 
-	if GUI then
-		GUI:Destroy()
-	end
+    if viewportConnection then
+        viewportConnection:Disconnect()
+    end
+
+    if GUI then
+        GUI:Destroy()
+    end
 end
 
 env.TokitoAutoRNGShutdown =
-	shutdown
+    shutdown
 
 -- =========================================================
 -- ESTADO INICIAL
@@ -2187,12 +3167,15 @@ env.TokitoAutoRNGShutdown =
 
 setToggleVisual(false)
 
--- Asegurar una última vez que Job Sahur esté en la whitelist.
-whitelistSet[JOB_SAHUR_KEY] = true
+whitelistSet[
+    JOB_SAHUR_KEY
+] = true
+
 rebuildWhitelist()
 saveConfig()
 
--- Ejecutar automáticamente si la configuración está activa.
 if config.enabled then
-	task.defer(runAutomation)
+    task.defer(
+        runAutomation
+    )
 end
