@@ -77,6 +77,7 @@ local CONFIG_FILE = "TokitoAutoRNGConfig.json"
 local config = {
     enabled = true,
     speed = 100,
+    spinDelay = 1.5,
     whitelist = DEFAULT_WHITELIST
 }
 
@@ -85,9 +86,13 @@ pcall(function()
         and type(readfile) == "function"
         and isfile(CONFIG_FILE) then
 
-        local loaded = HttpService:JSONDecode(readfile(CONFIG_FILE))
+        local loaded =
+            HttpService:JSONDecode(
+                readfile(CONFIG_FILE)
+            )
 
         if type(loaded) == "table" then
+
             if type(loaded.enabled) == "boolean" then
                 config.enabled = loaded.enabled
             end
@@ -98,6 +103,19 @@ pcall(function()
                     10,
                     500
                 )
+            end
+
+            if type(loaded.spinDelay) == "number" then
+                config.spinDelay = math.clamp(
+                    loaded.spinDelay,
+                    0.1,
+                    10
+                )
+
+                config.spinDelay =
+                    math.floor(
+                        config.spinDelay * 10 + 0.5
+                    ) / 10
             end
 
             if type(loaded.whitelist) == "string" then
@@ -158,10 +176,6 @@ do
     end
 end
 
--- =========================================================
--- JOB JOB JOB SAHUR SIEMPRE ACTIVO
--- =========================================================
-
 local JOB_SAHUR_NAME = "Job Job Job Sahur"
 local JOB_SAHUR_KEY = normalizeKey(JOB_SAHUR_NAME)
 
@@ -177,10 +191,11 @@ local function rebuildWhitelist()
         end
     end
 
-    config.whitelist = table.concat(
-        parts,
-        "\n"
-    )
+    config.whitelist =
+        table.concat(
+            parts,
+            "\n"
+        )
 end
 
 rebuildWhitelist()
@@ -196,7 +211,8 @@ local function setBrainrotEnabled(
     name,
     enabled
 )
-    local key = normalizeKey(name)
+    local key =
+        normalizeKey(name)
 
     if key == JOB_SAHUR_KEY then
         whitelistSet[key] = true
@@ -219,7 +235,8 @@ local state = {
     fired = 0,
     cycles = 0,
     movingRoot = nil,
-    connections = {}
+    connections = {},
+    lastSpinTime = 0
 }
 
 -- =========================================================
@@ -241,7 +258,8 @@ local COLORS = {
 }
 
 local function addCorner(parent, radius)
-    local corner = Instance.new("UICorner")
+    local corner =
+        Instance.new("UICorner")
 
     corner.CornerRadius =
         UDim.new(0, radius)
@@ -257,13 +275,16 @@ local function addStroke(
     thickness,
     transparency
 )
-    local stroke = Instance.new("UIStroke")
+    local stroke =
+        Instance.new("UIStroke")
 
     stroke.ApplyStrokeMode =
         Enum.ApplyStrokeMode.Border
 
     stroke.Color = color
-    stroke.Thickness = thickness or 1
+    stroke.Thickness =
+        thickness or 1
+
     stroke.Transparency =
         transparency or 0
 
@@ -282,7 +303,8 @@ local function makeLabel(
     color,
     font
 )
-    local label = Instance.new("TextLabel")
+    local label =
+        Instance.new("TextLabel")
 
     label.Name = name
     label.Size = size
@@ -318,7 +340,8 @@ if oldGui then
     oldGui:Destroy()
 end
 
-local GUI = Instance.new("ScreenGui")
+local GUI =
+    Instance.new("ScreenGui")
 
 GUI.Name = "TokitoAutoRNG"
 GUI.ResetOnSpawn = false
@@ -332,11 +355,13 @@ end) then
 end
 
 local WINDOW_WIDTH = 310
-local MAIN_HEIGHT = 260
+local MAIN_HEIGHT = 320
 
-local Window = Instance.new("Frame")
+local Window =
+    Instance.new("Frame")
 
 Window.Name = "Window"
+
 Window.Size =
     UDim2.fromOffset(
         WINDOW_WIDTH,
@@ -347,10 +372,7 @@ Window.AnchorPoint =
     Vector2.new(0.5, 0.5)
 
 Window.Position =
-    UDim2.fromScale(
-        0.5,
-        0.5
-    )
+    UDim2.fromScale(0.5, 0.5)
 
 Window.BackgroundColor3 =
     COLORS.Window
@@ -377,6 +399,7 @@ InterfaceScale.Parent = Window
 local viewportConnection
 
 local function updateScale()
+
     local camera =
         workspace.CurrentCamera
 
@@ -391,6 +414,7 @@ local function updateScale()
         math.min(
             (viewport.X - 16)
                 / WINDOW_WIDTH,
+
             (viewport.Y - 16)
                 / MAIN_HEIGHT
         )
@@ -399,15 +423,22 @@ local function updateScale()
         UserInputService.TouchEnabled
         and math.max(
             0.45,
-            math.min(0.72, fit)
+            math.min(
+                0.72,
+                fit
+            )
         )
         or math.max(
             0.65,
-            math.min(0.92, fit)
+            math.min(
+                0.92,
+                fit
+            )
         )
 end
 
 local function watchCamera()
+
     if viewportConnection then
         viewportConnection:Disconnect()
     end
@@ -416,10 +447,13 @@ local function watchCamera()
         workspace.CurrentCamera
 
     if camera then
+
         viewportConnection =
             camera:GetPropertyChangedSignal(
                 "ViewportSize"
-            ):Connect(updateScale)
+            ):Connect(
+                updateScale
+            )
     end
 
     updateScale()
@@ -427,7 +461,9 @@ end
 
 workspace:GetPropertyChangedSignal(
     "CurrentCamera"
-):Connect(watchCamera)
+):Connect(
+    watchCamera
+)
 
 watchCamera()
 
@@ -437,12 +473,14 @@ local BackgroundImage =
 BackgroundImage.Size =
     UDim2.fromScale(1, 1)
 
-BackgroundImage.BackgroundTransparency = 1
+BackgroundImage.BackgroundTransparency =
+    1
 
 BackgroundImage.Image =
     "rbxassetid://120663379122080"
 
-BackgroundImage.ImageTransparency = 0
+BackgroundImage.ImageTransparency =
+    0
 
 BackgroundImage.ScaleType =
     Enum.ScaleType.Stretch
@@ -450,7 +488,10 @@ BackgroundImage.ScaleType =
 BackgroundImage.ZIndex = 1
 BackgroundImage.Parent = Window
 
-addCorner(BackgroundImage, 14)
+addCorner(
+    BackgroundImage,
+    14
+)
 
 local Shade =
     Instance.new("Frame")
@@ -461,12 +502,17 @@ Shade.Size =
 Shade.BackgroundColor3 =
     COLORS.Window
 
-Shade.BackgroundTransparency = 0.22
+Shade.BackgroundTransparency =
+    0.22
+
 Shade.BorderSizePixel = 0
 Shade.ZIndex = 2
 Shade.Parent = Window
 
-addCorner(Shade, 14)
+addCorner(
+    Shade,
+    14
+)
 
 local AnimatedGradient =
     Instance.new("UIGradient")
@@ -498,7 +544,12 @@ local Header =
     Instance.new("Frame")
 
 Header.Size =
-    UDim2.new(1, 0, 0, 64)
+    UDim2.new(
+        1,
+        0,
+        0,
+        64
+    )
 
 Header.BackgroundTransparency = 1
 Header.Active = true
@@ -520,10 +571,18 @@ local MasterToggle =
     Instance.new("TextButton")
 
 MasterToggle.Size =
-    UDim2.fromOffset(50, 26)
+    UDim2.fromOffset(
+        50,
+        26
+    )
 
 MasterToggle.Position =
-    UDim2.new(1, -66, 0, 19)
+    UDim2.new(
+        1,
+        -66,
+        0,
+        19
+    )
 
 MasterToggle.BackgroundColor3 =
     COLORS.Control
@@ -534,7 +593,10 @@ MasterToggle.Text = ""
 MasterToggle.ZIndex = 5
 MasterToggle.Parent = Header
 
-addCorner(MasterToggle, 13)
+addCorner(
+    MasterToggle,
+    13
+)
 
 local MasterStroke =
     addStroke(
@@ -548,7 +610,10 @@ local MasterKnob =
     Instance.new("Frame")
 
 MasterKnob.Size =
-    UDim2.fromOffset(22, 22)
+    UDim2.fromOffset(
+        22,
+        22
+    )
 
 MasterKnob.Position =
     UDim2.new(
@@ -565,21 +630,34 @@ MasterKnob.BorderSizePixel = 0
 MasterKnob.ZIndex = 6
 MasterKnob.Parent = MasterToggle
 
-addCorner(MasterKnob, 11)
+addCorner(
+    MasterKnob,
+    11
+)
 
 local HeaderAccent =
     Instance.new("Frame")
 
 HeaderAccent.Size =
-    UDim2.new(1, -34, 0, 1)
+    UDim2.new(
+        1,
+        -34,
+        0,
+        1
+    )
 
 HeaderAccent.Position =
-    UDim2.fromOffset(17, 54)
+    UDim2.fromOffset(
+        17,
+        54
+    )
 
 HeaderAccent.BackgroundColor3 =
     COLORS.White
 
-HeaderAccent.BackgroundTransparency = 0.72
+HeaderAccent.BackgroundTransparency =
+    0.72
+
 HeaderAccent.BorderSizePixel = 0
 HeaderAccent.ZIndex = 4
 HeaderAccent.Parent = Header
@@ -588,20 +666,33 @@ local TabBar =
     Instance.new("Frame")
 
 TabBar.Size =
-    UDim2.new(1, -34, 0, 28)
+    UDim2.new(
+        1,
+        -34,
+        0,
+        28
+    )
 
 TabBar.Position =
-    UDim2.fromOffset(17, 65)
+    UDim2.fromOffset(
+        17,
+        65
+    )
 
 TabBar.BackgroundColor3 =
     COLORS.Log
 
-TabBar.BackgroundTransparency = 0.15
+TabBar.BackgroundTransparency =
+    0.15
+
 TabBar.BorderSizePixel = 0
 TabBar.ZIndex = 4
 TabBar.Parent = Window
 
-addCorner(TabBar, 8)
+addCorner(
+    TabBar,
+    8
+)
 
 addStroke(
     TabBar,
@@ -625,7 +716,8 @@ local function makeTab(
             -4
         )
 
-    button.Position = position
+    button.Position =
+        position
 
     button.BackgroundColor3 =
         COLORS.Control
@@ -652,7 +744,10 @@ end
 local MainTabButton =
     makeTab(
         "PRINCIPAL",
-        UDim2.fromOffset(2, 2)
+        UDim2.fromOffset(
+            2,
+            2
+        )
     )
 
 local WhitelistTabButton =
@@ -670,10 +765,18 @@ local Settings =
     Instance.new("Frame")
 
 Settings.Size =
-    UDim2.new(1, 0, 0, 126)
+    UDim2.new(
+        1,
+        0,
+        0,
+        206
+    )
 
 Settings.Position =
-    UDim2.fromOffset(0, 102)
+    UDim2.fromOffset(
+        0,
+        102
+    )
 
 Settings.BackgroundTransparency = 1
 Settings.ZIndex = 3
@@ -682,7 +785,8 @@ Settings.Parent = Window
 local function makeCard(
     name,
     position,
-    size
+    size,
+    parent
 )
     local card =
         Instance.new("Frame")
@@ -694,12 +798,18 @@ local function makeCard(
     card.BackgroundColor3 =
         COLORS.Row
 
-    card.BackgroundTransparency = 0.58
+    card.BackgroundTransparency =
+        0.58
+
     card.BorderSizePixel = 0
     card.ZIndex = 3
-    card.Parent = Settings
+    card.Parent =
+        parent or Settings
 
-    addCorner(card, 9)
+    addCorner(
+        card,
+        9
+    )
 
     addStroke(
         card,
@@ -711,19 +821,35 @@ local function makeCard(
     return card
 end
 
+-- =========================================================
+-- SPEED
+-- =========================================================
+
 local SpeedCard =
     makeCard(
         "Speed",
-        UDim2.fromOffset(17, 0),
-        UDim2.fromOffset(276, 58)
+        UDim2.fromOffset(
+            17,
+            0
+        ),
+        UDim2.fromOffset(
+            276,
+            58
+        )
     )
 
 makeLabel(
     SpeedCard,
     "Title",
     "Velocidad",
-    UDim2.fromOffset(150, 58),
-    UDim2.fromOffset(14, 0),
+    UDim2.fromOffset(
+        150,
+        58
+    ),
+    UDim2.fromOffset(
+        14,
+        0
+    ),
     12,
     COLORS.White
 ).ZIndex = 4
@@ -732,7 +858,10 @@ local SpeedShell =
     Instance.new("Frame")
 
 SpeedShell.Size =
-    UDim2.fromOffset(110, 38)
+    UDim2.fromOffset(
+        110,
+        38
+    )
 
 SpeedShell.Position =
     UDim2.new(
@@ -745,12 +874,17 @@ SpeedShell.Position =
 SpeedShell.BackgroundColor3 =
     COLORS.Window
 
-SpeedShell.BackgroundTransparency = 0.05
+SpeedShell.BackgroundTransparency =
+    0.05
+
 SpeedShell.BorderSizePixel = 0
 SpeedShell.ZIndex = 4
 SpeedShell.Parent = SpeedCard
 
-addCorner(SpeedShell, 8)
+addCorner(
+    SpeedShell,
+    8
+)
 
 addStroke(
     SpeedShell,
@@ -768,9 +902,13 @@ local function makeCounterButton(
         Instance.new("TextButton")
 
     button.Size =
-        UDim2.fromOffset(30, 30)
+        UDim2.fromOffset(
+            30,
+            30
+        )
 
-    button.Position = position
+    button.Position =
+        position
 
     button.BackgroundColor3 =
         COLORS.Control
@@ -789,7 +927,10 @@ local function makeCounterButton(
     button.ZIndex = 5
     button.Parent = parent
 
-    addCorner(button, 6)
+    addCorner(
+        button,
+        6
+    )
 
     return button
 end
@@ -798,7 +939,10 @@ local Minus =
     makeCounterButton(
         SpeedShell,
         "-",
-        UDim2.fromOffset(4, 4)
+        UDim2.fromOffset(
+            4,
+            4
+        )
     )
 
 local SpeedValue =
@@ -806,8 +950,14 @@ local SpeedValue =
         SpeedShell,
         "Value",
         tostring(config.speed),
-        UDim2.fromOffset(38, 30),
-        UDim2.fromOffset(36, 4),
+        UDim2.fromOffset(
+            38,
+            30
+        ),
+        UDim2.fromOffset(
+            36,
+            4
+        ),
         15,
         COLORS.White,
         Enum.Font.GothamBold
@@ -822,22 +972,180 @@ local Plus =
     makeCounterButton(
         SpeedShell,
         "+",
-        UDim2.fromOffset(76, 4)
+        UDim2.fromOffset(
+            76,
+            4
+        )
     )
+
+-- =========================================================
+-- SPIN DELAY
+-- =========================================================
+
+local SpinCard =
+    makeCard(
+        "SpinDelay",
+        UDim2.fromOffset(
+            17,
+            68
+        ),
+        UDim2.fromOffset(
+            276,
+            58
+        )
+    )
+
+makeLabel(
+    SpinCard,
+    "Title",
+    "Spin Delay",
+    UDim2.fromOffset(
+        150,
+        58
+    ),
+    UDim2.fromOffset(
+        14,
+        0
+    ),
+    12,
+    COLORS.White
+).ZIndex = 4
+
+makeLabel(
+    SpinCard,
+    "Subtitle",
+    "Tiempo entre Spin Again",
+    UDim2.fromOffset(
+        145,
+        18
+    ),
+    UDim2.fromOffset(
+        14,
+        34
+    ),
+    8,
+    COLORS.Dim,
+    Enum.Font.GothamMedium
+).ZIndex = 4
+
+local SpinShell =
+    Instance.new("Frame")
+
+SpinShell.Size =
+    UDim2.fromOffset(
+        110,
+        38
+    )
+
+SpinShell.Position =
+    UDim2.new(
+        1,
+        -122,
+        0.5,
+        -19
+    )
+
+SpinShell.BackgroundColor3 =
+    COLORS.Window
+
+SpinShell.BackgroundTransparency =
+    0.05
+
+SpinShell.BorderSizePixel = 0
+SpinShell.ZIndex = 4
+SpinShell.Parent = SpinCard
+
+addCorner(
+    SpinShell,
+    8
+)
+
+addStroke(
+    SpinShell,
+    COLORS.White,
+    1,
+    0.86
+)
+
+local SpinMinus =
+    makeCounterButton(
+        SpinShell,
+        "-",
+        UDim2.fromOffset(
+            4,
+            4
+        )
+    )
+
+SpinMinus.TextSize = 14
+
+local SpinValue =
+    makeLabel(
+        SpinShell,
+        "Value",
+        string.format(
+            "%.1fs",
+            config.spinDelay
+        ),
+        UDim2.fromOffset(
+            38,
+            30
+        ),
+        UDim2.fromOffset(
+            36,
+            4
+        ),
+        13,
+        COLORS.White,
+        Enum.Font.GothamBold
+    )
+
+SpinValue.TextXAlignment =
+    Enum.TextXAlignment.Center
+
+SpinValue.ZIndex = 5
+
+local SpinPlus =
+    makeCounterButton(
+        SpinShell,
+        "+",
+        UDim2.fromOffset(
+            76,
+            4
+        )
+    )
+
+SpinPlus.TextSize = 14
+
+-- =========================================================
+-- CYCLES
+-- =========================================================
 
 local CycleCard =
     makeCard(
         "Cycles",
-        UDim2.fromOffset(17, 68),
-        UDim2.fromOffset(276, 58)
+        UDim2.fromOffset(
+            17,
+            136
+        ),
+        UDim2.fromOffset(
+            276,
+            58
+        )
     )
 
 makeLabel(
     CycleCard,
     "Title",
     "Ciclos",
-    UDim2.fromOffset(120, 58),
-    UDim2.fromOffset(14, 0),
+    UDim2.fromOffset(
+        120,
+        58
+    ),
+    UDim2.fromOffset(
+        14,
+        0
+    ),
     12,
     COLORS.White
 ).ZIndex = 4
@@ -847,7 +1155,10 @@ local CycleValue =
         CycleCard,
         "Value",
         "0",
-        UDim2.fromOffset(140, 58),
+        UDim2.fromOffset(
+            140,
+            58
+        ),
         UDim2.new(
             1,
             -154,
@@ -872,10 +1183,16 @@ local WhitelistPage =
     Instance.new("Frame")
 
 WhitelistPage.Size =
-    UDim2.fromOffset(276, 142)
+    UDim2.fromOffset(
+        276,
+        142
+    )
 
 WhitelistPage.Position =
-    UDim2.fromOffset(17, 102)
+    UDim2.fromOffset(
+        17,
+        102
+    )
 
 WhitelistPage.BackgroundTransparency = 1
 WhitelistPage.Visible = false
@@ -886,10 +1203,16 @@ local OpenWhitelist =
     Instance.new("TextButton")
 
 OpenWhitelist.Size =
-    UDim2.fromOffset(276, 40)
+    UDim2.fromOffset(
+        276,
+        40
+    )
 
 OpenWhitelist.Position =
-    UDim2.fromOffset(0, 0)
+    UDim2.fromOffset(
+        0,
+        0
+    )
 
 OpenWhitelist.BackgroundColor3 =
     COLORS.White
@@ -911,16 +1234,25 @@ OpenWhitelist.Font =
 OpenWhitelist.ZIndex = 4
 OpenWhitelist.Parent = WhitelistPage
 
-addCorner(OpenWhitelist, 10)
+addCorner(
+    OpenWhitelist,
+    10
+)
 
 local AddBrainrotBox =
     Instance.new("TextBox")
 
 AddBrainrotBox.Size =
-    UDim2.fromOffset(176, 36)
+    UDim2.fromOffset(
+        176,
+        36
+    )
 
 AddBrainrotBox.Position =
-    UDim2.fromOffset(0, 48)
+    UDim2.fromOffset(
+        0,
+        48
+    )
 
 AddBrainrotBox.BackgroundColor3 =
     COLORS.Row
@@ -944,7 +1276,10 @@ AddBrainrotBox.ZIndex = 4
 AddBrainrotBox.ClearTextOnFocus = false
 AddBrainrotBox.Parent = WhitelistPage
 
-addCorner(AddBrainrotBox, 8)
+addCorner(
+    AddBrainrotBox,
+    8
+)
 
 addStroke(
     AddBrainrotBox,
@@ -957,10 +1292,16 @@ local AddBrainrotBtn =
     Instance.new("TextButton")
 
 AddBrainrotBtn.Size =
-    UDim2.fromOffset(92, 36)
+    UDim2.fromOffset(
+        92,
+        36
+    )
 
 AddBrainrotBtn.Position =
-    UDim2.fromOffset(184, 48)
+    UDim2.fromOffset(
+        184,
+        48
+    )
 
 AddBrainrotBtn.BackgroundColor3 =
     COLORS.Control
@@ -977,7 +1318,10 @@ AddBrainrotBtn.TextSize = 11
 AddBrainrotBtn.ZIndex = 4
 AddBrainrotBtn.Parent = WhitelistPage
 
-addCorner(AddBrainrotBtn, 8)
+addCorner(
+    AddBrainrotBtn,
+    8
+)
 
 addStroke(
     AddBrainrotBtn,
@@ -991,8 +1335,14 @@ local WhitelistCount =
         WhitelistPage,
         "Count",
         "",
-        UDim2.fromOffset(276, 20),
-        UDim2.fromOffset(0, 96),
+        UDim2.fromOffset(
+            276,
+            20
+        ),
+        UDim2.fromOffset(
+            0,
+            96
+        ),
         9,
         COLORS.Dim,
         Enum.Font.GothamBold
@@ -1010,12 +1360,21 @@ WhitelistOverlay.Name =
     "WhitelistOverlay"
 
 WhitelistOverlay.Size =
-    UDim2.fromScale(1, 1)
+    UDim2.fromScale(
+        1,
+        1
+    )
 
 WhitelistOverlay.BackgroundColor3 =
-    Color3.fromRGB(0, 0, 0)
+    Color3.fromRGB(
+        0,
+        0,
+        0
+    )
 
-WhitelistOverlay.BackgroundTransparency = 0.45
+WhitelistOverlay.BackgroundTransparency =
+    0.45
+
 WhitelistOverlay.BorderSizePixel = 0
 WhitelistOverlay.AutoButtonColor = false
 WhitelistOverlay.Text = ""
@@ -1030,10 +1389,16 @@ WhitelistModal.Name =
     "WhitelistModal"
 
 WhitelistModal.Size =
-    UDim2.fromOffset(280, 340)
+    UDim2.fromOffset(
+        280,
+        340
+    )
 
 WhitelistModal.AnchorPoint =
-    Vector2.new(0.5, 0.5)
+    Vector2.new(
+        0.5,
+        0.5
+    )
 
 WhitelistModal.Position =
     UDim2.fromScale(
@@ -1047,9 +1412,13 @@ WhitelistModal.BackgroundColor3 =
 WhitelistModal.BorderSizePixel = 0
 WhitelistModal.Active = true
 WhitelistModal.ZIndex = 21
-WhitelistModal.Parent = WhitelistOverlay
+WhitelistModal.Parent =
+    WhitelistOverlay
 
-addCorner(WhitelistModal, 14)
+addCorner(
+    WhitelistModal,
+    14
+)
 
 addStroke(
     WhitelistModal,
@@ -1062,8 +1431,14 @@ makeLabel(
     WhitelistModal,
     "Title",
     "LISTA BLANCA DE BRAINROTS",
-    UDim2.fromOffset(190, 22),
-    UDim2.fromOffset(16, 14),
+    UDim2.fromOffset(
+        190,
+        22
+    ),
+    UDim2.fromOffset(
+        16,
+        14
+    ),
     11,
     COLORS.White,
     Enum.Font.GothamBold
@@ -1073,8 +1448,14 @@ makeLabel(
     WhitelistModal,
     "Hint",
     "Toca una fila para activarla o desactivarla",
-    UDim2.fromOffset(190, 16),
-    UDim2.fromOffset(16, 34),
+    UDim2.fromOffset(
+        190,
+        16
+    ),
+    UDim2.fromOffset(
+        16,
+        34
+    ),
     9,
     COLORS.Dim,
     Enum.Font.GothamMedium
@@ -1084,7 +1465,10 @@ local ModalClose =
     Instance.new("TextButton")
 
 ModalClose.Size =
-    UDim2.fromOffset(28, 28)
+    UDim2.fromOffset(
+        28,
+        28
+    )
 
 ModalClose.Position =
     UDim2.new(
@@ -1107,18 +1491,30 @@ ModalClose.Font =
     Enum.Font.GothamBold
 
 ModalClose.ZIndex = 22
-ModalClose.Parent = WhitelistModal
+ModalClose.Parent =
+    WhitelistModal
 
-addCorner(ModalClose, 8)
+addCorner(
+    ModalClose,
+    8
+)
 
 local Scroll =
     Instance.new("ScrollingFrame")
 
 Scroll.Size =
-    UDim2.new(1, -24, 1, -108)
+    UDim2.new(
+        1,
+        -24,
+        1,
+        -108
+    )
 
 Scroll.Position =
-    UDim2.fromOffset(12, 56)
+    UDim2.fromOffset(
+        12,
+        56
+    )
 
 Scroll.BackgroundTransparency = 1
 Scroll.BorderSizePixel = 0
@@ -1128,31 +1524,45 @@ Scroll.ScrollBarImageColor3 =
     COLORS.Dim
 
 Scroll.CanvasSize =
-    UDim2.new(0, 0, 0, 0)
+    UDim2.new(
+        0,
+        0,
+        0,
+        0
+    )
 
 Scroll.AutomaticCanvasSize =
     Enum.AutomaticSize.Y
 
 Scroll.ZIndex = 22
-Scroll.Parent = WhitelistModal
+Scroll.Parent =
+    WhitelistModal
 
 local ScrollLayout =
     Instance.new("UIListLayout")
 
 ScrollLayout.Padding =
-    UDim.new(0, 6)
+    UDim.new(
+        0,
+        6
+    )
 
 ScrollLayout.SortOrder =
     Enum.SortOrder.LayoutOrder
 
-ScrollLayout.Parent = Scroll
+ScrollLayout.Parent =
+    Scroll
 
 local rowRefreshers = {}
 
 local function updateWhitelistCount()
+
     local count = 0
 
-    for _, name in ipairs(BRAINROT_LIST) do
+    for _, name in ipairs(
+        BRAINROT_LIST
+    ) do
+
         if isBrainrotEnabled(name) then
             count += 1
         end
@@ -1187,7 +1597,9 @@ local function createRow(
     row.BackgroundColor3 =
         COLORS.Row
 
-    row.BackgroundTransparency = 0.35
+    row.BackgroundTransparency =
+        0.35
+
     row.BorderSizePixel = 0
     row.AutoButtonColor = false
     row.Text = ""
@@ -1195,15 +1607,26 @@ local function createRow(
     row.ZIndex = 23
     row.Parent = Scroll
 
-    addCorner(row, 8)
+    addCorner(
+        row,
+        8
+    )
 
     local nameLabel =
         makeLabel(
             row,
             "Name",
             name,
-            UDim2.new(1, -56, 1, 0),
-            UDim2.fromOffset(10, 0),
+            UDim2.new(
+                1,
+                -56,
+                1,
+                0
+            ),
+            UDim2.fromOffset(
+                10,
+                0
+            ),
             11,
             COLORS.Text,
             Enum.Font.GothamMedium
@@ -1218,7 +1641,10 @@ local function createRow(
         Instance.new("Frame")
 
     pill.Size =
-        UDim2.fromOffset(36, 18)
+        UDim2.fromOffset(
+            36,
+            18
+        )
 
     pill.Position =
         UDim2.new(
@@ -1235,13 +1661,19 @@ local function createRow(
     pill.ZIndex = 24
     pill.Parent = row
 
-    addCorner(pill, 9)
+    addCorner(
+        pill,
+        9
+    )
 
     local knob =
         Instance.new("Frame")
 
     knob.Size =
-        UDim2.fromOffset(14, 14)
+        UDim2.fromOffset(
+            14,
+            14
+        )
 
     knob.Position =
         UDim2.new(
@@ -1258,7 +1690,10 @@ local function createRow(
     knob.ZIndex = 25
     knob.Parent = pill
 
-    addCorner(knob, 7)
+    addCorner(
+        knob,
+        7
+    )
 
     local brainrotName = name
 
@@ -1269,8 +1704,9 @@ local function createRow(
                 brainrotName
             )
 
-        if normalizeKey(brainrotName)
-            == JOB_SAHUR_KEY then
+        if normalizeKey(
+            brainrotName
+        ) == JOB_SAHUR_KEY then
 
             on = true
         end
@@ -1319,9 +1755,7 @@ local function createRow(
             ):Play()
 
         else
-
             knob.Position = target
-
         end
     end
 
@@ -1363,7 +1797,10 @@ local function createRow(
     return refresh
 end
 
-for index, name in ipairs(BRAINROT_LIST) do
+for index, name in ipairs(
+    BRAINROT_LIST
+) do
+
     rowRefreshers[#rowRefreshers + 1] =
         createRow(
             name,
@@ -1371,80 +1808,84 @@ for index, name in ipairs(BRAINROT_LIST) do
         )
 end
 
-AddBrainrotBtn.Activated:Connect(function()
+AddBrainrotBtn.Activated:Connect(
+    function()
 
-    pcall(function()
-        game:GetService("StarterGui")
-            :SetCore(
-                "SendNotification",
-                {
-                    Title =
-                        "Aviso Importante",
+        pcall(function()
+            game:GetService("StarterGui")
+                :SetCore(
+                    "SendNotification",
+                    {
+                        Title =
+                            "Aviso Importante",
 
-                    Text =
-                        "Tienes que agregar el brainrot exactamente como aparezca en el idioma de juego que usas o no se comprará",
+                        Text =
+                            "Tienes que agregar el brainrot exactamente como aparezca en el idioma de juego que usas o no se comprará",
 
-                    Duration = 8
-                }
-            )
-    end)
-
-    local newName =
-        AddBrainrotBox.Text:match(
-            "^%s*(.-)%s*$"
-        )
-
-    if newName ~= "" then
-
-        local key =
-            normalizeKey(newName)
-
-        if not brainrotKeys[key] then
-
-            brainrotKeys[key] = true
-
-            table.insert(
-                BRAINROT_LIST,
-                newName
-            )
-
-            setBrainrotEnabled(
-                newName,
-                true
-            )
-
-            rowRefreshers[#rowRefreshers + 1] =
-                createRow(
-                    newName,
-                    #BRAINROT_LIST
+                        Duration = 8
+                    }
                 )
+        end)
 
-            updateWhitelistCount()
+        local newName =
+            AddBrainrotBox.Text:match(
+                "^%s*(.-)%s*$"
+            )
 
-        else
+        if newName ~= "" then
 
-            if not isBrainrotEnabled(
-                newName
-            ) then
+            local key =
+                normalizeKey(newName)
+
+            if not brainrotKeys[key] then
+
+                brainrotKeys[key] = true
+
+                table.insert(
+                    BRAINROT_LIST,
+                    newName
+                )
 
                 setBrainrotEnabled(
                     newName,
                     true
                 )
 
-                for _, refresh in ipairs(
-                    rowRefreshers
-                ) do
-                    refresh(false)
-                end
+                rowRefreshers[
+                    #rowRefreshers + 1
+                ] =
+                    createRow(
+                        newName,
+                        #BRAINROT_LIST
+                    )
 
                 updateWhitelistCount()
-            end
-        end
 
-        AddBrainrotBox.Text = ""
+            else
+
+                if not isBrainrotEnabled(
+                    newName
+                ) then
+
+                    setBrainrotEnabled(
+                        newName,
+                        true
+                    )
+
+                    for _, refresh in ipairs(
+                        rowRefreshers
+                    ) do
+                        refresh(false)
+                    end
+
+                    updateWhitelistCount()
+                end
+            end
+
+            AddBrainrotBox.Text = ""
+        end
     end
-end)
+)
 
 local function makeFooterButton(
     text,
@@ -1459,7 +1900,8 @@ local function makeFooterButton(
             34
         )
 
-    button.Position = position
+    button.Position =
+        position
 
     button.BackgroundColor3 =
         COLORS.Control
@@ -1468,15 +1910,20 @@ local function makeFooterButton(
     button.AutoButtonColor = false
     button.Text = text
     button.TextSize = 9
-    button.TextColor3 = COLORS.Text
+    button.TextColor3 =
+        COLORS.Text
 
     button.Font =
         Enum.Font.GothamBold
 
     button.ZIndex = 22
-    button.Parent = WhitelistModal
+    button.Parent =
+        WhitelistModal
 
-    addCorner(button, 8)
+    addCorner(
+        button,
+        8
+    )
 
     addStroke(
         button,
@@ -1491,81 +1938,97 @@ end
 local SelectAllButton =
     makeFooterButton(
         "SELECCIONAR TODO",
-        UDim2.fromOffset(12, 294)
+        UDim2.fromOffset(
+            12,
+            294
+        )
     )
 
 local ClearButton =
     makeFooterButton(
         "LIMPIAR",
-        UDim2.fromOffset(144, 294)
+        UDim2.fromOffset(
+            144,
+            294
+        )
     )
 
-SelectAllButton.Activated:Connect(function()
+SelectAllButton.Activated:Connect(
+    function()
 
-    for _, name in ipairs(
-        BRAINROT_LIST
-    ) do
+        for _, name in ipairs(
+            BRAINROT_LIST
+        ) do
+
+            whitelistSet[
+                normalizeKey(name)
+            ] = true
+        end
 
         whitelistSet[
-            normalizeKey(name)
+            JOB_SAHUR_KEY
         ] = true
-    end
 
-    whitelistSet[
-        JOB_SAHUR_KEY
-    ] = true
+        rebuildWhitelist()
+        saveConfig()
+        updateWhitelistCount()
 
-    rebuildWhitelist()
-    saveConfig()
-    updateWhitelistCount()
-
-    for _, refresh in ipairs(
-        rowRefreshers
-    ) do
-        refresh(true)
-    end
-end)
-
-ClearButton.Activated:Connect(function()
-
-    for _, name in ipairs(
-        BRAINROT_LIST
-    ) do
-
-        local key =
-            normalizeKey(name)
-
-        if key ~= JOB_SAHUR_KEY then
-            whitelistSet[key] = nil
+        for _, refresh in ipairs(
+            rowRefreshers
+        ) do
+            refresh(true)
         end
     end
+)
 
-    whitelistSet[
-        JOB_SAHUR_KEY
-    ] = true
+ClearButton.Activated:Connect(
+    function()
 
-    rebuildWhitelist()
-    saveConfig()
-    updateWhitelistCount()
+        for _, name in ipairs(
+            BRAINROT_LIST
+        ) do
 
-    for _, refresh in ipairs(
-        rowRefreshers
-    ) do
-        refresh(true)
+            local key =
+                normalizeKey(name)
+
+            if key ~= JOB_SAHUR_KEY then
+                whitelistSet[key] = nil
+            end
+        end
+
+        whitelistSet[
+            JOB_SAHUR_KEY
+        ] = true
+
+        rebuildWhitelist()
+        saveConfig()
+        updateWhitelistCount()
+
+        for _, refresh in ipairs(
+            rowRefreshers
+        ) do
+            refresh(true)
+        end
     end
-end)
+)
 
-OpenWhitelist.Activated:Connect(function()
-    WhitelistOverlay.Visible = true
-end)
+OpenWhitelist.Activated:Connect(
+    function()
+        WhitelistOverlay.Visible = true
+    end
+)
 
-ModalClose.Activated:Connect(function()
-    WhitelistOverlay.Visible = false
-end)
+ModalClose.Activated:Connect(
+    function()
+        WhitelistOverlay.Visible = false
+    end
+)
 
-WhitelistOverlay.Activated:Connect(function()
-    WhitelistOverlay.Visible = false
-end)
+WhitelistOverlay.Activated:Connect(
+    function()
+        WhitelistOverlay.Visible = false
+    end
+)
 
 updateWhitelistCount()
 
@@ -1598,13 +2061,17 @@ local function setTab(name)
         or COLORS.Window
 end
 
-MainTabButton.Activated:Connect(function()
-    setTab("PRINCIPAL")
-end)
+MainTabButton.Activated:Connect(
+    function()
+        setTab("PRINCIPAL")
+    end
+)
 
-WhitelistTabButton.Activated:Connect(function()
-    setTab("LISTA BLANCA")
-end)
+WhitelistTabButton.Activated:Connect(
+    function()
+        setTab("LISTA BLANCA")
+    end
+)
 
 setTab("PRINCIPAL")
 
@@ -1612,8 +2079,9 @@ setTab("PRINCIPAL")
 -- TOGGLE
 -- =========================================================
 
-local function setToggleVisual(enabled)
-
+local function setToggleVisual(
+    enabled
+)
     MasterToggle.BackgroundColor3 =
         enabled
         and COLORS.White
@@ -1668,7 +2136,6 @@ local function characterParts()
         character:FindFirstChildOfClass(
             "Humanoid"
         )
-
         or character:WaitForChild(
             "Humanoid",
             5
@@ -1678,13 +2145,14 @@ local function characterParts()
         character:FindFirstChild(
             "HumanoidRootPart"
         )
-
         or character:WaitForChild(
             "HumanoidRootPart",
             5
         )
 
-    return character, humanoid, root
+    return character,
+        humanoid,
+        root
 end
 
 -- =========================================================
@@ -1739,7 +2207,7 @@ local function equipCarpetInactive()
                 humanoid:EquipTool(tool)
             end)
 
-            task.wait(0.15)
+            task.wait(0)
 
             return tool.Parent == character
         end
@@ -1749,7 +2217,7 @@ local function equipCarpetInactive()
 end
 
 -- =========================================================
--- NUEVO SISTEMA ROBUSTO DE POSICIÓN
+-- POSICIÓN
 -- =========================================================
 
 local function getPromptAdornee(prompt)
@@ -1778,7 +2246,6 @@ local function promptPosition(prompt)
         return nil
     end
 
-    -- 1. Adornee real del ProximityPrompt
     local adornee =
         getPromptAdornee(prompt)
 
@@ -1793,6 +2260,7 @@ local function promptPosition(prompt)
         end
 
         if adornee:IsA("Model") then
+
             local pp =
                 adornee.PrimaryPart
 
@@ -1811,17 +2279,14 @@ local function promptPosition(prompt)
         end
     end
 
-    -- 2. Prompt directamente en Attachment
     if prompt.Parent:IsA("Attachment") then
         return prompt.Parent.WorldPosition
     end
 
-    -- 3. Prompt directamente en BasePart
     if prompt.Parent:IsA("BasePart") then
         return prompt.Parent.Position
     end
 
-    -- 4. Buscar BasePart directa
     local parent =
         prompt.Parent
 
@@ -1834,7 +2299,6 @@ local function promptPosition(prompt)
         return directPart.Position
     end
 
-    -- 5. Buscar Attachment
     local attachment =
         parent:FindFirstChildWhichIsA(
             "Attachment",
@@ -1845,7 +2309,6 @@ local function promptPosition(prompt)
         return attachment.WorldPosition
     end
 
-    -- 6. Buscar el Model contenedor
     local model =
         prompt:FindFirstAncestorOfClass(
             "Model"
@@ -1881,7 +2344,7 @@ local function promptPosition(prompt)
 end
 
 -- =========================================================
--- RNG MACHINE
+-- RNG
 -- =========================================================
 
 local function findRNGPrompt()
@@ -1908,59 +2371,11 @@ local function findRNGPrompt()
             "ProximityPrompt"
         ) then
 
-        return prompt, machine
+        return prompt,
+            machine
     end
 
     return nil, nil
-end
-
-local function machinePosition(
-    machine,
-    rngPrompt
-)
-    local promptOrigin =
-        promptPosition(rngPrompt)
-
-    if promptOrigin then
-        return promptOrigin
-    end
-
-    if machine
-        and machine:IsA("BasePart") then
-
-        return machine.Position
-    end
-
-    if machine then
-
-        if machine:IsA("Model") then
-
-            if machine.PrimaryPart then
-                return machine.PrimaryPart.Position
-            end
-
-            local ok, pivot =
-                pcall(function()
-                    return machine:GetPivot()
-                end)
-
-            if ok then
-                return pivot.Position
-            end
-        end
-
-        local part =
-            machine:FindFirstChildWhichIsA(
-                "BasePart",
-                true
-            )
-
-        if part then
-            return part.Position
-        end
-    end
-
-    return nil
 end
 
 -- =========================================================
@@ -2069,7 +2484,6 @@ local function isWhitelistedBrainrot(
             1,
             true
         )
-
         or entry:find(
             normalizedIdentity,
             1,
@@ -2084,7 +2498,7 @@ local function isWhitelistedBrainrot(
 end
 
 -- =========================================================
--- BUSCAR PROMPT DE COMPRA
+-- PURCHASE
 -- =========================================================
 
 local function findDisplayPurchase(
@@ -2116,7 +2530,6 @@ local function findDisplayPurchase(
         if item:IsA(
             "ProximityPrompt"
         )
-
         and item.Enabled
         and item ~= excluded then
 
@@ -2134,7 +2547,6 @@ local function findDisplayPurchase(
                 1,
                 true
             )
-
             or identity:find(
                 "buy",
                 1,
@@ -2247,10 +2659,13 @@ local function promptCallbacks(
                 )
             ) do
 
-                if type(connection.Function)
-                    == "function" then
+                if type(
+                    connection.Function
+                ) == "function" then
 
-                    data.hold[#data.hold + 1] =
+                    data.hold[
+                        #data.hold + 1
+                    ] =
                         connection.Function
                 end
             end
@@ -2261,10 +2676,13 @@ local function promptCallbacks(
                 )
             ) do
 
-                if type(connection.Function)
-                    == "function" then
+                if type(
+                    connection.Function
+                ) == "function" then
 
-                    data.trigger[#data.trigger + 1] =
+                    data.trigger[
+                        #data.trigger + 1
+                    ] =
                         connection.Function
                 end
             end
@@ -2300,7 +2718,7 @@ local function haltVelocity()
 end
 
 -- =========================================================
--- MOVIMIENTO CORREGIDO
+-- MOVIMIENTO
 -- =========================================================
 
 local function flyToPrompt(
@@ -2339,7 +2757,8 @@ local function flyToPrompt(
     local desiredRange = 1.5
 
     local destination =
-        position + Vector3.new(
+        position
+        + Vector3.new(
             0,
             1.8,
             0
@@ -2409,11 +2828,8 @@ local function flyToPrompt(
 
         if displacement.Magnitude > 0.01 then
 
-            local direction =
-                displacement.Unit
-
             root.AssemblyLinearVelocity =
-                direction
+                displacement.Unit
                 * config.speed
 
             root.AssemblyAngularVelocity =
@@ -2455,7 +2871,7 @@ local function flyToPrompt(
 end
 
 -- =========================================================
--- ACTIVAR PROMPT DE FORMA INSTANTÁNEA
+-- ACTIVAR PROMPT
 -- =========================================================
 
 local function firePrompt(
@@ -2506,10 +2922,6 @@ local function firePrompt(
         end
     end
 
-    -- =====================================================
-    -- ACTIVACIÓN INSTANTÁNEA
-    -- =====================================================
-
     local oldDuration =
         prompt.HoldDuration
 
@@ -2538,10 +2950,10 @@ local function firePrompt(
         end)
 
         pcall(function()
-            prompt.RequiresLineOfSight = false
+            prompt.RequiresLineOfSight =
+                false
         end)
 
-        -- Intento inmediato por InputHold.
         inputFired =
             pcall(function()
 
@@ -2550,7 +2962,6 @@ local function firePrompt(
 
             end)
 
-        -- Intento inmediato por fireproximityprompt.
         if prompt.Parent
             and prompt.Enabled
             and type(
@@ -2569,8 +2980,6 @@ local function firePrompt(
         end
     end
 
-    -- No añadimos una espera larga.
-    -- Solo dejamos que Roblox procese un frame.
     RunService.Heartbeat:Wait()
 
     triggerConnection:Disconnect()
@@ -2609,6 +3018,41 @@ local function firePrompt(
     end
 
     return activated
+end
+
+-- =========================================================
+-- SPIN DELAY
+-- =========================================================
+
+local function waitForSpinDelay(
+    token
+)
+
+    while
+        state.enabled
+        and state.token == token do
+
+        local elapsed =
+            os.clock()
+            - state.lastSpinTime
+
+        local remaining =
+            config.spinDelay
+            - elapsed
+
+        if remaining <= 0 then
+            return true
+        end
+
+        task.wait(
+            math.min(
+                remaining,
+                0.05
+            )
+        )
+    end
+
+    return false
 end
 
 -- =========================================================
@@ -2657,10 +3101,6 @@ local function runAutomation()
 
         local previousPurchase
 
-        -- =================================================
-        -- COMPRAR Y REINTENTAR HASTA QUE DESAPAREZCA
-        -- =================================================
-
         local function purchaseDisplay(
             prompt,
             brainrotName
@@ -2673,7 +3113,6 @@ local function runAutomation()
                 return false
             end
 
-            -- Ir físicamente al prompt.
             if not flyToPrompt(
                 prompt,
                 token,
@@ -2685,15 +3124,6 @@ local function runAutomation()
 
             haltVelocity()
 
-            -- =================================================
-            -- BUCLE DE COMPRA
-            -- Sigue intentando mientras el mismo prompt
-            -- de compra siga existiendo.
-            -- =================================================
-
-            local purchaseStarted =
-                os.clock()
-
             while
                 state.enabled
                 and state.token == token
@@ -2701,7 +3131,6 @@ local function runAutomation()
                 and prompt.Parent
                 and prompt.Enabled do
 
-                -- Recalcular el objetivo cada intento.
                 local freshPosition =
                     promptPosition(prompt)
 
@@ -2725,8 +3154,6 @@ local function runAutomation()
                             - root.Position
                         ).Magnitude
 
-                    -- Si se separó demasiado del prompt,
-                    -- volver al punto exacto antes de disparar.
                     if distance
                         > math.max(
                             3,
@@ -2747,24 +3174,12 @@ local function runAutomation()
                     end
                 end
 
-                -- Intento INMEDIATO.
                 local attemptResult =
                     firePrompt(
                         prompt,
                         "RNG display Purchase",
                         true
                     )
-
-                -- =================================================
-                -- COMPROBACIÓN FUERTE
-                -- =================================================
-                --
-                -- No damos por terminada la compra solo porque
-                -- firePrompt haya devuelto true.
-                --
-                -- Mientras el prompt siga existiendo y siga
-                -- habilitado, volvemos a intentarlo.
-                -- =================================================
 
                 if not prompt.Parent
                     or not prompt.Enabled then
@@ -2779,8 +3194,6 @@ local function runAutomation()
                     return true
                 end
 
-                -- Por si el juego reemplazó el objeto:
-                -- intentar encontrar nuevamente el purchase.
                 local currentPurchase,
                     currentPurchaseName =
                     findDisplayPurchase(nil)
@@ -2788,8 +3201,6 @@ local function runAutomation()
                 if currentPurchase
                     and currentPurchase ~= prompt then
 
-                    -- El prompt original quedó obsoleto.
-                    -- Continuamos con el nuevo.
                     prompt =
                         currentPurchase
 
@@ -2811,19 +3222,8 @@ local function runAutomation()
                     continue
                 end
 
-                -- Evitar un bucle que monopolice un solo frame.
                 RunService.Heartbeat:Wait()
-
-                -- Mantener la variable usada por análisis/debug.
-                if attemptResult then
-                    purchaseStarted =
-                        purchaseStarted
-                end
             end
-
-            -- =================================================
-            -- COMPROBACIÓN FINAL
-            -- =================================================
 
             if not prompt
                 or not prompt.Parent
@@ -2841,10 +3241,6 @@ local function runAutomation()
 
             return false
         end
-
-        -- =================================================
-        -- PRIMERA REVISIÓN
-        -- =================================================
 
         local existing,
             existingName,
@@ -2896,18 +3292,15 @@ local function runAutomation()
             if not rngPrompt then
 
                 task.wait(0.1)
-
                 continue
             end
 
             if not equipCarpetInactive() then
 
                 task.wait(0.25)
-
                 continue
             end
 
-            -- Ir al prompt exacto de la máquina.
             if not flyToPrompt(
                 rngPrompt,
                 token,
@@ -2915,27 +3308,54 @@ local function runAutomation()
             ) then
 
                 task.wait()
-
                 continue
             end
 
             haltVelocity()
 
-            -- Activar el RNG inmediatamente.
-            if not firePrompt(
-                rngPrompt,
-                "RNG prompt",
-                false
-            ) then
+            -- =============================================
+            -- ESPERAR EL SPIN DEL USUARIO
+            -- =============================================
+
+            if not waitForSpinDelay(token) then
+                break
+            end
+
+            if not state.enabled
+                or state.token ~= token then
+
+                break
+            end
+
+            -- =============================================
+            -- SPIN AGAIN
+            -- =============================================
+
+            local spinActivated =
+                firePrompt(
+                    rngPrompt,
+                    "RNG prompt",
+                    false
+                )
+
+            -- Guardar el momento REAL del disparo.
+            -- El siguiente Spin no podrá ejecutarse hasta
+            -- que pase config.spinDelay.
+            if spinActivated then
+                state.lastSpinTime =
+                    os.clock()
+            end
+
+            if not spinActivated then
 
                 task.wait(0.1)
 
                 continue
             end
 
-            -- =================================================
-            -- ESPERAR A QUE APAREZCA LA COMPRA
-            -- =================================================
+            -- =============================================
+            -- ESPERAR PURCHASE
+            -- =============================================
 
             local purchase
             local purchaseName
@@ -2976,8 +3396,7 @@ local function runAutomation()
 
                 if occupied then
 
-                    rejectedDisplay =
-                        true
+                    rejectedDisplay = true
 
                     break
                 end
@@ -2990,10 +3409,6 @@ local function runAutomation()
 
                 break
             end
-
-            -- =================================================
-            -- COMPRAR
-            -- =================================================
 
             if purchase then
 
@@ -3013,15 +3428,11 @@ local function runAutomation()
                         break
                     end
 
-                    -- El prompt puede haber cambiado.
-                    -- Buscar de nuevo inmediatamente.
                     task.wait()
 
                     purchase,
                         purchaseName =
-                        findDisplayPurchase(
-                            nil
-                        )
+                        findDisplayPurchase(nil)
                 end
             end
 
@@ -3053,6 +3464,10 @@ end
 MasterToggle.Activated:Connect(
     toggleAutomation
 )
+
+-- =========================================================
+-- SPEED
+-- =========================================================
 
 Minus.Activated:Connect(function()
 
@@ -3087,6 +3502,58 @@ Plus.Activated:Connect(function()
 end)
 
 -- =========================================================
+-- SPIN DELAY
+-- =========================================================
+
+SpinMinus.Activated:Connect(
+    function()
+
+        config.spinDelay =
+            math.max(
+                0.1,
+                config.spinDelay - 0.1
+            )
+
+        config.spinDelay =
+            math.floor(
+                config.spinDelay * 10 + 0.5
+            ) / 10
+
+        SpinValue.Text =
+            string.format(
+                "%.1fs",
+                config.spinDelay
+            )
+
+        saveConfig()
+    end
+)
+
+SpinPlus.Activated:Connect(
+    function()
+
+        config.spinDelay =
+            math.min(
+                10,
+                config.spinDelay + 0.1
+            )
+
+        config.spinDelay =
+            math.floor(
+                config.spinDelay * 10 + 0.5
+            ) / 10
+
+        SpinValue.Text =
+            string.format(
+                "%.1fs",
+                config.spinDelay
+            )
+
+        saveConfig()
+    end
+)
+
+-- =========================================================
 -- DRAG
 -- =========================================================
 
@@ -3102,7 +3569,6 @@ do
 
             if input.UserInputType
                 ~= Enum.UserInputType.MouseButton1
-
                 and input.UserInputType
                 ~= Enum.UserInputType.Touch then
 
@@ -3120,7 +3586,6 @@ do
 
             if position.X
                 >= togglePosition.X - 8
-
                 and position.X
                 <= togglePosition.X
                     + toggleSize.X
@@ -3130,7 +3595,6 @@ do
             end
 
             dragging = true
-
             activeInput = input
 
             dragStart =
@@ -3147,7 +3611,6 @@ do
 
                     if input.UserInputState
                         == Enum.UserInputState.End
-
                         or input.UserInputState
                         == Enum.UserInputState.Cancel then
 
