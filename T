@@ -1,0 +1,373 @@
+if getgenv().TokitoHub then
+    pcall(function()
+        local oldGui = game:GetService("CoreGui"):FindFirstChild("TokitoHub")
+        if oldGui then oldGui:Destroy() end
+    end)
+    getgenv().TokitoHub = nil
+end
+getgenv().TokitoHub = true
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+
+-- ==========================================
+-- INTERFAZ GRÁFICA (GUI)
+-- ==========================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "TokitoHub"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = game:GetService("CoreGui")
+
+-- Pantalla de Carga
+local loadFrame = Instance.new("Frame")
+loadFrame.Size = UDim2.new(0, 250, 0, 80)
+loadFrame.Position = UDim2.new(0.5, -125, 0.5, -40)
+loadFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+loadFrame.Parent = gui
+Instance.new("UICorner", loadFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", loadFrame).Color = Color3.fromRGB(0, 170, 255)
+
+local loadTitle = Instance.new("TextLabel")
+loadTitle.Size = UDim2.new(1, 0, 0, 30)
+loadTitle.Position = UDim2.new(0, 0, 0, 10)
+loadTitle.BackgroundTransparency = 1
+loadTitle.Text = "Cargando Tokito Hub..."
+loadTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadTitle.Font = Enum.Font.GothamBold
+loadTitle.TextSize = 14
+loadTitle.Parent = loadFrame
+
+local barBG = Instance.new("Frame")
+barBG.Size = UDim2.new(0, 210, 0, 6)
+barBG.Position = UDim2.new(0, 20, 0, 50)
+barBG.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+barBG.Parent = loadFrame
+Instance.new("UICorner", barBG).CornerRadius = UDim.new(1, 0)
+
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.new(0, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+barFill.Parent = barBG
+Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
+
+-- Animación de carga
+TweenService:Create(barFill, TweenInfo.new(1.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+task.wait(1.6)
+loadFrame:Destroy()
+
+-- Marco Principal
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 300, 0, 350)
+main.Position = UDim2.new(0.5, -150, 0.5, -175)
+main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+main.ClipsDescendants = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(0, 170, 255)
+mainStroke.Thickness = 1.5
+mainStroke.Transparency = 0.2
+mainStroke.Parent = main
+
+-- Topbar
+local topbar = Instance.new("Frame")
+topbar.Size = UDim2.new(1, 0, 0, 35)
+topbar.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+topbar.Parent = main
+Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 10)
+
+local topbarFix = Instance.new("Frame")
+topbarFix.Size = UDim2.new(1, 0, 0, 10)
+topbarFix.Position = UDim2.new(0, 0, 1, -10)
+topbarFix.BackgroundColor3 = topbar.BackgroundColor3
+topbarFix.BorderSizePixel = 0
+topbarFix.Parent = topbar
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 1, 0)
+title.Position = UDim2.new(0, 15, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Tokito Hub | Compact"
+title.TextColor3 = Color3.fromRGB(0, 170, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = topbar
+
+-- Botón Cerrar
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -30, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 12
+closeBtn.Parent = topbar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+-- Botón Minimizar
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 24, 0, 24)
+minBtn.Position = UDim2.new(1, -60, 0, 5)
+minBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+minBtn.Text = "-"
+minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Font = Enum.Font.GothamBold
+minBtn.TextSize = 16
+minBtn.Parent = topbar
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+
+-- Scroll de opciones
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -20, 1, -50)
+scroll.Position = UDim2.new(0, 10, 0, 45)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 3
+scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 170, 255)
+scroll.Parent = main
+
+-- Lógica de Minimizar
+local minimized = false
+minBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        scroll.Visible = false
+        TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 35)}):Play()
+    else
+        TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 350)}):Play()
+        task.wait(0.2)
+        scroll.Visible = true
+    end
+end)
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 8)
+layout.Parent = scroll
+
+-- Sistema de Arrastre (Drag)
+local dragging, dragInput, dragStart, startPos
+topbar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+topbar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Función para crear Toggles Animados
+local function createToggle(name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+    btn.Text = ""
+    btn.Parent = scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -50, 1, 0)
+    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = btn
+
+    local status = Instance.new("Frame")
+    status.Size = UDim2.new(0, 12, 0, 12)
+    status.Position = UDim2.new(1, -25, 0.5, -6)
+    status.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    status.Parent = btn
+    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(status, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(30, 35, 45) or Color3.fromRGB(25, 25, 32)}):Play()
+        pcall(callback, state)
+    end)
+end
+
+-- ==========================================
+-- LÓGICA DE LAS FUNCIONES
+-- ==========================================
+
+-- 1. FPS BOOSTER
+local savedLighting = nil
+local savedTerrainDecoration = nil
+createToggle("FPS Booster", function(state)
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if state then
+        savedLighting = {
+            GlobalShadows = Lighting.GlobalShadows,
+            Brightness = Lighting.Brightness,
+            FogEnd = Lighting.FogEnd
+        }
+        Lighting.GlobalShadows = false
+        Lighting.Brightness = 1
+        Lighting.FogEnd = 100000
+        if terrain then
+            savedTerrainDecoration = terrain.Decoration
+            terrain.Decoration = false
+        end
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then obj.CastShadow = false end
+            if obj:IsA("Texture") or obj:IsA("Decal") then obj.Transparency = 1 end
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then obj.Enabled = false end
+        end
+    else
+        if savedLighting then
+            Lighting.GlobalShadows = savedLighting.GlobalShadows
+            Lighting.Brightness = savedLighting.Brightness
+            Lighting.FogEnd = savedLighting.FogEnd
+        end
+        if terrain and savedTerrainDecoration ~= nil then
+            terrain.Decoration = savedTerrainDecoration
+        end
+    end
+end)
+
+-- 2. ANTI-RAGDOLL V1
+local v1Loop
+local function isRagdolled(hum)
+    local state = hum:GetState()
+    return state == Enum.HumanoidStateType.Physics or state == Enum.HumanoidStateType.Ragdoll or state == Enum.HumanoidStateType.FallingDown
+end
+
+createToggle("Anti-Ragdoll V1", function(state)
+    if state then
+        v1Loop = RunService.Heartbeat:Connect(function()
+            local char = LP.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if hum and root and isRagdolled(hum) then
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+                root.Anchored = false
+                for _, desc in ipairs(char:GetDescendants()) do
+                    if desc:IsA("BallSocketConstraint") or (desc:IsA("Attachment") and desc.Name:find("RagdollAttachment")) then
+                        desc:Destroy()
+                    end
+                end
+            end
+        end)
+    else
+        if v1Loop then v1Loop:Disconnect() v1Loop = nil end
+    end
+end)
+
+-- 3. ANTI-RAGDOLL V2
+local scriptLoaded = false
+createToggle("Anti-Ragdoll V2", function(state)
+    if state and not scriptLoaded then
+        scriptLoaded = true
+        pcall(function() loadstring(game:HttpGet("https://pastefy.app/ZqWdbCDe/raw"))() end)
+    end
+end)
+
+-- 4. COMPRAR AL INSTANTE
+local instantConn
+createToggle("Comprar al instante", function(state)
+    if instantConn then instantConn:Disconnect() instantConn = nil end
+    if state then
+        local function applyInst(v) if v:IsA("ProximityPrompt") then v.HoldDuration = 0 end end
+        for _, v in ipairs(Workspace:GetDescendants()) do applyInst(v) end
+        instantConn = Workspace.DescendantAdded:Connect(applyInst)
+    end
+end)
+
+-- 5. AUTO COMPRAR
+local autoClickEnabled = false
+local autoClickConns = {}
+
+local function isBuyPrompt(prompt)
+    local action = string.lower(prompt.ActionText or "")
+    local objText = string.lower(prompt.ObjectText or "")
+    return action:find("compr") or action:find("buy") or objText:find("compr") or objText:find("buy")
+end
+
+local function connectPrompt(prompt)
+    if prompt:IsA("ProximityPrompt") then
+        local conn = prompt.PromptShown:Connect(function()
+            if autoClickEnabled and isBuyPrompt(prompt) then
+                task.spawn(function()
+                    while autoClickEnabled and prompt and prompt.Parent and prompt.Enabled do
+                        pcall(function() fireproximityprompt(prompt) end)
+                        task.wait(0.1)
+                    end
+                end)
+            end
+        end)
+        table.insert(autoClickConns, conn)
+    end
+end
+
+createToggle("Auto Comprar", function(state)
+    autoClickEnabled = state
+    for _, c in ipairs(autoClickConns) do c:Disconnect() end
+    autoClickConns = {}
+
+    if state then
+        for _, v in ipairs(Workspace:GetDescendants()) do connectPrompt(v) end
+        table.insert(autoClickConns, Workspace.DescendantAdded:Connect(connectPrompt))
+    end
+end)
+
+-- 6. FREEZE
+local freezeConn
+local savedSpeed = 16
+createToggle("Freeze", function(state)
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not hum or not root then return end
+
+    if state then
+        savedSpeed = hum.WalkSpeed
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        root.Anchored = true
+        freezeConn = RunService.Heartbeat:Connect(function()
+            if root and root.Parent then
+                root.Velocity = Vector3.zero
+                root.RotVelocity = Vector3.zero
+            end
+        end)
+    else
+        hum.WalkSpeed = savedSpeed
+        hum.JumpPower = 50
+        root.Anchored = false
+        if freezeConn then freezeConn:Disconnect() freezeConn = nil end
+    end
+end)
+
+-- Ajuste automático del scroll
+scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+end)
