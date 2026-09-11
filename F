@@ -1,0 +1,2433 @@
+local env = getgenv()
+
+env.FSSAutoToken = (env.FSSAutoToken or 0) + 1
+env.FSSAutoEnabled = false
+
+-- =========================================================
+-- LIMPIEZA DE EJECUCIONES ANTERIORES
+-- =========================================================
+
+if env.FSSTokiGui then
+    pcall(function()
+        env.FSSTokiGui:Destroy()
+    end)
+
+    env.FSSTokiGui = nil
+end
+
+if env.FSSGKConnection then
+    pcall(function()
+        env.FSSGKConnection:Disconnect()
+    end)
+
+    env.FSSGKConnection = nil
+end
+
+if env.FSSGuiConnections then
+    for _, connection in pairs(env.FSSGuiConnections) do
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
+
+    env.FSSGuiConnections = nil
+end
+
+local token = env.FSSAutoToken
+
+-- =========================================================
+-- CONFIGURACIÓN INTERNA
+-- =========================================================
+
+local config = {
+    enabled = true,
+    autoGoal = true,
+    looseBalls = false,
+    requireGoalkeeper = true,
+    alternateCentered = true,
+
+    shotSpeed = 205,
+    directShotSpeed = 160,
+    directGoalDistance = 11,
+
+    teleportSettle = 0.1,
+    cornerOffset = 12,
+    targetHeight = 2.7,
+    gravityCompensation = 55,
+
+    goalkeeperPrediction = 0.45,
+    goalkeeperSaveDistance = 80,
+    centerThreshold = 2.5,
+
+    maxStealDistance = 400,
+    tackleRetry = 0.3,
+    tackleCooldown = 3.05,
+    ownershipWait = 0.9,
+    scoreWait = 1.8,
+}
+
+assert(
+    config.shotSpeed <= 240
+        and config.directShotSpeed <= 205
+        and config.cornerOffset < 14,
+    "Configuración de tiro no segura"
+)
+
+local stats
+
+local function resetStats()
+    stats = {
+        started = os.time(),
+
+        tackleRequests = 0,
+        tackleAccepted = 0,
+        tackleRejected = 0,
+
+        steals = 0,
+        loosePickups = 0,
+        acquireFailures = 0,
+
+        shots = 0,
+        goals = 0,
+
+        saves = 0,
+        saveReplies = 0,
+
+        originRejections = 0,
+        errors = 0,
+
+        last = "Listo",
+    }
+
+    env.FSSAutoStats = stats
+end
+
+resetStats()
+
+env.FSSConfig = config
+env.FSSAutoEnabled = true
+
+-- =========================================================
+-- SERVICIOS
+-- =========================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- =========================================================
+-- CONFIGURACIÓN DE LA GUI
+-- =========================================================
+
+local GUI_CONFIG = {
+    defaultWidth = 310,
+    defaultHeight = 92,
+
+    minWidth = 245,
+    maxWidth = 520,
+
+    minHeight = 76,
+    maxHeight = 180,
+
+    cornerRadius = 11,
+
+    backgroundTransparency = 0.06,
+
+    showStats = true,
+}
+
+-- =========================================================
+-- TAMAÑO Y ESTADO GUARDADOS
+-- =========================================================
+
+local savedGuiSize = env.FSSGuiSize
+
+if typeof(savedGuiSize) ~= "Vector2" then
+    savedGuiSize = Vector2.new(
+        GUI_CONFIG.defaultWidth,
+        GUI_CONFIG.defaultHeight
+    )
+end
+
+savedGuiSize = Vector2.new(
+    math.clamp(
+        savedGuiSize.X,
+        GUI_CONFIG.minWidth,
+        GUI_CONFIG.maxWidth
+    ),
+
+    math.clamp(
+        savedGuiSize.Y,
+        GUI_CONFIG.minHeight,
+        GUI_CONFIG.maxHeight
+    )
+)
+
+env.FSSGuiSize = savedGuiSize
+
+local guiLocked = env.FSSGuiLocked == true
+
+-- =========================================================
+-- GUI PRINCIPAL
+-- =========================================================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "TokiAutoGol"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = game:GetService("CoreGui")
+
+env.FSSTokiGui = gui
+env.FSSGuiConnections = {}
+
+local main = Instance.new("Frame")
+main.Name = "Main"
+
+main.Size = UDim2.fromOffset(
+    savedGuiSize.X,
+    savedGuiSize.Y
+)
+
+main.Position = UDim2.new(
+    0.5,
+    -savedGuiSize.X / 2,
+    0.5,
+    -savedGuiSize.Y / 2
+)
+
+main.BackgroundColor3 = Color3.fromRGB(
+    6,
+    12,
+    27
+)
+
+main.BackgroundTransparency =
+    GUI_CONFIG.backgroundTransparency
+
+main.BorderSizePixel = 0
+main.ClipsDescendants = false
+main.Parent = gui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius =
+    UDim.new(
+        0,
+        GUI_CONFIG.cornerRadius
+    )
+mainCorner.Parent = main
+
+local stroke = Instance.new("UIStroke")
+stroke.Name = "Borde"
+stroke.Thickness = 1.5
+stroke.Transparency = 0
+stroke.Color =
+    Color3.fromRGB(
+        75,
+        190,
+        255
+    )
+stroke.Parent = main
+
+-- =========================================================
+-- BRILLO
+-- =========================================================
+
+local glow = Instance.new("Frame")
+glow.Name = "Brillo"
+
+glow.Size = UDim2.new(
+    1,
+    12,
+    1,
+    12
+)
+
+glow.Position = UDim2.fromOffset(
+    -6,
+    -6
+)
+
+glow.BackgroundTransparency = 1
+glow.BorderSizePixel = 0
+glow.ZIndex = 0
+glow.Parent = main
+
+local glowCorner = Instance.new("UICorner")
+glowCorner.CornerRadius =
+    UDim.new(
+        0,
+        GUI_CONFIG.cornerRadius + 5
+    )
+glowCorner.Parent = glow
+
+local glowStroke = Instance.new("UIStroke")
+glowStroke.Thickness = 5
+glowStroke.Transparency = 0.78
+glowStroke.Color =
+    Color3.fromRGB(
+        40,
+        170,
+        255
+    )
+glowStroke.Parent = glow
+
+-- =========================================================
+-- CABECERA
+-- =========================================================
+
+local header = Instance.new("Frame")
+header.Name = "Cabecera"
+
+header.Size = UDim2.new(
+    1,
+    0,
+    0,
+    44
+)
+
+header.BackgroundTransparency = 1
+header.Parent = main
+
+-- Decoración lateral
+
+local accent = Instance.new("Frame")
+accent.Name = "Decoracion"
+
+accent.Position =
+    UDim2.fromOffset(
+        11,
+        10
+    )
+
+accent.Size =
+    UDim2.fromOffset(
+        3,
+        24
+    )
+
+accent.BackgroundColor3 =
+    Color3.fromRGB(
+        80,
+        210,
+        255
+    )
+
+accent.BorderSizePixel = 0
+accent.Parent = header
+
+local accentCorner = Instance.new("UICorner")
+accentCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+accentCorner.Parent = accent
+
+-- =========================================================
+-- TÍTULO
+-- =========================================================
+
+local title = Instance.new("TextLabel")
+title.Name = "Titulo"
+
+title.BackgroundTransparency = 1
+
+title.Position =
+    UDim2.fromOffset(
+        21,
+        7
+    )
+
+title.Size =
+    UDim2.new(
+        1,
+        -260,
+        0,
+        20
+    )
+
+title.Font =
+    Enum.Font.GothamBold
+
+title.Text = "TOKI"
+
+title.TextSize = 17
+
+title.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+title.TextColor3 =
+    Color3.fromRGB(
+        130,
+        225,
+        255
+    )
+
+title.Parent = header
+
+-- =========================================================
+-- SUBTÍTULO
+-- =========================================================
+
+local subtitle = Instance.new("TextLabel")
+subtitle.Name = "Subtitulo"
+
+subtitle.BackgroundTransparency = 1
+
+subtitle.Position =
+    UDim2.fromOffset(
+        21,
+        26
+    )
+
+subtitle.Size =
+    UDim2.new(
+        1,
+        -260,
+        0,
+        12
+    )
+
+subtitle.Font =
+    Enum.Font.Gotham
+
+subtitle.Text =
+    "FIFA Super Soccer"
+
+subtitle.TextSize = 8
+
+subtitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+subtitle.TextColor3 =
+    Color3.fromRGB(
+        105,
+        130,
+        165
+    )
+
+subtitle.Parent = header
+
+-- =========================================================
+-- BOTÓN DE CANDADO
+-- =========================================================
+
+local lockButton = Instance.new("TextButton")
+lockButton.Name = "Candado"
+
+lockButton.AutoButtonColor = false
+
+lockButton.AnchorPoint =
+    Vector2.new(
+        1,
+        0.5
+    )
+
+lockButton.Position =
+    UDim2.new(
+        1,
+        -151,
+        0.5,
+        0
+    )
+
+lockButton.Size =
+    UDim2.fromOffset(
+        28,
+        30
+    )
+
+lockButton.BackgroundColor3 =
+    Color3.fromRGB(
+        20,
+        30,
+        45
+    )
+
+lockButton.BorderSizePixel = 0
+
+lockButton.Text = ""
+
+lockButton.Parent = header
+
+local lockCorner = Instance.new("UICorner")
+lockCorner.CornerRadius =
+    UDim.new(
+        0,
+        8
+    )
+lockCorner.Parent = lockButton
+
+local lockStroke = Instance.new("UIStroke")
+lockStroke.Thickness = 1.1
+lockStroke.Color =
+    Color3.fromRGB(
+        80,
+        110,
+        145
+    )
+lockStroke.Parent = lockButton
+
+-- =========================================================
+-- ICONO DEL CANDADO
+-- =========================================================
+
+local lockIcon = Instance.new("Frame")
+lockIcon.Name = "Icono"
+
+lockIcon.Size =
+    UDim2.fromOffset(
+        20,
+        20
+    )
+
+lockIcon.AnchorPoint =
+    Vector2.new(
+        0.5,
+        0.5
+    )
+
+lockIcon.Position =
+    UDim2.new(
+        0.5,
+        0,
+        0.5,
+        1
+    )
+
+lockIcon.BackgroundTransparency = 1
+lockIcon.Parent = lockButton
+
+local lockBody = Instance.new("Frame")
+lockBody.Name = "Cuerpo"
+
+lockBody.Size =
+    UDim2.fromOffset(
+        13,
+        10
+    )
+
+lockBody.Position =
+    UDim2.fromOffset(
+        3.5,
+        8
+    )
+
+lockBody.BackgroundColor3 =
+    Color3.fromRGB(
+        170,
+        220,
+        245
+    )
+
+lockBody.BorderSizePixel = 0
+lockBody.Parent = lockIcon
+
+local lockBodyCorner = Instance.new("UICorner")
+lockBodyCorner.CornerRadius =
+    UDim.new(
+        0,
+        3
+    )
+lockBodyCorner.Parent = lockBody
+
+local lockShackle = Instance.new("Frame")
+lockShackle.Name = "Arco"
+
+lockShackle.Size =
+    UDim2.fromOffset(
+        9,
+        9
+    )
+
+lockShackle.Position =
+    UDim2.fromOffset(
+        5.5,
+        3
+    )
+
+lockShackle.BackgroundTransparency = 1
+lockShackle.BorderSizePixel = 0
+lockShackle.Parent = lockIcon
+
+local lockShackleCorner = Instance.new("UICorner")
+lockShackleCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+lockShackleCorner.Parent = lockShackle
+
+local lockShackleStroke = Instance.new("UIStroke")
+lockShackleStroke.Thickness = 2
+lockShackleStroke.Color =
+    Color3.fromRGB(
+        170,
+        220,
+        245
+    )
+lockShackleStroke.Parent = lockShackle
+
+-- =========================================================
+-- BOTÓN PRINCIPAL
+-- =========================================================
+
+local toggle = Instance.new("TextButton")
+toggle.Name = "BotonAutoGol"
+
+toggle.AutoButtonColor = false
+
+toggle.AnchorPoint =
+    Vector2.new(
+        1,
+        0.5
+    )
+
+toggle.Position =
+    UDim2.new(
+        1,
+        -10,
+        0.5,
+        0
+    )
+
+toggle.Size =
+    UDim2.fromOffset(
+        130,
+        30
+    )
+
+toggle.Font =
+    Enum.Font.GothamBold
+
+toggle.TextSize = 10
+
+toggle.TextColor3 =
+    Color3.fromRGB(
+        235,
+        250,
+        255
+    )
+
+toggle.Text =
+    "AUTOGOL • ACTIVO"
+
+toggle.BorderSizePixel = 0
+toggle.Parent = header
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius =
+    UDim.new(
+        0,
+        9
+    )
+toggleCorner.Parent = toggle
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Thickness = 1.25
+toggleStroke.Parent = toggle
+
+local toggleDot = Instance.new("Frame")
+toggleDot.Name = "Indicador"
+
+toggleDot.Size =
+    UDim2.fromOffset(
+        8,
+        8
+    )
+
+toggleDot.AnchorPoint =
+    Vector2.new(
+        0,
+        0.5
+    )
+
+toggleDot.Position =
+    UDim2.fromOffset(
+        9,
+        15
+    )
+
+toggleDot.BorderSizePixel = 0
+
+toggleDot.BackgroundColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+toggleDot.Parent = toggle
+
+local dotCorner = Instance.new("UICorner")
+dotCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+dotCorner.Parent = toggleDot
+
+-- =========================================================
+-- CUERPO
+-- =========================================================
+
+local body = Instance.new("Frame")
+body.Name = "Estado"
+
+body.BackgroundTransparency = 1
+
+body.Position =
+    UDim2.fromOffset(
+        13,
+        46
+    )
+
+body.Size =
+    UDim2.new(
+        1,
+        -26,
+        1,
+        -55
+    )
+
+body.Parent = main
+
+-- =========================================================
+-- PUNTO DE ESTADO
+-- =========================================================
+
+local statusDot = Instance.new("Frame")
+statusDot.Name = "PuntoEstado"
+
+statusDot.AnchorPoint =
+    Vector2.new(
+        0,
+        0.5
+    )
+
+statusDot.Position =
+    UDim2.new(
+        0,
+        0,
+        0.5,
+        0
+    )
+
+statusDot.Size =
+    UDim2.fromOffset(
+        7,
+        7
+    )
+
+statusDot.BorderSizePixel = 0
+
+statusDot.BackgroundColor3 =
+    Color3.fromRGB(
+        65,
+        230,
+        145
+    )
+
+statusDot.Parent = body
+
+local statusDotCorner = Instance.new("UICorner")
+statusDotCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+
+statusDotCorner.Parent = statusDot
+
+-- =========================================================
+-- MENSAJE DE ESTADO
+-- =========================================================
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "Mensaje"
+
+statusLabel.BackgroundTransparency = 1
+
+statusLabel.Position =
+    UDim2.fromOffset(
+        14,
+        0
+    )
+
+statusLabel.Size =
+    UDim2.new(
+        1,
+        -135,
+        1,
+        0
+    )
+
+statusLabel.Font =
+    Enum.Font.GothamMedium
+
+statusLabel.Text =
+    "Listo"
+
+statusLabel.TextSize = 9
+
+statusLabel.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+statusLabel.TextColor3 =
+    Color3.fromRGB(
+        150,
+        170,
+        200
+    )
+
+statusLabel.TextTruncate =
+    Enum.TextTruncate.AtEnd
+
+statusLabel.Parent = body
+
+-- =========================================================
+-- ESTADÍSTICAS
+-- =========================================================
+
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Name = "Estadisticas"
+
+statsLabel.AnchorPoint =
+    Vector2.new(
+        1,
+        0.5
+    )
+
+statsLabel.Position =
+    UDim2.new(
+        1,
+        0,
+        0.5,
+        0
+    )
+
+statsLabel.Size =
+    UDim2.fromOffset(
+        125,
+        18
+    )
+
+statsLabel.BackgroundTransparency = 1
+
+statsLabel.Font =
+    Enum.Font.GothamBold
+
+statsLabel.Text =
+    "Goles: 0 • Tiros: 0"
+
+statsLabel.TextSize = 8
+
+statsLabel.TextXAlignment =
+    Enum.TextXAlignment.Right
+
+statsLabel.TextColor3 =
+    Color3.fromRGB(
+        95,
+        180,
+        225
+    )
+
+statsLabel.Parent = body
+
+-- =========================================================
+-- BOTÓN PARA CAMBIAR EL TAMAÑO
+-- =========================================================
+
+local resize = Instance.new("TextButton")
+resize.Name = "CambiarTamano"
+
+resize.AutoButtonColor = false
+
+resize.AnchorPoint =
+    Vector2.new(
+        1,
+        1
+    )
+
+resize.Position =
+    UDim2.new(
+        1,
+        -3,
+        1,
+        -3
+    )
+
+resize.Size =
+    UDim2.fromOffset(
+        17,
+        17
+    )
+
+resize.BackgroundTransparency = 1
+
+resize.Text = "◢"
+
+resize.Font =
+    Enum.Font.GothamBold
+
+resize.TextSize = 10
+
+resize.TextColor3 =
+    Color3.fromRGB(
+        70,
+        160,
+        205
+    )
+
+resize.ZIndex = 20
+resize.Parent = main
+
+-- =========================================================
+-- ACTUALIZAR ICONO Y ESTADO DEL CANDADO
+-- =========================================================
+
+local function actualizarCandado()
+    if guiLocked then
+        lockStroke.Color =
+            Color3.fromRGB(
+                50,
+                210,
+                150
+            )
+
+        lockBody.BackgroundColor3 =
+            Color3.fromRGB(
+                95,
+                225,
+                170
+            )
+
+        lockShackleStroke.Color =
+            Color3.fromRGB(
+                95,
+                225,
+                170
+            )
+
+        -- Candado cerrado
+        lockShackle.Rotation = 0
+
+        lockButton.BackgroundColor3 =
+            Color3.fromRGB(
+                15,
+                48,
+                42
+            )
+
+    else
+        lockStroke.Color =
+            Color3.fromRGB(
+                255,
+                190,
+                80
+            )
+
+        lockBody.BackgroundColor3 =
+            Color3.fromRGB(
+                245,
+                205,
+                115
+            )
+
+        lockShackleStroke.Color =
+            Color3.fromRGB(
+                245,
+                205,
+                115
+            )
+
+        -- Candado abierto
+        lockShackle.Rotation = 28
+
+        lockButton.BackgroundColor3 =
+            Color3.fromRGB(
+                48,
+                38,
+                18
+            )
+    end
+
+    env.FSSGuiLocked = guiLocked
+end
+
+actualizarCandado()
+
+-- =========================================================
+-- FUNCIÓN DEL BOTÓN AUTOGOL
+-- =========================================================
+
+local function actualizarBotonAutoGol(
+    enabled,
+    instant
+)
+    local targetButton =
+        enabled
+        and Color3.fromRGB(
+            0,
+            110,
+            200
+        )
+        or Color3.fromRGB(
+            25,
+            34,
+            49
+        )
+
+    local targetStroke =
+        enabled
+        and Color3.fromRGB(
+            40,
+            190,
+            255
+        )
+        or Color3.fromRGB(
+            70,
+            85,
+            110
+        )
+
+    local targetText =
+        enabled
+        and "AUTOGOL • ACTIVO"
+        or "AUTOGOL • PAUSADO"
+
+    local targetPosition =
+        enabled
+        and UDim2.fromOffset(
+            113,
+            15
+        )
+        or UDim2.fromOffset(
+            9,
+            15
+        )
+
+    toggle.Text = targetText
+
+    if instant then
+        toggle.BackgroundColor3 =
+            targetButton
+
+        toggleStroke.Color =
+            targetStroke
+
+        toggleDot.Position =
+            targetPosition
+    else
+        TweenService:Create(
+            toggle,
+            TweenInfo.new(
+                0.16,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            ),
+            {
+                BackgroundColor3 =
+                    targetButton
+            }
+        ):Play()
+
+        TweenService:Create(
+            toggleStroke,
+            TweenInfo.new(
+                0.16,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Color =
+                    targetStroke
+            }
+        ):Play()
+
+        TweenService:Create(
+            toggleDot,
+            TweenInfo.new(
+                0.16,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Position =
+                    targetPosition
+            }
+        ):Play()
+    end
+
+    statusDot.BackgroundColor3 =
+        enabled
+        and Color3.fromRGB(
+            65,
+            230,
+            145
+        )
+        or Color3.fromRGB(
+            110,
+            120,
+            135
+        )
+end
+
+actualizarBotonAutoGol(
+    config.autoGoal,
+    true
+)
+
+-- =========================================================
+-- BOTÓN AUTOGOL
+-- =========================================================
+
+table.insert(
+    env.FSSGuiConnections,
+    toggle.MouseButton1Click:Connect(
+        function()
+            config.autoGoal =
+                not config.autoGoal
+
+            actualizarBotonAutoGol(
+                config.autoGoal,
+                false
+            )
+
+            if config.autoGoal then
+                stats.last =
+                    "Autogol activado"
+            else
+                stats.last =
+                    "Autogol pausado"
+            end
+        end
+    )
+)
+
+-- =========================================================
+-- BOTÓN CANDADO
+-- =========================================================
+
+table.insert(
+    env.FSSGuiConnections,
+    lockButton.MouseButton1Click:Connect(
+        function()
+            guiLocked = not guiLocked
+
+            actualizarCandado()
+
+            if guiLocked then
+                stats.last =
+                    "Interfaz bloqueada"
+            else
+                stats.last =
+                    "Interfaz desbloqueada"
+            end
+        end
+    )
+)
+
+-- =========================================================
+-- ARRASTRAR LA GUI
+-- =========================================================
+
+do
+    local dragging = false
+
+    local dragStart
+    local startPosition
+
+    local function puntoDentro(obj, point)
+        local pos = obj.AbsolutePosition
+        local size = obj.AbsoluteSize
+
+        return point.X >= pos.X
+            and point.X <= pos.X + size.X
+            and point.Y >= pos.Y
+            and point.Y <= pos.Y + size.Y
+    end
+
+    local function puedeMoverse(input)
+        if guiLocked then
+            return false
+        end
+
+        if puntoDentro(
+            toggle,
+            input.Position
+        ) then
+            return false
+        end
+
+        if puntoDentro(
+            lockButton,
+            input.Position
+        ) then
+            return false
+        end
+
+        if puntoDentro(
+            resize,
+            input.Position
+        ) then
+            return false
+        end
+
+        return true
+    end
+
+    local function actualizarArrastre(input)
+        if not dragging then
+            return
+        end
+
+        if not dragStart
+            or not startPosition
+        then
+            return
+        end
+
+        local delta =
+            input.Position
+            - dragStart
+
+        local viewport =
+            workspace.CurrentCamera
+                and workspace.CurrentCamera.ViewportSize
+                or Vector2.new(
+                    1920,
+                    1080
+                )
+
+        local size =
+            main.AbsoluteSize
+
+        local newX =
+            startPosition.X.Offset
+            + delta.X
+
+        local newY =
+            startPosition.Y.Offset
+            + delta.Y
+
+        newX = math.clamp(
+            newX,
+            -size.X + 30,
+            viewport.X - 30
+        )
+
+        newY = math.clamp(
+            newY,
+            -size.Y + 25,
+            viewport.Y - 25
+        )
+
+        main.Position =
+            UDim2.new(
+                0,
+                newX,
+                0,
+                newY
+            )
+    end
+
+    table.insert(
+        env.FSSGuiConnections,
+        main.InputBegan:Connect(
+            function(input)
+                if not puedeMoverse(input) then
+                    return
+                end
+
+                if input.UserInputType
+                    == Enum.UserInputType.MouseButton1
+                    or input.UserInputType
+                    == Enum.UserInputType.Touch
+                then
+                    dragging = true
+
+                    dragStart =
+                        input.Position
+
+                    startPosition =
+                        main.Position
+
+                    input.Changed:Connect(
+                        function()
+                            if input.UserInputState
+                                == Enum.UserInputState.End
+                            then
+                                dragging = false
+                            end
+                        end
+                    )
+                end
+            end
+        )
+    )
+
+    table.insert(
+        env.FSSGuiConnections,
+        UserInputService.InputChanged:Connect(
+            function(input)
+                if not dragging
+                    or guiLocked
+                then
+                    return
+                end
+
+                if input.UserInputType
+                    == Enum.UserInputType.MouseMovement
+                    or input.UserInputType
+                    == Enum.UserInputType.Touch
+                then
+                    actualizarArrastre(input)
+                end
+            end
+        )
+    )
+end
+
+-- =========================================================
+-- CAMBIAR EL TAMAÑO
+-- =========================================================
+
+do
+    local resizing = false
+
+    local resizeStart
+    local resizeStartSize
+
+    local function actualizarTamano(input)
+        if not resizing
+            or guiLocked
+        then
+            return
+        end
+
+        local delta =
+            input.Position
+            - resizeStart
+
+        local width =
+            resizeStartSize.X
+            + delta.X
+
+        local height =
+            resizeStartSize.Y
+            + delta.Y
+
+        width = math.clamp(
+            width,
+            GUI_CONFIG.minWidth,
+            GUI_CONFIG.maxWidth
+        )
+
+        height = math.clamp(
+            height,
+            GUI_CONFIG.minHeight,
+            GUI_CONFIG.maxHeight
+        )
+
+        main.Size =
+            UDim2.fromOffset(
+                width,
+                height
+            )
+
+        env.FSSGuiSize =
+            Vector2.new(
+                width,
+                height
+            )
+    end
+
+    table.insert(
+        env.FSSGuiConnections,
+        resize.InputBegan:Connect(
+            function(input)
+                if guiLocked then
+                    return
+                end
+
+                if input.UserInputType
+                    == Enum.UserInputType.MouseButton1
+                    or input.UserInputType
+                    == Enum.UserInputType.Touch
+                then
+                    resizing = true
+
+                    resizeStart =
+                        input.Position
+
+                    resizeStartSize =
+                        Vector2.new(
+                            main.AbsoluteSize.X,
+                            main.AbsoluteSize.Y
+                        )
+
+                    input.Changed:Connect(
+                        function()
+                            if input.UserInputState
+                                == Enum.UserInputState.End
+                            then
+                                resizing = false
+                            end
+                        end
+                    )
+                end
+            end
+        )
+    )
+
+    table.insert(
+        env.FSSGuiConnections,
+        UserInputService.InputChanged:Connect(
+            function(input)
+                if not resizing
+                    or guiLocked
+                then
+                    return
+                end
+
+                if input.UserInputType
+                    == Enum.UserInputType.MouseMovement
+                    or input.UserInputType
+                    == Enum.UserInputType.Touch
+                then
+                    actualizarTamano(input)
+                end
+            end
+        )
+    )
+end
+
+-- =========================================================
+-- COLORES ANIMADOS
+-- =========================================================
+
+local guiAlive = true
+
+task.spawn(function()
+    while guiAlive
+        and gui.Parent
+    do
+        local t = os.clock()
+
+        local hue =
+            0.56
+            + (
+                (
+                    math.sin(
+                        t * 1.25
+                    )
+                    + 1
+                )
+                * 0.5
+            )
+            * 0.13
+
+        local neon =
+            Color3.fromHSV(
+                hue,
+                0.82,
+                1
+            )
+
+        stroke.Color = neon
+        glowStroke.Color = neon
+        title.TextColor3 = neon
+        accent.BackgroundColor3 = neon
+
+        if config.autoGoal then
+            toggleStroke.Color = neon
+        end
+
+        task.wait(0.03)
+    end
+end)
+
+-- =========================================================
+-- ACTUALIZAR TEXTO DE LA GUI
+-- =========================================================
+
+task.spawn(function()
+    while guiAlive
+        and gui.Parent
+        and env.FSSAutoToken == token
+    do
+        if stats then
+            local last =
+                tostring(
+                    stats.last
+                    or "Listo"
+                )
+
+            if #last > 48 then
+                last =
+                    string.sub(
+                        last,
+                        1,
+                        48
+                    )
+                    .. "..."
+            end
+
+            statusLabel.Text = last
+
+            if GUI_CONFIG.showStats then
+                statsLabel.Visible = true
+
+                statsLabel.Text =
+                    string.format(
+                        "Goles: %d • Tiros: %d",
+                        stats.goals or 0,
+                        stats.shots or 0
+                    )
+            else
+                statsLabel.Visible = false
+            end
+
+            if not config.autoGoal then
+                statusDot.BackgroundColor3 =
+                    Color3.fromRGB(
+                        110,
+                        120,
+                        135
+                    )
+            elseif stats.errors
+                and stats.errors > 0
+            then
+                statusDot.BackgroundColor3 =
+                    Color3.fromRGB(
+                        255,
+                        120,
+                        100
+                    )
+            else
+                statusDot.BackgroundColor3 =
+                    Color3.fromRGB(
+                        65,
+                        230,
+                        145
+                    )
+            end
+        end
+
+        task.wait(0.15)
+    end
+end)
+
+-- =========================================================
+-- LÓGICA ORIGINAL
+-- =========================================================
+
+local PerformAction =
+    ReplicatedStorage
+        .Packages
+        ._Index["sleitnick_knit@1.7.0"]
+        .knit
+        .Services
+        .ActionService
+        .RE
+        .PerformAction
+
+local cornerFlip = false
+
+env.FSSGKConnection =
+    ReplicatedStorage
+        .__GamemodeComm
+        .RE
+        .GetBallTouchResult
+        .OnClientEvent
+        :Connect(function()
+            if config.enabled
+                and LocalPlayer:GetAttribute(
+                    "TeamRole"
+                ) == "Goalkeeper"
+            then
+                ReplicatedStorage
+                    .__GamemodeComm
+                    .RE
+                    .SetBallTouchResult
+                    :FireServer(true)
+
+                stats.saveReplies += 1
+            end
+        end)
+
+local function activeBall()
+    for _, ball in CollectionService:GetTagged(
+        "Football"
+    ) do
+        if ball:IsA("BasePart")
+            and ball:IsDescendantOf(
+                workspace
+            )
+            and ball:GetAttribute(
+                "Enabled"
+            ) == true
+        then
+            return ball
+        end
+    end
+end
+
+local function playerByAgentId(agentId)
+    if not agentId then
+        return
+    end
+
+    for _, player in Players:GetPlayers() do
+        if player:GetAttribute(
+            "AgentId"
+        ) == agentId
+        then
+            return player
+        end
+    end
+end
+
+local function opposingGoalkeeper(side)
+    for _, player in Players:GetPlayers() do
+        if player.Team
+            and player.Team.Name == side
+            and (
+                player:GetAttribute(
+                    "TeamRole"
+                ) == "Goalkeeper"
+                or player:GetAttribute(
+                    "TeamPosition"
+                ) == "GK"
+            )
+        then
+            local root =
+                player.Character
+                and player.Character:FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if root then
+                return root
+            end
+        end
+    end
+
+    for _, model in workspace:GetDescendants() do
+        if model:IsA("Model")
+            and model:GetAttribute(
+                "TeamRole"
+            ) == "Goalkeeper"
+            and model:GetAttribute(
+                "IsHomeOrAway"
+            ) == side
+        then
+            local root =
+                model:FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if root then
+                return root
+            end
+        end
+    end
+end
+
+local function waitForPossession(
+    ball,
+    timeout
+)
+    local deadline =
+        os.clock()
+        + timeout
+
+    repeat
+        if LocalPlayer:GetAttribute(
+            "HasBall"
+        ) == true
+            and ball:GetAttribute(
+                "PossessorId"
+            ) == LocalPlayer:GetAttribute(
+                "AgentId"
+            )
+            and ball:GetAttribute(
+                "NetworkOwner"
+            ) == LocalPlayer.Name
+        then
+            return true
+        end
+
+        task.wait(0.03)
+    until os.clock() >= deadline
+        or env.FSSAutoToken ~= token
+
+    return false
+end
+
+local function shoot(
+    ball,
+    root,
+    source,
+    releaseOverride
+)
+    local targetSide =
+        LocalPlayer.Team
+        and LocalPlayer.Team.Name == "Home"
+        and "Away"
+        or "Home"
+
+    local teamFolder =
+        workspace.Stadium.Teams:FindFirstChild(
+            targetSide
+        )
+
+    local goal =
+        teamFolder
+        and teamFolder:FindFirstChild(
+            "Goal"
+        )
+
+    local goalHitbox =
+        goal
+        and goal:FindFirstChild(
+            "Hitbox"
+        )
+
+    local goalkeeper =
+        opposingGoalkeeper(
+            targetSide
+        )
+
+    if not goalHitbox
+        or (
+            config.requireGoalkeeper
+            and not goalkeeper
+        )
+    then
+        stats.last =
+            "Esperando la portería o al portero"
+
+        return
+    end
+
+    local center =
+        goalHitbox.Position
+
+    local kick =
+        root:FindFirstChild(
+            "KickAttachment"
+        )
+
+    local origin =
+        releaseOverride
+        or (
+            kick
+            and kick.WorldPosition
+        )
+        or (
+            root.Position
+                + root.CFrame.LookVector * 3
+                + Vector3.new(
+                    0,
+                    -1,
+                    0
+                )
+        )
+
+    local flatCenter =
+        Vector3.new(
+            center.X - origin.X,
+            0,
+            center.Z - origin.Z
+        )
+
+    if flatCenter.Magnitude < 1 then
+        return
+    end
+
+    local directGoal =
+        not releaseOverride
+
+    local flightTime =
+        flatCenter.Magnitude
+        / config.shotSpeed
+
+    local goalkeeperPosition =
+        goalkeeper
+        and goalkeeper.Position
+            + goalkeeper.AssemblyLinearVelocity
+                * (
+                    directGoal
+                    and 0
+                    or math.min(
+                        flightTime,
+                        config.goalkeeperPrediction
+                    )
+                )
+        or center
+
+    local chooseLeft
+
+    if config.alternateCentered
+        and math.abs(
+            goalkeeperPosition.X
+                - center.X
+        ) < config.centerThreshold
+    then
+        cornerFlip =
+            not cornerFlip
+
+        chooseLeft =
+            cornerFlip
+    else
+        chooseLeft =
+            goalkeeperPosition.X
+            >= center.X
+    end
+
+    local aim =
+        Vector3.new(
+            center.X
+                + (
+                    chooseLeft
+                    and -config.cornerOffset
+                    or config.cornerOffset
+                ),
+
+            config.targetHeight,
+
+            center.Z
+        )
+
+    if directGoal then
+        local otherSide =
+            targetSide == "Home"
+            and "Away"
+            or "Home"
+
+        local otherGoal =
+            workspace
+                .Stadium
+                .Teams[otherSide]
+                .Goal
+                .Hitbox
+                .Position
+
+        local towardField =
+            Vector3.new(
+                otherGoal.X
+                    - center.X,
+
+                0,
+
+                otherGoal.Z
+                    - center.Z
+            ).Unit
+
+        local destination =
+            Vector3.new(
+                aim.X,
+                root.Position.Y,
+                center.Z
+            )
+            + towardField
+                * config.directGoalDistance
+
+        root.CFrame =
+            CFrame.lookAt(
+                destination,
+                Vector3.new(
+                    aim.X,
+                    destination.Y,
+                    center.Z
+                )
+            )
+
+        root.AssemblyLinearVelocity =
+            Vector3.zero
+
+        root.AssemblyAngularVelocity =
+            Vector3.zero
+
+        task.wait(
+            config.teleportSettle
+        )
+
+        kick =
+            root:FindFirstChild(
+                "KickAttachment"
+            )
+
+        origin =
+            (
+                kick
+                and kick.WorldPosition
+            )
+            or root.Position
+    end
+
+    local shotSpeed =
+        directGoal
+        and config.directShotSpeed
+        or config.shotSpeed
+
+    local flat =
+        Vector3.new(
+            aim.X - origin.X,
+            0,
+            aim.Z - origin.Z
+        )
+
+    flightTime =
+        flat.Magnitude
+        / shotSpeed
+
+    local velocity =
+        flat.Unit * shotSpeed
+        + Vector3.new(
+            0,
+            (
+                aim.Y
+                - origin.Y
+                + 0.5
+                    * config.gravityCompensation
+                    * flightTime ^ 2
+            )
+            / flightTime,
+
+            0
+        )
+
+    local ownTeam =
+        LocalPlayer.Team
+
+    local oldScore =
+        ownTeam
+        and ownTeam:GetAttribute(
+            "Score"
+        )
+        or 0
+
+    ball:SetAttribute(
+        "State",
+        "Released"
+    )
+
+    LocalPlayer:SetAttribute(
+        "HasBall",
+        false
+    )
+
+    ball:SetAttribute(
+        "PossessorId",
+        nil
+    )
+
+    ball.Velocity =
+        Vector3.zero
+
+    ball:PivotTo(
+        CFrame.new(
+            origin
+        )
+    )
+
+    ball.Velocity =
+        velocity
+
+    PerformAction:FireServer(
+        "ActionPrimary",
+        origin,
+        velocity
+    )
+
+    stats.shots += 1
+
+    local sourceText
+
+    if source == "owned" then
+        sourceText =
+            "Tiro con balón"
+
+    elseif source == "loose-ball" then
+        sourceText =
+            "Pelota recuperada"
+
+    elseif source == "steal" then
+        sourceText =
+            "Tiro después de robar"
+
+    else
+        sourceText =
+            "Tiro"
+    end
+
+    local shotText =
+        directGoal
+        and "directo"
+        or "lejano"
+
+    local sideText =
+        chooseLeft
+        and "izquierda"
+        or "derecha"
+
+    stats.last =
+        string.format(
+            "%s • %s • esquina %s",
+            sourceText,
+            shotText,
+            sideText
+        )
+
+    local minimumGoalDistance =
+        math.huge
+
+    local deadline =
+        os.clock()
+        + config.scoreWait
+
+    repeat
+        task.wait(0.1)
+
+        if ball.Parent then
+            minimumGoalDistance =
+                math.min(
+                    minimumGoalDistance,
+                    (
+                        ball.Position
+                            - center
+                    ).Magnitude
+                )
+        end
+    until os.clock() >= deadline
+        or env.FSSAutoToken ~= token
+
+    local newScore =
+        ownTeam
+        and ownTeam:GetAttribute(
+            "Score"
+        )
+        or oldScore
+
+    if newScore > oldScore then
+        stats.goals +=
+            newScore - oldScore
+
+        stats.last =
+            "¡Gol marcado!"
+
+    elseif minimumGoalDistance > 100 then
+        stats.originRejections += 1
+
+        stats.last =
+            "El tiro fue rechazado"
+
+    else
+        stats.last =
+            "Tiro atajado o fallido"
+    end
+end
+
+-- =========================================================
+-- LOOP PRINCIPAL
+-- =========================================================
+
+task.spawn(function()
+    local nextTackle = 0
+
+    while env.FSSAutoToken == token do
+        if not config.enabled then
+            task.wait(0.15)
+            continue
+        end
+
+        local ok, message =
+            pcall(function()
+                if LocalPlayer:GetAttribute(
+                    "DisableControls"
+                ) == true
+                    or LocalPlayer:GetAttribute(
+                        "Freeze"
+                    ) == true
+                    or LocalPlayer:GetAttribute(
+                        "IsOnPitch"
+                    ) ~= true
+                then
+                    return
+                end
+
+                local character =
+                    LocalPlayer.Character
+                    or workspace:FindFirstChild(
+                        LocalPlayer.Name
+                    )
+
+                local root =
+                    character
+                    and character:FindFirstChild(
+                        "HumanoidRootPart"
+                    )
+
+                local hitbox =
+                    character
+                    and character:FindFirstChild(
+                        "Hitbox"
+                    )
+
+                local tackleHitbox =
+                    character
+                    and character:FindFirstChild(
+                        "TackleHitbox"
+                    )
+
+                local ball =
+                    activeBall()
+
+                if not root
+                    or not hitbox
+                    or not tackleHitbox
+                    or not ball
+                then
+                    return
+                end
+
+                if LocalPlayer:GetAttribute(
+                    "HasBall"
+                ) == true
+                    and ball:GetAttribute(
+                        "PossessorId"
+                    ) == LocalPlayer:GetAttribute(
+                        "AgentId"
+                    )
+                    and ball:GetAttribute(
+                        "NetworkOwner"
+                    ) == LocalPlayer.Name
+                then
+                    if config.autoGoal then
+                        shoot(
+                            ball,
+                            root,
+                            "owned"
+                        )
+                    end
+
+                    return
+                end
+
+                if LocalPlayer:GetAttribute(
+                    "TeamRole"
+                ) == "Goalkeeper"
+                    and ball:GetAttribute(
+                        "State"
+                    ) == "Released"
+                    and ball.Position.Y > -50
+                then
+                    local teamFolder =
+                        LocalPlayer.Team
+                        and workspace.Stadium.Teams:FindFirstChild(
+                            LocalPlayer.Team.Name
+                        )
+
+                    local goal =
+                        teamFolder
+                        and teamFolder:FindFirstChild(
+                            "Goal"
+                        )
+
+                    local goalHitbox =
+                        goal
+                        and goal:FindFirstChild(
+                            "Hitbox"
+                        )
+
+                    local toGoal =
+                        goalHitbox
+                        and goalHitbox.Position
+                            - ball.Position
+
+                    if toGoal
+                        and ball.AssemblyLinearVelocity:Dot(
+                            toGoal
+                        ) > 0
+                        and (
+                            ball.Position
+                                - root.Position
+                        ).Magnitude
+                            <= config.goalkeeperSaveDistance
+                    then
+                        firetouchinterest(
+                            hitbox,
+                            ball,
+                            0
+                        )
+
+                        task.wait(0.03)
+
+                        firetouchinterest(
+                            hitbox,
+                            ball,
+                            1
+                        )
+
+                        if waitForPossession(
+                            ball,
+                            config.ownershipWait
+                        ) then
+                            stats.saves += 1
+
+                            stats.last =
+                                "Atajada del portero"
+                        end
+
+                        return
+                    end
+                end
+
+                if not config.autoGoal then
+                    return
+                end
+
+                local possessor =
+                    playerByAgentId(
+                        ball:GetAttribute(
+                            "PossessorId"
+                        )
+                    )
+
+                if not possessor then
+                    if not config.looseBalls
+                        or ball.Position.Y < -50
+                    then
+                        return
+                    end
+
+                    local releasePosition =
+                        ball.Position
+
+                    firetouchinterest(
+                        hitbox,
+                        ball,
+                        0
+                    )
+
+                    task.wait(0.03)
+
+                    firetouchinterest(
+                        hitbox,
+                        ball,
+                        1
+                    )
+
+                    if waitForPossession(
+                        ball,
+                        config.ownershipWait
+                    ) then
+                        stats.loosePickups += 1
+
+                        shoot(
+                            ball,
+                            root,
+                            "loose-ball",
+                            releasePosition
+                        )
+                    end
+
+                    return
+                end
+
+                if possessor.Team
+                        == LocalPlayer.Team
+                    or os.clock() < nextTackle
+                then
+                    return
+                end
+
+                local targetCharacter =
+                    possessor.Character
+
+                local targetHitbox =
+                    targetCharacter
+                    and targetCharacter:FindFirstChild(
+                        "Hitbox"
+                    )
+
+                local targetRoot =
+                    targetCharacter
+                    and targetCharacter:FindFirstChild(
+                        "HumanoidRootPart"
+                    )
+
+                if not targetHitbox
+                    or not targetRoot
+                then
+                    return
+                end
+
+                local distance =
+                    (
+                        targetRoot.Position
+                            - root.Position
+                    ).Magnitude
+
+                if distance >
+                    config.maxStealDistance
+                then
+                    return
+                end
+
+                stats.tackleRequests += 1
+
+                PerformAction:FireServer(
+                    "Tackle"
+                )
+
+                local accepted = false
+
+                for _ = 1, 12 do
+                    task.wait(0.025)
+
+                    if LocalPlayer:GetAttribute(
+                        "Tackling"
+                    ) == true then
+                        accepted = true
+                        break
+                    end
+                end
+
+                if not accepted then
+                    stats.tackleRejected += 1
+
+                    stats.last =
+                        "No se pudo hacer la entrada; reintentando"
+
+                    nextTackle =
+                        os.clock()
+                        + config.tackleRetry
+
+                    return
+                end
+
+                stats.tackleAccepted += 1
+
+                nextTackle =
+                    os.clock()
+                    + config.tackleCooldown
+
+                firetouchinterest(
+                    tackleHitbox,
+                    targetHitbox,
+                    0
+                )
+
+                task.wait(0.03)
+
+                firetouchinterest(
+                    tackleHitbox,
+                    targetHitbox,
+                    1
+                )
+
+                task.wait(0.08)
+
+                firetouchinterest(
+                    hitbox,
+                    ball,
+                    0
+                )
+
+                task.wait(0.03)
+
+                firetouchinterest(
+                    hitbox,
+                    ball,
+                    1
+                )
+
+                if not waitForPossession(
+                    ball,
+                    config.ownershipWait
+                ) then
+                    stats.acquireFailures += 1
+
+                    stats.last =
+                        string.format(
+                            "No se pudo recuperar el balón de %s (%.1f)",
+                            possessor.Name,
+                            distance
+                        )
+
+                    return
+                end
+
+                stats.steals += 1
+
+                stats.last =
+                    string.format(
+                        "Balón robado a %s (%.1f)",
+                        possessor.Name,
+                        distance
+                    )
+
+                task.wait(0.08)
+
+                shoot(
+                    ball,
+                    root,
+                    "steal"
+                )
+            end)
+
+        if not ok then
+            stats.errors += 1
+
+            stats.last =
+                "Error: "
+                .. tostring(
+                    message
+                )
+        end
+
+        task.wait(0.08)
+    end
+end)
+
+-- =========================================================
+-- LIMPIEZA AUTOMÁTICA
+-- =========================================================
+
+task.spawn(function()
+    while env.FSSAutoToken == token do
+        if not env.FSSTokiGui
+            or not env.FSSTokiGui.Parent
+        then
+            guiAlive = false
+            break
+        end
+
+        task.wait(0.5)
+    end
+end)
+
+-- =========================================================
+-- ESTADO FINAL
+-- =========================================================
+
+config.enabled = true
+config.autoGoal = true
+
+env.FSSAutoEnabled = true
+
+actualizarBotonAutoGol(
+    true,
+    true
+)
+
+actualizarCandado()
