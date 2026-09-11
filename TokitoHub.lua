@@ -1,31 +1,32 @@
 -- ============================================================
--- TOKITOHUB SINGLE-INSTANCE / STABILITY GUARD
---
--- La versión anterior destruía la GUI de la primera instancia y
--- después volvía a ejecutar TODO el archivo. Eso dejaba vivos
--- Heartbeat/Jumprequest/task.spawn/scripts externos de la primera
--- instancia y podía duplicar actividad en la segunda carga.
---
--- Ahora: una segunda ejecución NO vuelve a inicializar el hub.
--- Simplemente vuelve a mostrar la instancia ya existente.
--- Esto es una corrección de ciclo de vida, no un bypass de anticheat.
+-- TOKITOHUB SINGLE-INSTANCE / TOGGLE FIX V4
+-- Mantiene el arranque original y solo reemplaza versiones viejas.
 -- ============================================================
 local __TOKITO_ENV = getgenv()
 local __TOKITO_COREGUI = game:GetService("CoreGui")
-
+local __TOKITO_VERSION = 5
 local __TOKITO_EXISTING = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
-if __TOKITO_ENV.__TokitoHubActive == true or __TOKITO_EXISTING then
-    __TOKITO_ENV.__TokitoHubActive = true
-    __TOKITO_ENV.TokitoHub = true
 
+if __TOKITO_EXISTING then
+    local sameVersion = false
     pcall(function()
-        local existing = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
-        if existing and existing:IsA("ScreenGui") then
-            existing.Enabled = true
-        end
+        sameVersion = __TOKITO_EXISTING:GetAttribute("TokitoToggleFixVersion") == __TOKITO_VERSION
     end)
 
-    return
+    if sameVersion then
+        pcall(function()
+            if __TOKITO_EXISTING:IsA("ScreenGui") then
+                __TOKITO_EXISTING.Enabled = true
+            end
+        end)
+        __TOKITO_ENV.__TokitoHubActive = true
+        __TOKITO_ENV.TokitoHub = true
+        return
+    end
+
+    pcall(function()
+        __TOKITO_EXISTING:Destroy()
+    end)
 end
 
 __TOKITO_ENV.__TokitoHubActive = true
@@ -130,7 +131,14 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "TokitoHub"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+pcall(function() gui:SetAttribute("TokitoToggleFixVersion", __TOKITO_VERSION) end)
 gui.Parent = game:GetService("CoreGui")
+
+-- Señal de vida de esta instancia. Permite distinguir una GUI actual
+-- de una instancia vieja que quedó sin callbacks funcionales.
+__TOKITO_ENV.__TokitoHubPing = function()
+    return gui ~= nil and gui.Parent ~= nil
+end
 
 -- API local de reapertura: ejecutar el loader otra vez solo muestra
 -- la misma instancia, sin crear otra copia del hub.
@@ -380,8 +388,12 @@ function UI.createToggle(name,callback)
  row.BackgroundColor3=Color3.fromRGB(17,27,46)
  row.BorderSizePixel=0
  row.Text=""
+ row.Active=false
+ row.Selectable=false
+ row.AutoButtonColor=false
  Instance.new("UICorner",row).CornerRadius=UDim.new(0,9)
  addHover(row)
+
  local label=Instance.new("TextLabel",row)
  label.Size=UDim2.new(1,-78,1,0)
  label.Position=UDim2.new(0,10,0,0)
@@ -391,32 +403,78 @@ function UI.createToggle(name,callback)
  label.Font=Enum.Font.GothamMedium
  label.TextSize=10
  label.TextXAlignment=Enum.TextXAlignment.Left
+ label.Active=false
+
  local sw=Instance.new("Frame",row)
  sw.Size=UDim2.new(0,34,0,17)
  sw.Position=UDim2.new(1,-44,0.5,-8.5)
  sw.BackgroundColor3=Color3.fromRGB(55,62,76)
  sw.BorderSizePixel=0
+ sw.Active=false
  Instance.new("UICorner",sw).CornerRadius=UDim.new(1,0)
+
  local dot=Instance.new("Frame",sw)
  dot.Size=UDim2.new(0,13,0,13)
  dot.Position=UDim2.new(0,2,0.5,-6.5)
  dot.BackgroundColor3=Color3.fromRGB(235,240,248)
  dot.BorderSizePixel=0
+ dot.Active=false
  Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
+
  local state=Config[name]==true
  local function paint()
   sw.BackgroundColor3=state and Color3.fromRGB(0,170,255) or Color3.fromRGB(55,62,76)
   dot.Position=state and UDim2.new(1,-15,0.5,-6.5) or UDim2.new(0,2,0.5,-6.5)
  end
  paint()
- row.MouseButton1Click:Connect(function()
+
+ local locked=false
+ local function toggle()
+  if locked or not row.Parent then return end
+  locked=true
+
   state=not state
   Config[name]=state
   saveConfig()
   paint()
-  pcall(callback,state)
- end)
- if state then task.defer(function() pcall(callback,true) end) end
+
+  local ok,err=pcall(callback,state)
+  if not ok and statusText and statusText.Parent then
+   statusText.Text="ERROR • "..name
+   task.delay(2,function()
+    if statusText and statusText.Parent then statusText.Text="READY" end
+   end)
+  end
+
+  task.delay(0.20,function()
+   locked=false
+  end)
+ end
+
+ -- Área de clic/tap SOLO sobre el interruptor.
+ -- Importante: NO debe cubrir toda la fila, porque un hitbox del 100%
+ -- intercepta el gesto de arrastre y hace imposible desplazar el ScrollingFrame.
+ local hit=Instance.new("TextButton",row)
+ hit.Name="ToggleHitbox"
+ hit.Size=UDim2.new(0,54,1,0)
+ hit.Position=UDim2.new(1,-60,0,0)
+ hit.BackgroundTransparency=1
+ hit.BorderSizePixel=0
+ hit.Text=""
+ hit.TextTransparency=1
+ hit.AutoButtonColor=false
+ hit.Active=true
+ hit.Selectable=false
+ hit.ZIndex=50
+ pcall(function() hit.Interactable=true end)
+
+ -- Activated es intencional aquí: a diferencia de InputBegan, no dispara el
+ -- toggle al comenzar un swipe. Eso permite deslizar el menú sin activar opciones.
+ hit.Activated:Connect(toggle)
+
+ if state then
+  task.defer(function() pcall(callback,true) end)
+ end
 end
 function UI.createButton(name,callback)
  local page=sections[classify(name)] or sections.GENERAL
@@ -1411,9 +1469,10 @@ do
 		toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)  
 		toggleBtn.TextSize = 10  
 		toggleBtn.AutoButtonColor = false  
+		toggleBtn.Active = true  
 		Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 5)  
 
-		addConnection(toggleBtn.MouseButton1Click:Connect(function()  
+		addConnection(toggleBtn.Activated:Connect(function()  
 			internalAutoStealEnabled = not internalAutoStealEnabled  
 			getgenv().Config.AutoStealEnabled = internalAutoStealEnabled  
 			toggleBtn.Text = internalAutoStealEnabled and "AUTO-GRAB: ON" or "AUTO-GRAB: OFF"  
@@ -2713,7 +2772,7 @@ do
     -- BOTÓN AIMBOT
     -- ============================================================
 
-    ToggleBtn.MouseButton1Click:Connect(function()
+    ToggleBtn.Activated:Connect(function()
         AimbotEnabled = not AimbotEnabled
 
         if AimbotEnabled then
@@ -3512,7 +3571,7 @@ do
     -- BOTÓN AIMBOT
     -- ============================================================
 
-    ToggleBtn.MouseButton1Click:Connect(function()
+    ToggleBtn.Activated:Connect(function()
         AimbotEnabled = not AimbotEnabled
 
         if AimbotEnabled then
