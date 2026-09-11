@@ -1,23 +1,35 @@
-if getgenv().TokitoHub then
-    pcall(function()
-        local oldGui = game:GetService("CoreGui"):FindFirstChild("TokitoHub")
-        if oldGui then
-            oldGui:Destroy()
-        end
+-- ============================================================
+-- TOKITOHUB SINGLE-INSTANCE / STABILITY GUARD
+--
+-- La versión anterior destruía la GUI de la primera instancia y
+-- después volvía a ejecutar TODO el archivo. Eso dejaba vivos
+-- Heartbeat/Jumprequest/task.spawn/scripts externos de la primera
+-- instancia y podía duplicar actividad en la segunda carga.
+--
+-- Ahora: una segunda ejecución NO vuelve a inicializar el hub.
+-- Simplemente vuelve a mostrar la instancia ya existente.
+-- Esto es una corrección de ciclo de vida, no un bypass de anticheat.
+-- ============================================================
+local __TOKITO_ENV = getgenv()
+local __TOKITO_COREGUI = game:GetService("CoreGui")
 
-        local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-        if playerGui then
-            local oldPlayerGui = playerGui:FindFirstChild("TokitoHub")
-            if oldPlayerGui then
-                oldPlayerGui:Destroy()
-            end
+local __TOKITO_EXISTING = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
+if __TOKITO_ENV.__TokitoHubActive == true or __TOKITO_EXISTING then
+    __TOKITO_ENV.__TokitoHubActive = true
+    __TOKITO_ENV.TokitoHub = true
+
+    pcall(function()
+        local existing = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
+        if existing and existing:IsA("ScreenGui") then
+            existing.Enabled = true
         end
     end)
 
-    getgenv().TokitoHub = nil
+    return
 end
 
-getgenv().TokitoHub = true
+__TOKITO_ENV.__TokitoHubActive = true
+__TOKITO_ENV.TokitoHub = true
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
@@ -75,65 +87,6 @@ local function shouldSkipIntro()
 	return getgenv().TokitoHubSkipIntro == true or Config.SkipIntro == true
 end
 
--- Firebase
-local FIREBASE_URL = "https://httpcustom-65ce3-default-rtdb.firebaseio.com/comandos.json"
-local POLL_INTERVAL = 1
-local ultimaRespuesta = nil
-
-local function verificarComandos()
-	local success, response = pcall(function()
-		return game:HttpGet(FIREBASE_URL, true)
-	end)
-
-	if not success or not response or response == "null" then
-		return
-	end
-
-	-- Ignorar la primera lectura al iniciar el script
-	if ultimaRespuesta == nil then
-		ultimaRespuesta = response
-		return
-	end
-
-	-- Si no cambió el contenido, no hacer nada
-	if response == ultimaRespuesta then
-		return
-	end
-
-	ultimaRespuesta = response
-
-	local ok, data = pcall(function()
-		return HttpService:JSONDecode(response)
-	end)
-
-	if not ok or type(data) ~= "table" then
-		return
-	end
-
-	local character = player.Character or player.CharacterAdded:Wait()
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-	if not humanoid then
-		return
-	end
-
-	if data.accion == "velocidad" and type(data.valor) == "number" then
-		humanoid.WalkSpeed = data.valor
-
-	elseif data.accion == "reset_character" then
-		humanoid.Health = 0
-
-	elseif data.accion == "reset" then
-		humanoid.WalkSpeed = 16
-	end
-end
-
-task.spawn(function()
-	while true do
-		verificarComandos()
-		task.wait(POLL_INTERVAL)
-	end
-end)
 local ICON_URL = "https://raw.githubusercontent.com/mariandrespat18-cpu/Tokito-/main/file_00000000cbcc71f595c773a9e5cd4d90.png"
 
 local function getIcon()
@@ -178,6 +131,17 @@ gui.Name = "TokitoHub"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = game:GetService("CoreGui")
+
+-- API local de reapertura: ejecutar el loader otra vez solo muestra
+-- la misma instancia, sin crear otra copia del hub.
+__TOKITO_ENV.__TokitoHubGui = gui
+__TOKITO_ENV.__TokitoHubShow = function()
+	pcall(function()
+		if gui and gui.Parent then
+			gui.Enabled = true
+		end
+	end)
+end
 
 local splash = Instance.new("Frame")
 splash.Name = "Splash"
@@ -225,199 +189,470 @@ splashSub.Font = Enum.Font.Gotham
 splashSub.TextSize = 14
 splashSub.Parent = splash
 
-local function createMenu()
-local border = Instance.new("Frame")
-border.Name = "Border"
-border.Size = UDim2.new(0, 250, 0, 175)
-border.Position = UDim2.new(0.35, 0, 0.3, 0)
-border.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-border.BorderSizePixel = 0
-border.Parent = gui
-Instance.new("UICorner", border).CornerRadius = UDim.new(0, 12)
+local function __TokitoBuildUI(gui, Config, saveConfig, UIS, TweenService, ICON)
+local UI={}
+local border=Instance.new("Frame")
+border.Name="Border"
+border.Size=UDim2.new(0,500,0,330)
+border.Position=UDim2.new(0.5,-250,0.5,-165)
+border.BackgroundColor3=Color3.fromRGB(7,11,22)
+border.BorderSizePixel=0
+border.ClipsDescendants=true
+border.Parent=gui
+Instance.new("UICorner",border).CornerRadius=UDim.new(0,18)
+local stroke=Instance.new("UIStroke",border)
+stroke.Thickness=1.5
+stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+local grad=Instance.new("UIGradient",stroke)
+grad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(0,95,255)),ColorSequenceKeypoint.new(.18,Color3.fromRGB(0,170,255)),ColorSequenceKeypoint.new(.36,Color3.fromRGB(90,220,255)),ColorSequenceKeypoint.new(.50,Color3.fromRGB(0,120,255)),ColorSequenceKeypoint.new(.70,Color3.fromRGB(70,160,255)),ColorSequenceKeypoint.new(.86,Color3.fromRGB(0,210,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,95,255))})
+local main=Instance.new("Frame",border)
+main.Size=UDim2.new(1,-4,1,-4)
+main.Position=UDim2.new(0,2,0,2)
+main.BackgroundColor3=Color3.fromRGB(12,17,31)
+main.BorderSizePixel=0
+main.ClipsDescendants=true
+Instance.new("UICorner",main).CornerRadius=UDim.new(0,16)
+local top=Instance.new("Frame",main)
+top.Size=UDim2.new(1,0,0,42)
+local topStroke=Instance.new("UIStroke",top)
+topStroke.Thickness=1
+topStroke.Transparency=.55
+topStroke.Color=Color3.fromRGB(70,180,255)
+top.BackgroundColor3=Color3.fromRGB(16,25,44)
+top.BorderSizePixel=0
+top.Active=true
+local topGlow=Instance.new("Frame",top)
+topGlow.Size=UDim2.new(1,0,0,2)
+topGlow.Position=UDim2.new(0,0,1,-2)
+topGlow.BackgroundColor3=Color3.fromRGB(0,170,255)
+topGlow.BorderSizePixel=0
+local topGlowGrad=Instance.new("UIGradient",topGlow)
+topGlowGrad.Color=grad.Color
+local title=Instance.new("TextLabel",top)
+title.Size=UDim2.new(1,-210,1,0)
+title.Position=UDim2.new(0,12,0,0)
+title.BackgroundTransparency=1
+title.Text="Tokito Hub"
+title.TextColor3=Color3.fromRGB(255,255,255)
+title.Font=Enum.Font.GothamBlack
+title.TextSize=16
+title.TextXAlignment=Enum.TextXAlignment.Left
+local sub=Instance.new("TextLabel",top)
+sub.Size=UDim2.new(0,170,1,0)
+sub.Position=UDim2.new(0,104,0,0)
+sub.BackgroundTransparency=1
+sub.Text="CONTROL CENTER"
+sub.TextColor3=Color3.fromRGB(105,180,255)
+sub.Font=Enum.Font.Gotham
+sub.TextSize=9
+sub.TextXAlignment=Enum.TextXAlignment.Left
+local close=Instance.new("TextButton",top)
+close.Size=UDim2.new(0,24,0,22)
+close.Position=UDim2.new(1,-28,0,8)
+close.Text="X"
+close.TextColor3=Color3.fromRGB(255,255,255)
+close.Font=Enum.Font.GothamBold
+close.TextSize=11
+close.BackgroundColor3=Color3.fromRGB(70,32,54)
+close.BorderSizePixel=0
+Instance.new("UICorner",close).CornerRadius=UDim.new(0,8)
+local side=Instance.new("Frame",main)
+local sideGlow=Instance.new("UIStroke",side)
+sideGlow.Thickness=1
+sideGlow.Transparency=.7
+sideGlow.Color=Color3.fromRGB(0,160,255)
+side.Size=UDim2.new(0,112,1,-52)
+side.Position=UDim2.new(0,6,0,48)
+side.BackgroundColor3=Color3.fromRGB(15,23,40)
+side.BorderSizePixel=0
+Instance.new("UICorner",side).CornerRadius=UDim.new(0,12)
+local sideTitle=Instance.new("TextLabel",side)
+sideTitle.Size=UDim2.new(1,-12,0,24)
+sideTitle.Position=UDim2.new(0,6,0,4)
+sideTitle.BackgroundTransparency=1
+sideTitle.Text="SECTIONS"
+sideTitle.TextColor3=Color3.fromRGB(130,190,255)
+sideTitle.Font=Enum.Font.GothamBold
+sideTitle.TextSize=9
+sideTitle.TextXAlignment=Enum.TextXAlignment.Left
+local tabs=Instance.new("ScrollingFrame",side)
+tabs.Size=UDim2.new(1,-8,1,-34)
+tabs.Position=UDim2.new(0,4,0,30)
+tabs.BackgroundTransparency=1
+tabs.BorderSizePixel=0
+tabs.ScrollBarThickness=2
+tabs.ScrollBarImageColor3=Color3.fromRGB(60,180,255)
+tabs.ScrollBarImageTransparency=.35
+tabs.AutomaticCanvasSize=Enum.AutomaticSize.Y
+tabs.CanvasSize=UDim2.new()
+local tabLayout=Instance.new("UIListLayout",tabs)
+tabLayout.Padding=UDim.new(0,4)
+tabLayout.SortOrder=Enum.SortOrder.LayoutOrder
+local content=Instance.new("Frame",main)
+content.Size=UDim2.new(1,-128,1,-52)
+content.Position=UDim2.new(0,122,0,48)
+content.BackgroundColor3=Color3.fromRGB(10,15,27)
+content.BorderSizePixel=0
+Instance.new("UICorner",content).CornerRadius=UDim.new(0,12)
+local contentAccent=Instance.new("Frame",content)
+contentAccent.Size=UDim2.new(0,2,0,52)
+contentAccent.Position=UDim2.new(0,0,0,10)
+contentAccent.BackgroundColor3=Color3.fromRGB(0,175,255)
+contentAccent.BorderSizePixel=0
+local contentAccentGrad=Instance.new("UIGradient",contentAccent)
+contentAccentGrad.Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(0,75,255)),
+ ColorSequenceKeypoint.new(.5,Color3.fromRGB(100,225,255)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(0,115,255))
+})
+local contentTopShade=Instance.new("Frame",content)
+contentTopShade.Size=UDim2.new(1,-8,0,18)
+contentTopShade.Position=UDim2.new(0,4,0,4)
+contentTopShade.BackgroundColor3=Color3.fromRGB(12,18,32)
+contentTopShade.BackgroundTransparency=.22
+contentTopShade.BorderSizePixel=0
+contentTopShade.ZIndex=2
+local sections={}
+local buttons={}
+local order={"STEAL","VISUALES","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
+local function makeSection(name)
+ local page=Instance.new("ScrollingFrame",content)
+ page.Name=name
+ page.ZIndex=3
+ page.Size=UDim2.new(1,-12,1,-12)
+ page.Position=UDim2.new(0,6,0,6)
+ page.BackgroundTransparency=1
+ page.BorderSizePixel=0
+ page.ScrollBarThickness=2
+ page.ScrollBarImageColor3=Color3.fromRGB(65,185,255)
+ page.ScrollBarImageTransparency=.22
+ page.ScrollingDirection=Enum.ScrollingDirection.Y
+ page.AutomaticCanvasSize=Enum.AutomaticSize.Y
+ page.CanvasSize=UDim2.new()
+ page.Visible=false
+ local pad=Instance.new("UIPadding",page)
+ pad.PaddingTop=UDim.new(0,24);pad.PaddingBottom=UDim.new(0,8);pad.PaddingLeft=UDim.new(0,6);pad.PaddingRight=UDim.new(0,6)
+ local lay=Instance.new("UIListLayout",page)
+ lay.Padding=UDim.new(0,7)
+ lay.SortOrder=Enum.SortOrder.LayoutOrder
+ local tab=Instance.new("TextButton",tabs)
+ tab.Size=UDim2.new(1,0,0,38)
+ tab.Text=name
+ tab.Font=Enum.Font.GothamBold
+ tab.TextSize=11
+ tab.TextColor3=Color3.fromRGB(220,235,255)
+ tab.BackgroundColor3=Color3.fromRGB(24,35,58)
+ tab.BorderSizePixel=0
+ Instance.new("UICorner",tab).CornerRadius=UDim.new(0,9)
+ sections[name]=page
+ buttons[name]=tab
+ tab.MouseButton1Click:Connect(function()
+  for n,p in pairs(sections) do p.Visible=(n==name) end
+  for n,b in pairs(buttons) do
+   b.BackgroundColor3=(n==name) and Color3.fromRGB(27,60,101) or Color3.fromRGB(19,29,48)
+   b.TextColor3=(n==name) and Color3.fromRGB(235,248,255) or Color3.fromRGB(175,205,235)
+  end
+ end)
+end
+for _,n in ipairs(order) do makeSection(n) end
+local current="STEAL"
+sections[current].Visible=true
+buttons[current].BackgroundColor3=Color3.fromRGB(27,60,101)
+buttons[current].TextColor3=Color3.fromRGB(235,248,255)
+local function classify(name)
+ local n=string.lower(tostring(name))
+ if n=="skip intro" then return "GENERAL" end
+ if n:find("fps") or n:find("booster") or n:find("anti lag") then return "OPTIMIZACIÓN" end
+ if n:find("xray") or n:find("esp") or n:find("aimbot") or n:find("capa laser") then return "VISUALES" end
+ if n:find("speed") or n:find("invisible") or n:find("infinite jump") then return "MOVILIDAD" end
+ if n:find("server") or n:find("rendimiento") or n:find("inventario") or n:find("kick boton") or n:find("reset") or n:find("comprar") or n:find("ap spammer") or n:find("ap circle") then return "UTILIDADES" end
+ if n:find("autograb") or n:find("ragdoll") or n:find("freeze") or n:find("defender") or n:find("bee") or n:find("torreta") or n:find("steal") or n:find("best") or n:find("clone") or n:find("clon") or n:find("potion") or n:find("brainrot") or n:find("drop") or n:find("line to base") or n:find("auto kick") or n:find("rayo") then return "STEAL" end
+ return "GENERAL"
+end
+local function addHover(b)
+ b.MouseEnter:Connect(function() TweenService:Create(b,TweenInfo.new(.12,Enum.EasingStyle.Quad),{BackgroundColor3=Color3.fromRGB(23,38,63)}):Play() end)
+ b.MouseLeave:Connect(function() TweenService:Create(b,TweenInfo.new(.16,Enum.EasingStyle.Quad),{BackgroundColor3=Color3.fromRGB(17,27,46)}):Play() end)
+end
+function UI.createToggle(name,callback)
+ local page=sections[classify(name)] or sections.GENERAL
+ local row=Instance.new("TextButton",page)
+ row.Size=UDim2.new(1,0,0,30)
+ row.BackgroundColor3=Color3.fromRGB(17,27,46)
+ row.BorderSizePixel=0
+ row.Text=""
+ Instance.new("UICorner",row).CornerRadius=UDim.new(0,9)
+ addHover(row)
+ local label=Instance.new("TextLabel",row)
+ label.Size=UDim2.new(1,-78,1,0)
+ label.Position=UDim2.new(0,10,0,0)
+ label.BackgroundTransparency=1
+ label.Text=name
+ label.TextColor3=Color3.fromRGB(245,248,255)
+ label.Font=Enum.Font.GothamMedium
+ label.TextSize=10
+ label.TextXAlignment=Enum.TextXAlignment.Left
+ local sw=Instance.new("Frame",row)
+ sw.Size=UDim2.new(0,34,0,17)
+ sw.Position=UDim2.new(1,-44,0.5,-8.5)
+ sw.BackgroundColor3=Color3.fromRGB(55,62,76)
+ sw.BorderSizePixel=0
+ Instance.new("UICorner",sw).CornerRadius=UDim.new(1,0)
+ local dot=Instance.new("Frame",sw)
+ dot.Size=UDim2.new(0,13,0,13)
+ dot.Position=UDim2.new(0,2,0.5,-6.5)
+ dot.BackgroundColor3=Color3.fromRGB(235,240,248)
+ dot.BorderSizePixel=0
+ Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
+ local state=Config[name]==true
+ local function paint()
+  sw.BackgroundColor3=state and Color3.fromRGB(0,170,255) or Color3.fromRGB(55,62,76)
+  dot.Position=state and UDim2.new(1,-15,0.5,-6.5) or UDim2.new(0,2,0.5,-6.5)
+ end
+ paint()
+ row.MouseButton1Click:Connect(function()
+  state=not state
+  Config[name]=state
+  saveConfig()
+  paint()
+  pcall(callback,state)
+ end)
+ if state then task.defer(function() pcall(callback,true) end) end
+end
+function UI.createButton(name,callback)
+ local page=sections[classify(name)] or sections.GENERAL
+ local row=Instance.new("TextButton",page)
+ row.Size=UDim2.new(1,0,0,30)
+ row.BackgroundColor3=Color3.fromRGB(17,27,46)
+ row.BorderSizePixel=0
+ row.Text=name
+ row.TextColor3=Color3.fromRGB(245,248,255)
+ row.Font=Enum.Font.GothamMedium
+ row.TextSize=12
+ Instance.new("UICorner",row).CornerRadius=UDim.new(0,9)
+ addHover(row)
+ row.MouseButton1Click:Connect(function() pcall(callback) end)
+end
+local minimized=false
+local mini=Instance.new("ImageButton",gui)
+mini.Name="MiniButton"
+mini.Size=UDim2.new(0,56,0,56)
+mini.Position=UDim2.new(0,18,0,200)
+mini.BackgroundColor3=Color3.fromRGB(10,20,36)
+mini.BorderSizePixel=0
+mini.Image=ICON or ""
+mini.Visible=false
+mini.Active=true
+Instance.new("UICorner",mini).CornerRadius=UDim.new(1,0)
+local ms=Instance.new("UIStroke",mini);ms.Thickness=2
+local mg=Instance.new("UIGradient",ms);mg.Color=grad.Color
+local function setMini(v)
+ minimized=v
+ border.Visible=not v
+ mini.Visible=v
+end
+local minBtn=Instance.new("TextButton",top)
+minBtn.Size=UDim2.new(0,24,0,22)
+minBtn.Position=UDim2.new(1,-58,0,8)
+minBtn.BackgroundColor3=Color3.fromRGB(29,47,78)
+minBtn.Text="—"
+minBtn.TextColor3=Color3.fromRGB(255,255,255)
+minBtn.Font=Enum.Font.GothamBold
+minBtn.TextSize=15
+minBtn.BorderSizePixel=0
+Instance.new("UICorner",minBtn).CornerRadius=UDim.new(0,8)
+minBtn.MouseButton1Click:Connect(function() setMini(true) end)
+mini.MouseButton1Click:Connect(function() setMini(false) end)
+close.MouseButton1Click:Connect(function() gui.Enabled=false end)
+local function drag(handle,root)
+ local dragging=false
+ local start
+ local pos
+ handle.InputBegan:Connect(function(i)
+  if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+   dragging=true;start=i.Position;pos=root.Position
+  end
+ end)
+ handle.InputEnded:Connect(function(i)
+  if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=false end
+ end)
+ UIS.InputChanged:Connect(function(i)
+  if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+   local d=i.Position-start
+   root.Position=UDim2.new(pos.X.Scale,pos.X.Offset+d.X,pos.Y.Scale,pos.Y.Offset+d.Y)
+  end
+ end)
+end
+drag(top,border)
+drag(mini,mini)
+-- compact RGB decoration + size wheel
+local decoLeft=Instance.new("Frame",main)
+decoLeft.Size=UDim2.new(0,2,0,64)
+decoLeft.Position=UDim2.new(0,2,0,52)
+decoLeft.BackgroundColor3=Color3.fromRGB(0,190,255)
+decoLeft.BorderSizePixel=0
+local decoGrad=Instance.new("UIGradient",decoLeft)
+decoGrad.Color=grad.Color
+local glowDot=Instance.new("Frame",top)
+glowDot.Size=UDim2.new(0,6,0,6)
+glowDot.Position=UDim2.new(0,88,0.5,-3)
+glowDot.BackgroundColor3=Color3.fromRGB(90,225,255)
+glowDot.BorderSizePixel=0
+Instance.new("UICorner",glowDot).CornerRadius=UDim.new(1,0)
+local headerLine=Instance.new("Frame",top)
+headerLine.Size=UDim2.new(0,72,0,1)
+headerLine.Position=UDim2.new(0,12,1,-5)
+headerLine.BackgroundColor3=Color3.fromRGB(70,185,255)
+headerLine.BorderSizePixel=0
+local headerLineGrad=Instance.new("UIGradient",headerLine)
+headerLineGrad.Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(0,80,255)),
+ ColorSequenceKeypoint.new(.55,Color3.fromRGB(95,220,255)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(0,130,255))
+})
+local statusDot=Instance.new("Frame",top)
+statusDot.Size=UDim2.new(0,5,0,5)
+statusDot.Position=UDim2.new(1,-118,0.5,-2.5)
+statusDot.BackgroundColor3=Color3.fromRGB(90,220,255)
+statusDot.BorderSizePixel=0
+Instance.new("UICorner",statusDot).CornerRadius=UDim.new(1,0)
+local statusText=Instance.new("TextLabel",top)
+statusText.Size=UDim2.new(0,44,0,18)
+statusText.Position=UDim2.new(1,-111,0.5,-9)
+statusText.BackgroundTransparency=1
+statusText.Text="READY"
+statusText.TextColor3=Color3.fromRGB(150,205,255)
+statusText.Font=Enum.Font.GothamMedium
+statusText.TextSize=8
+statusText.TextXAlignment=Enum.TextXAlignment.Left
+local wheel=Instance.new("TextButton",top)
+wheel.Name="SizeWheel"
+wheel.Size=UDim2.new(0,24,0,24)
+wheel.Position=UDim2.new(1,-88,0,7)
+wheel.BackgroundColor3=Color3.fromRGB(18,42,72)
+wheel.BorderSizePixel=0
+wheel.Text="◉"
+wheel.TextColor3=Color3.fromRGB(150,235,255)
+wheel.Font=Enum.Font.GothamBold
+wheel.TextSize=13
+Instance.new("UICorner",wheel).CornerRadius=UDim.new(1,0)
+local wheelStroke=Instance.new("UIStroke",wheel)
+wheelStroke.Thickness=1.5
+wheelStroke.Color=Color3.fromRGB(0,185,255)
+local wheelGrad=Instance.new("UIGradient",wheelStroke)
+wheelGrad.Color=grad.Color
+local wheelPopup=Instance.new("Frame",gui)
+wheelPopup.Size=UDim2.new(0,146,0,42)
+wheelPopup.BackgroundColor3=Color3.fromRGB(8,16,30)
+wheelPopup.BorderSizePixel=0
+wheelPopup.Visible=false
+wheelPopup.ZIndex=20
+Instance.new("UICorner",wheelPopup).CornerRadius=UDim.new(0,10)
+local popupStroke=Instance.new("UIStroke",wheelPopup)
+popupStroke.Thickness=1
+popupStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+popupStroke.Color=Color3.fromRGB(45,150,245)
+local popupTitle=Instance.new("TextLabel",wheelPopup)
+popupTitle.Size=UDim2.new(0,42,1,0)
+popupTitle.Position=UDim2.new(0,5,0,0)
+popupTitle.BackgroundTransparency=1
+popupTitle.Text="SIZE"
+popupTitle.TextColor3=Color3.fromRGB(120,220,255)
+popupTitle.Font=Enum.Font.GothamBold
+popupTitle.TextSize=9
+local track=Instance.new("Frame",wheelPopup)
+track.Size=UDim2.new(0,82,0,5)
+track.Position=UDim2.new(0,51,0.5,-2)
+track.BackgroundColor3=Color3.fromRGB(40,62,88)
+track.BorderSizePixel=0
+Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
+local fill=Instance.new("Frame",track)
+fill.Size=UDim2.new(.48,0,1,0)
+fill.BackgroundColor3=Color3.fromRGB(0,180,255)
+fill.BorderSizePixel=0
+Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+local knob=Instance.new("TextButton",track)
+knob.Size=UDim2.new(0,14,0,14)
+knob.Position=UDim2.new(.48,-7,.5,-7)
+knob.BackgroundColor3=Color3.fromRGB(220,250,255)
+knob.Text=""
+knob.BorderSizePixel=0
+Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
+local scaleVal=tonumber(Config["UIScale"]) or 0.72
+scaleVal=math.clamp(scaleVal,0.58,1.04)
+local function applyScale(v)
+ scaleVal=math.clamp(v,0.58,1.04)
+ Config["UIScale"]=scaleVal
+ saveConfig()
+ border.Size=UDim2.new(0,500*scaleVal,0,330*scaleVal)
+ border.Position=UDim2.new(0.5,-250*scaleVal,0.5,-165*scaleVal)
+ fill.Size=UDim2.new((scaleVal-.58)/.46,0,1,0)
+ knob.Position=UDim2.new((scaleVal-.58)/.46,-7,.5,-7)
+end
+applyScale(scaleVal)
+local popupOpen=false
+local function positionPopup()
+ local p=border.AbsolutePosition
+ local x=p.X+border.AbsoluteSize.X-158
+ local y=p.Y+border.AbsoluteSize.Y+8
+ wheelPopup.Position=UDim2.fromOffset(x,y)
+end
+wheel.MouseButton1Click:Connect(function()
+ popupOpen=not popupOpen
+ wheelPopup.Visible=popupOpen
+ if popupOpen then positionPopup() end
+end)
+local draggingSize=false
+local function updateSizeFromX(x)
+ local pct=math.clamp((x-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
+ applyScale(.58 + pct*.46)
+end
+knob.InputBegan:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  draggingSize=true
+ end
+end)
+UIS.InputChanged:Connect(function(i)
+ if draggingSize and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then updateSizeFromX(i.Position.X) end
+end)
+UIS.InputEnded:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then draggingSize=false end
+end)
+-- mouse wheel on the knob/popup changes size too
+track.InputChanged:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseMovement then
+  -- handled by knob; keep the track as a click target
+ end
+end)
+wheel.MouseEnter:Connect(function() TweenService:Create(wheel,{BackgroundColor3=Color3.fromRGB(22,66,105)},TweenInfo.new(.12)):Play() end)
+wheel.MouseLeave:Connect(function() TweenService:Create(wheel,{BackgroundColor3=Color3.fromRGB(18,42,72)},TweenInfo.new(.12)):Play() end)
 
-local borderStroke = Instance.new("UIStroke")  
-borderStroke.Thickness = 2  
-borderStroke.Transparency = 0.02  
-borderStroke.Parent = border  
-
-local borderGradient = Instance.new("UIGradient")  
-borderGradient.Rotation = 0  
-borderGradient.Color = ColorSequence.new({  
-	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 70, 220)),  
-	ColorSequenceKeypoint.new(0.20, Color3.fromRGB(0, 120, 255)),  
-	ColorSequenceKeypoint.new(0.40, Color3.fromRGB(0, 185, 255)),  
-	ColorSequenceKeypoint.new(0.60, Color3.fromRGB(40, 110, 255)),  
-	ColorSequenceKeypoint.new(0.80, Color3.fromRGB(80, 200, 255)),  
-	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 70, 220)),  
-})  
-borderGradient.Parent = border  
-
-local frame = Instance.new("Frame")  
-frame.Name = "Main"  
-frame.Size = UDim2.new(1, -4, 1, -4)  
-frame.Position = UDim2.new(0, 2, 0, 2)  
-frame.BackgroundColor3 = Color3.fromRGB(14, 18, 30)  
-frame.BorderSizePixel = 0  
-frame.ClipsDescendants = true  
-frame.Parent = border  
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)  
-
-local frameStroke = Instance.new("UIStroke")  
-frameStroke.Thickness = 1  
-frameStroke.Transparency = 0.78  
-frameStroke.Color = Color3.fromRGB(255, 255, 255)  
-frameStroke.Parent = frame  
-
-local topbar = Instance.new("Frame")  
-topbar.Name = "Topbar"  
-topbar.Size = UDim2.new(1, 0, 0, 30)  
-topbar.BackgroundColor3 = Color3.fromRGB(18, 28, 45)  
-topbar.BorderSizePixel = 0  
-topbar.Active = true  
-topbar.Parent = frame  
-Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 10)  
-
-local topbarFix = Instance.new("Frame")  
-topbarFix.Size = UDim2.new(1, 0, 0, 10)  
-topbarFix.Position = UDim2.new(0, 0, 1, -10)  
-topbarFix.BackgroundColor3 = topbar.BackgroundColor3  
-topbarFix.BorderSizePixel = 0  
-topbarFix.Parent = topbar  
-
-local topGlow = Instance.new("Frame")  
-topGlow.Size = UDim2.new(1, 0, 0, 2)  
-topGlow.Position = UDim2.new(0, 0, 1, -2)  
-topGlow.BackgroundColor3 = Color3.fromRGB(0, 170, 255)  
-topGlow.BorderSizePixel = 0  
-topGlow.Parent = topbar  
-
-local topGlowGrad = Instance.new("UIGradient")  
-topGlowGrad.Color = ColorSequence.new({  
-	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 110, 255)),  
-	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(120, 220, 255)),  
-	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 70, 220)),  
-})  
-topGlowGrad.Parent = topGlow  
-
-local title = Instance.new("TextLabel")  
-title.Size = UDim2.new(1, -68, 1, 0)  
-title.Position = UDim2.new(0, 8, 0, 0)  
-title.BackgroundTransparency = 1  
-title.Text = "Tokito Hub"  
-title.TextColor3 = Color3.fromRGB(255, 255, 255)  
-title.Font = Enum.Font.GothamBold  
-title.TextSize = 14  
-title.TextXAlignment = Enum.TextXAlignment.Left  
-title.Parent = topbar  
-
-local minimizeBtn = Instance.new("TextButton")  
-minimizeBtn.Size = UDim2.new(0, 22, 0, 18)  
-minimizeBtn.Position = UDim2.new(1, -48, 0, 6)  
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(28, 46, 78)  
-minimizeBtn.Text = "—"  
-minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)  
-minimizeBtn.Font = Enum.Font.GothamBold  
-minimizeBtn.TextSize = 16  
-minimizeBtn.BorderSizePixel = 0  
-minimizeBtn.Parent = topbar  
-Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)  
-
-local closeBtn = Instance.new("TextButton")  
-closeBtn.Size = UDim2.new(0, 22, 0, 18)  
-closeBtn.Position = UDim2.new(1, -24, 0, 6)  
-closeBtn.BackgroundColor3 = Color3.fromRGB(40, 28, 55)  
-closeBtn.Text = "X"  
-closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)  
-closeBtn.Font = Enum.Font.GothamBold  
-closeBtn.TextSize = 12  
-closeBtn.BorderSizePixel = 0  
-closeBtn.Parent = topbar  
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)  
-
-local scroll = Instance.new("ScrollingFrame")  
-scroll.Name = "Menu"  
-scroll.Size = UDim2.new(1, -8, 1, -36)  
-scroll.Position = UDim2.new(0, 4, 0, 34)  
-scroll.BackgroundTransparency = 1  
-scroll.BorderSizePixel = 0  
-scroll.ScrollBarThickness = 4  
-scroll.ScrollingDirection = Enum.ScrollingDirection.Y  
-scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y  
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)  
-scroll.Parent = frame  
-
-local padding = Instance.new("UIPadding")  
-padding.PaddingTop = UDim.new(0, 4)  
-padding.PaddingBottom = UDim.new(0, 4)  
-padding.PaddingLeft = UDim.new(0, 2)  
-padding.PaddingRight = UDim.new(0, 2)  
-padding.Parent = scroll  
-
-local layout = Instance.new("UIListLayout")  
-layout.Padding = UDim.new(0, 5)  
-layout.SortOrder = Enum.SortOrder.LayoutOrder  
-layout.Parent = scroll  
-
-local function addHover(btn)  
-	btn.MouseEnter:Connect(function()  
-		TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(36, 58, 95)}):Play()  
-	end)  
-	btn.MouseLeave:Connect(function()  
-		TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(24, 34, 52)}):Play()  
-	end)  
-end  
-
-local function createToggle(name, callback)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, 0, 0, 30)
-	btn.BackgroundColor3 = Color3.fromRGB(24, 34, 52)
-	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 12
-	btn.BorderSizePixel = 0
-	btn.Parent = scroll
-
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-	addHover(btn)
-
-	local state = Config[name] == true
-	btn.Text = name .. (state and " [ON]" or " [OFF]")
-
-	btn.MouseButton1Click:Connect(function()
-		state = not state
-		btn.Text = name .. (state and " [ON]" or " [OFF]")
-		Config[name] = state
-		saveConfig()
-		pcall(callback, state)
-	end)
-
-	if state then
-		task.defer(function()
-			pcall(callback, true)
-		end)
-	end
-end  
-local function createButton(name, callback)
-	local btn = Instance.new("TextButton")
-
-	btn.Size = UDim2.new(1,0,0,30)
-	btn.BackgroundColor3 = Color3.fromRGB(24,34,52)
-	btn.TextColor3 = Color3.fromRGB(255,255,255)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 12
-	btn.Text = name
-	btn.BorderSizePixel = 0
-	btn.Parent = scroll
-
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-
-	addHover(btn)
-
-	btn.MouseButton1Click:Connect(function()
-		pcall(callback)
-	end)
+local function finish()
+ task.spawn(function()
+  while gui.Parent do
+   grad.Rotation=(grad.Rotation+0.65)%360
+   mg.Rotation=(mg.Rotation-0.9)%360
+   topGlowGrad.Rotation=(topGlowGrad.Rotation+1.15)%360
+   decoGrad.Rotation=(decoGrad.Rotation-0.8)%360
+   wheelGrad.Rotation=(wheelGrad.Rotation+1.1)%360
+   headerLineGrad.Offset=Vector2.new((math.sin(os.clock()*0.9)*0.12),0)
+   contentAccentGrad.Offset=Vector2.new((math.sin(os.clock()*0.75)*0.10),0)
+   wheelStroke.Transparency=.20+.07*math.sin(os.clock()*2.3)
+   statusDot.BackgroundTransparency=.05+.18*(0.5+0.5*math.sin(os.clock()*2.8))
+   task.wait(.02)
+  end
+ end)
+end
+UI.finish=finish
+UI.border=border
+UI.mini=mini
+UI.setMini=setMini
+return UI
 end
 
+local function createMenu()
+local UI = __TokitoBuildUI(gui, Config, saveConfig, UIS, TweenService, ICON)
+local createToggle = UI.createToggle
+local createButton = UI.createButton
 local antiLagEnabled = false  
 local antiLagConn  
 local savedLighting = nil  
@@ -1336,7 +1571,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LP = Players.LocalPlayer
 
 local CONFIG = {
-    AUTO_STEAL_ENABLED = true, -- Activado por defecto para uso independiente
+    AUTO_STEAL_ENABLED = false, -- Activado por defecto para uso independiente
     HOLD_MIN = 1.3,
     HOLD_MAX = 2.6,
     ENTRY_DELAY = 0.3,
@@ -1408,14 +1643,7 @@ local function attachPlotChannel(remote)
     if plotAnimalSync.connections[remote] then return end
     local channelName = tostring(remote.Name)
     if not plots:FindFirstChild(channelName) then return end
-    if syncRemotes.requestData and plotAnimalSync.caches[channelName] == nil then
-        local ok, data = pcall(function() return syncRemotes.requestData:InvokeServer(channelName) end)
-        if ok and typeof(data) == "table" then
-            plotAnimalSync.caches[channelName] = data
-        else
-            plotAnimalSync.caches[channelName] = {}
-        end
-    elseif plotAnimalSync.caches[channelName] == nil then
+    if plotAnimalSync.caches[channelName] == nil then
         plotAnimalSync.caches[channelName] = {}
     end
     plotAnimalSync.connections[remote] = remote.OnClientEvent:Connect(function(queue)
@@ -2552,90 +2780,8 @@ do
     end)
 
     -- ============================================================
-    -- INTERCEPCIÓN DEL DISPARO
-    -- ============================================================
-
-    pcall(function()
-        local OldNamecall
-
-        OldNamecall = hookmetamethod(
-            game,
-            "__namecall",
-            newcclosure(function(self, ...)
-                local Args = {...}
-                local Method = getnamecallmethod()
-
-                if AimbotEnabled
-                    and CurrentTarget
-                    and not checkcaller() then
-
-                    if string.find(Method, "FindPartOnRay") then
-                        return
-                            CurrentTarget,
-                            CurrentTarget.Position,
-                            Vector3.new(0, 1, 0),
-                            Enum.Material.Plastic
-
-                    elseif Method == "Raycast" then
-                        local Origin = Args[1]
-
-                        local Direction =
-                            (CurrentTarget.Position - Origin).Unit * 10000
-
-                        local WallbangParams = RaycastParams.new()
-
-                        WallbangParams.FilterType =
-                            Enum.RaycastFilterType.Include
-
-                        WallbangParams.FilterDescendantsInstances = {
-                            CurrentTarget.Parent
-                        }
-
-                        WallbangParams.IgnoreWater = true
-
-                        Args[2] = Direction
-                        Args[3] = WallbangParams
-
-                        return OldNamecall(
-                            self,
-                            unpack(Args)
-                        )
-                    end
-                end
-
-                return OldNamecall(self, ...)
-            end)
-        )
-
-        local OldIndex
-
-        OldIndex = hookmetamethod(
-            game,
-            "__index",
-            newcclosure(function(self, Index)
-                if AimbotEnabled
-                    and CurrentTarget
-                    and not checkcaller() then
-
-                    if self == Mouse then
-                        if Index == "Hit" or Index == "hit" then
-                            return CurrentTarget.CFrame
-
-                        elseif Index == "Target" or Index == "target" then
-                            return CurrentTarget
-                        end
-                    end
-                end
-
-                return OldIndex(self, Index)
-            end)
-        )
-    end)
-
-    -- ============================================================
     -- INTEGRACIÓN CON createToggle
     -- ============================================================
-
     createToggle("Capa laser aim", function(state)
         MainFrame.Visible = state
 
@@ -3443,89 +3589,8 @@ do
     WallbangParams.IgnoreWater = true
 
     -- ============================================================
-    -- INTERCEPCIÓN DEL DISPARO
-    -- ============================================================
-
-    pcall(function()
-        local OldNamecall
-
-        OldNamecall = hookmetamethod(
-            game,
-            "__namecall",
-            newcclosure(function(self, ...)
-                local Method = getnamecallmethod()
-
-                if AimbotEnabled
-                    and CurrentTarget
-                    and not checkcaller() then
-
-                    if string.find(Method, "FindPartOnRay") then
-                        return
-                            CurrentTarget,
-                            CurrentTarget.Position,
-                            Vector3.new(0, 1, 0),
-                            Enum.Material.Plastic
-
-                    elseif Method == "Raycast" then
-                        local Args = {...}
-                        local Origin = Args[1]
-
-                        if typeof(Origin) == "Vector3" then
-                            local Direction =
-                                (CurrentTarget.Position - Origin).Unit * 10000
-
-                            WallbangParams.FilterDescendantsInstances = {
-                                CurrentTarget.Parent
-                            }
-
-                            Args[2] = Direction
-                            Args[3] = WallbangParams
-
-                            return OldNamecall(
-                                self,
-                                unpack(Args)
-                            )
-                        end
-                    end
-                end
-
-                return OldNamecall(self, ...)
-            end)
-        )
-
-        local OldIndex
-
-        OldIndex = hookmetamethod(
-            game,
-            "__index",
-            newcclosure(function(self, Index)
-                if AimbotEnabled
-                    and CurrentTarget
-                    and not checkcaller()
-                    and self == Mouse then
-
-                    if Index == "Hit"
-                        or Index == "hit" then
-
-                        return CurrentTarget.CFrame
-                    end
-
-                    if Index == "Target"
-                        or Index == "target" then
-
-                        return CurrentTarget
-                    end
-                end
-
-                return OldIndex(self, Index)
-            end)
-        )
-    end)
-
-    -- ============================================================
     -- INTEGRACIÓN CON createToggle
     -- ============================================================
-
     createToggle("AIMBOT OPTIMIZADO", function(state)
         MainFrame.Visible = state
 
@@ -19006,100 +19071,7 @@ createButton("Server Hopper", function()
 end)
 
 -- ================= END SERVER HOPPER =================
-local mini = Instance.new("ImageButton")  
-mini.Name = "MiniButton"  
-mini.Size = UDim2.new(0, 54, 0, 54)  
-mini.Position = UDim2.new(0, 18, 0, 200)  
-mini.BackgroundColor3 = Color3.fromRGB(12, 22, 38)  
-mini.BackgroundTransparency = 0  
-mini.BorderSizePixel = 0  
-mini.Image = ICON  
-mini.ScaleType = Enum.ScaleType.Fit  
-mini.ImageColor3 = Color3.fromRGB(255, 255, 255)  
-mini.Visible = false  
-mini.Active = true  
-mini.Parent = gui  
-Instance.new("UICorner", mini).CornerRadius = UDim.new(1, 0)  
-
-local miniStroke = Instance.new("UIStroke")  
-miniStroke.Thickness = 2  
-miniStroke.Transparency = 0.1  
-miniStroke.Color = Color3.fromRGB(90, 190, 255)  
-miniStroke.Parent = mini  
-
-local miniGlow = Instance.new("UIGradient")  
-miniGlow.Color = ColorSequence.new({  
-	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 90, 255)),  
-	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(120, 220, 255)),  
-	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 90, 255)),  
-})  
-miniGlow.Parent = miniStroke  
-
-local minimized = false  
-
-local function setMinimized(state)  
-	minimized = state  
-	border.Visible = not state  
-	mini.Visible = state  
-end  
-
-minimizeBtn.MouseButton1Click:Connect(function()  
-	setMinimized(true)  
-end)  
-
-mini.MouseButton1Click:Connect(function()  
-	setMinimized(false)  
-end)  
-
-closeBtn.MouseButton1Click:Connect(function()  
-	gui:Destroy()  
-	getgenv().TokitoHub = nil  
-end)  
-
-local function makeDraggable(handle, root)  
-	handle.Active = true  
-
-	local dragging = false  
-	local dragStart  
-	local startPos  
-
-	handle.InputBegan:Connect(function(input)  
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
-			dragging = true  
-			dragStart = input.Position  
-			startPos = root.Position  
-		end  
-	end)  
-
-	handle.InputEnded:Connect(function(input)  
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
-			dragging = false  
-		end  
-	end)  
-
-	UIS.InputChanged:Connect(function(input)  
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then  
-			local delta = input.Position - dragStart  
-			root.Position = UDim2.new(  
-				startPos.X.Scale,  
-				startPos.X.Offset + delta.X,  
-				startPos.Y.Scale,  
-				startPos.Y.Offset + delta.Y  
-			)  
-		end  
-	end)  
-end  
-
-makeDraggable(topbar, border)  
-makeDraggable(mini, mini)  
-
-task.spawn(function()  
-	while gui.Parent do  
-		borderGradient.Rotation = (borderGradient.Rotation + 1) % 360  
-		task.wait(0.02)  
-	end  
-end)
-
+UI.finish()
 end
 
 if splash then
@@ -19407,8 +19379,10 @@ end
 
 if shouldSkipIntro() then
 	createMenu()
+	pcall(function() gui:SetAttribute("TokitoReady",true) end)
 else
 	playIntro(Color3.fromRGB(192, 192, 192), function()
 		createMenu()
+		pcall(function() gui:SetAttribute("TokitoReady",true) end)
 	end)
 end
