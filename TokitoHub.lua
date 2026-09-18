@@ -4,7 +4,7 @@
 -- ============================================================
 local __TOKITO_ENV = getgenv()
 local __TOKITO_COREGUI = game:GetService("CoreGui")
-local __TOKITO_VERSION = 5
+local __TOKITO_VERSION = 7
 local __TOKITO_EXISTING = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
 
 if __TOKITO_EXISTING then
@@ -23,6 +23,12 @@ if __TOKITO_EXISTING then
         __TOKITO_ENV.TokitoHub = true
         return
     end
+
+    pcall(function()
+        if type(__TOKITO_ENV.__TokitoHubCleanup) == "function" then
+            __TOKITO_ENV.__TokitoHubCleanup()
+        end
+    end)
 
     pcall(function()
         __TOKITO_EXISTING:Destroy()
@@ -131,6 +137,8 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "TokitoHub"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 1000000
 pcall(function() gui:SetAttribute("TokitoToggleFixVersion", __TOKITO_VERSION) end)
 gui.Parent = game:GetService("CoreGui")
 
@@ -147,6 +155,9 @@ __TOKITO_ENV.__TokitoHubShow = function()
 	pcall(function()
 		if gui and gui.Parent then
 			gui.Enabled = true
+			if type(__TOKITO_ENV.__TokitoHubOpenVisual) == "function" then
+				__TOKITO_ENV.__TokitoHubOpenVisual()
+			end
 		end
 	end)
 end
@@ -199,20 +210,36 @@ splashSub.Parent = splash
 
 local function __TokitoBuildUI(gui, Config, saveConfig, UIS, TweenService, ICON)
 local UI={}
+local glow=Instance.new("Frame")
+glow.Name="BorderGlow"
+glow.Size=UDim2.new(0,416,0,281)
+glow.Position=UDim2.new(0.5,-208,0.5,-140.5)
+glow.BackgroundTransparency=1
+glow.BorderSizePixel=0
+glow.Parent=gui
+Instance.new("UICorner",glow).CornerRadius=UDim.new(0,22)
+local glowStroke=Instance.new("UIStroke",glow)
+glowStroke.Thickness=6
+glowStroke.Transparency=.82
+glowStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+local glowGrad=Instance.new("UIGradient",glowStroke)
+
 local border=Instance.new("Frame")
 border.Name="Border"
-border.Size=UDim2.new(0,500,0,330)
-border.Position=UDim2.new(0.5,-250,0.5,-165)
+border.Size=UDim2.new(0,400,0,265)
+border.Position=UDim2.new(0.5,-200,0.5,-132.5)
 border.BackgroundColor3=Color3.fromRGB(7,11,22)
 border.BorderSizePixel=0
 border.ClipsDescendants=true
 border.Parent=gui
 Instance.new("UICorner",border).CornerRadius=UDim.new(0,18)
 local stroke=Instance.new("UIStroke",border)
-stroke.Thickness=1.5
+stroke.Thickness=2.15
+stroke.Transparency=.04
 stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
 local grad=Instance.new("UIGradient",stroke)
 grad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(0,95,255)),ColorSequenceKeypoint.new(.18,Color3.fromRGB(0,170,255)),ColorSequenceKeypoint.new(.36,Color3.fromRGB(90,220,255)),ColorSequenceKeypoint.new(.50,Color3.fromRGB(0,120,255)),ColorSequenceKeypoint.new(.70,Color3.fromRGB(70,160,255)),ColorSequenceKeypoint.new(.86,Color3.fromRGB(0,210,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,95,255))})
+glowGrad.Color=grad.Color
 local main=Instance.new("Frame",border)
 main.Size=UDim2.new(1,-4,1,-4)
 main.Position=UDim2.new(0,2,0,2)
@@ -220,6 +247,14 @@ main.BackgroundColor3=Color3.fromRGB(12,17,31)
 main.BorderSizePixel=0
 main.ClipsDescendants=true
 Instance.new("UICorner",main).CornerRadius=UDim.new(0,16)
+local mainGrad=Instance.new("UIGradient",main)
+mainGrad.Rotation=90
+mainGrad.Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(15,23,42)),
+ ColorSequenceKeypoint.new(.45,Color3.fromRGB(10,16,30)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(7,12,24))
+})
+
 local top=Instance.new("Frame",main)
 top.Size=UDim2.new(1,0,0,42)
 local topStroke=Instance.new("UIStroke",top)
@@ -229,6 +264,13 @@ topStroke.Color=Color3.fromRGB(70,180,255)
 top.BackgroundColor3=Color3.fromRGB(16,25,44)
 top.BorderSizePixel=0
 top.Active=true
+local topGrad=Instance.new("UIGradient",top)
+topGrad.Rotation=0
+topGrad.Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(17,31,54)),
+ ColorSequenceKeypoint.new(.5,Color3.fromRGB(11,23,43)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(19,30,52))
+})
 local topGlow=Instance.new("Frame",top)
 topGlow.Size=UDim2.new(1,0,0,2)
 topGlow.Position=UDim2.new(0,0,1,-2)
@@ -264,6 +306,10 @@ close.TextSize=11
 close.BackgroundColor3=Color3.fromRGB(70,32,54)
 close.BorderSizePixel=0
 Instance.new("UICorner",close).CornerRadius=UDim.new(0,8)
+local closeStroke=Instance.new("UIStroke",close)
+closeStroke.Thickness=1
+closeStroke.Transparency=.35
+closeStroke.Color=Color3.fromRGB(255,90,160)
 local side=Instance.new("Frame",main)
 local sideGlow=Instance.new("UIStroke",side)
 sideGlow.Thickness=1
@@ -274,6 +320,12 @@ side.Position=UDim2.new(0,6,0,48)
 side.BackgroundColor3=Color3.fromRGB(15,23,40)
 side.BorderSizePixel=0
 Instance.new("UICorner",side).CornerRadius=UDim.new(0,12)
+local sideGrad=Instance.new("UIGradient",side)
+sideGrad.Rotation=90
+sideGrad.Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(18,29,50)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(10,18,33))
+})
 local sideTitle=Instance.new("TextLabel",side)
 sideTitle.Size=UDim2.new(1,-12,0,24)
 sideTitle.Position=UDim2.new(0,6,0,4)
@@ -302,6 +354,17 @@ content.Position=UDim2.new(0,122,0,48)
 content.BackgroundColor3=Color3.fromRGB(10,15,27)
 content.BorderSizePixel=0
 Instance.new("UICorner",content).CornerRadius=UDim.new(0,12)
+local contentStroke=Instance.new("UIStroke",content)
+contentStroke.Thickness=1
+contentStroke.Transparency=.58
+contentStroke.Color=Color3.fromRGB(43,130,220)
+local contentGrad=Instance.new("UIGradient",content)
+contentGrad.Rotation=90
+contentGrad.Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(12,20,36)),
+ ColorSequenceKeypoint.new(.5,Color3.fromRGB(9,15,28)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(12,18,31))
+})
 local contentAccent=Instance.new("Frame",content)
 contentAccent.Size=UDim2.new(0,2,0,52)
 contentAccent.Position=UDim2.new(0,0,0,10)
@@ -322,7 +385,7 @@ contentTopShade.BorderSizePixel=0
 contentTopShade.ZIndex=2
 local sections={}
 local buttons={}
-local order={"STEAL","VISUALES","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
+local order={"STEAL","VISUALES","TEXTURAS","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
 local function makeSection(name)
  local page=Instance.new("ScrollingFrame",content)
  page.Name=name
@@ -352,6 +415,16 @@ local function makeSection(name)
  tab.BackgroundColor3=Color3.fromRGB(24,35,58)
  tab.BorderSizePixel=0
  Instance.new("UICorner",tab).CornerRadius=UDim.new(0,9)
+ local tabStroke=Instance.new("UIStroke",tab)
+ tabStroke.Thickness=1
+ tabStroke.Transparency=.72
+ tabStroke.Color=Color3.fromRGB(55,125,205)
+ local tabGrad=Instance.new("UIGradient",tab)
+ tabGrad.Rotation=0
+ tabGrad.Color=ColorSequence.new({
+  ColorSequenceKeypoint.new(0,Color3.fromRGB(27,43,69)),
+  ColorSequenceKeypoint.new(1,Color3.fromRGB(18,29,49))
+ })
  sections[name]=page
  buttons[name]=tab
  tab.MouseButton1Click:Connect(function()
@@ -359,6 +432,11 @@ local function makeSection(name)
   for n,b in pairs(buttons) do
    b.BackgroundColor3=(n==name) and Color3.fromRGB(27,60,101) or Color3.fromRGB(19,29,48)
    b.TextColor3=(n==name) and Color3.fromRGB(235,248,255) or Color3.fromRGB(175,205,235)
+   local bs=b:FindFirstChildOfClass("UIStroke")
+   if bs then
+    bs.Color=(n==name) and Color3.fromRGB(70,205,255) or Color3.fromRGB(55,125,205)
+    bs.Transparency=(n==name) and .30 or .72
+   end
   end
  end)
 end
@@ -367,20 +445,582 @@ local current="STEAL"
 sections[current].Visible=true
 buttons[current].BackgroundColor3=Color3.fromRGB(27,60,101)
 buttons[current].TextColor3=Color3.fromRGB(235,248,255)
+local currentStroke=buttons[current]:FindFirstChildOfClass("UIStroke")
+if currentStroke then
+ currentStroke.Color=Color3.fromRGB(70,205,255)
+ currentStroke.Transparency=.30
+end
+
+-- ============================================================
+-- TEXTURAS / SKY THEME
+-- Solo contiene los temas visuales tomados del script "p".
+-- ============================================================
+local currentSkyTheme = tostring(Config.SkyTheme or "Off")
+local skySelectorLabel = nil
+local CANDY_SKY_TAG = "TokiHubSkyTheme"
+local candyOriginalLighting = nil
+local CANDY_SKY_PRESETS = {
+    ["Off"] = { kind = "off" },
+    ["Night"] = { clock = 22, brightness = 2, ambient = {110,100,130}, outAmb = {120,110,140}, sky = {stars = 4000, moon = 18, sun = 0, moonTex = true}, atm = {dens = 0.45, color = {120,60,180}, decay = {60,20,100}, glare = 0.5, haze = 1.2} },
+    ["Aurora"] = { clock = 14, brightness = 3, ambient = {150,120,150}, outAmb = {160,130,150}, atm = {dens = 0.55, color = {255,80,200}, decay = {255,20,150}, glare = 2.5, haze = 3}, clouds = {cover = 0.7, dens = 0.7, color = {255,240,250}} },
+    ["Sunset"] = { clock = 17.2, brightness = 2.5, ambient = {170,120,100}, outAmb = {180,130,110}, sky = {stars = 0, sun = 25, moon = 0}, atm = {dens = 0.5, color = {255,130,60}, decay = {255,80,30}, glare = 2, haze = 2.5}, clouds = {cover = 0.55, dens = 0.55, color = {255,200,140}} },
+    ["Galaxy"] = { clock = 0, brightness = 1.5, ambient = {70,60,100}, outAmb = {80,70,110}, sky = {stars = 10000, moon = 30, sun = 0}, atm = {dens = 0.15, color = {40,20,80}, decay = {20,10,50}, glare = 0.3, haze = 0.5} },
+    ["Cyber"] = { clock = 21, brightness = 2.2, ambient = {90,130,170}, outAmb = {100,140,180}, sky = {stars = 2000, moon = 12}, atm = {dens = 0.4, color = {0,200,255}, decay = {150,0,255}, glare = 2, haze = 2}, clouds = {cover = 0.4, dens = 0.6, color = {100,200,255}} },
+    ["Sakura"] = { clock = 11, brightness = 3.5, ambient = {170,150,160}, outAmb = {180,160,170}, sky = {sun = 8}, atm = {dens = 0.3, color = {255,200,220}, decay = {255,170,200}, glare = 1, haze = 1.5}, clouds = {cover = 0.6, dens = 0.4, color = {255,250,252}} },
+    ["Pink Night"] = { clock = 23, brightness = 2.2, ambient = {120,60,110}, outAmb = {140,70,120}, sky = {stars = 5000, moon = 22, sun = 0, moonTex = true}, atm = {dens = 0.5, color = {255,80,180}, decay = {140,30,100}, glare = 0.7, haze = 1.4}, clouds = {cover = 0.3, dens = 0.5, color = {180,90,150}} },
+    ["Blood Moon"] = { clock = 22.5, brightness = 1.6, ambient = {130,40,40}, outAmb = {150,50,50}, sky = {stars = 1500, moon = 28, sun = 0, moonTex = true}, atm = {dens = 0.6, color = {220,30,30}, decay = {120,10,10}, glare = 1.4, haze = 2}, clouds = {cover = 0.5, dens = 0.7, color = {120,30,30}} },
+    ["Emerald Dawn"] = { clock = 6.5, brightness = 2.8, ambient = {130,170,140}, outAmb = {140,180,150}, sky = {sun = 18, moon = 0, stars = 0}, atm = {dens = 0.4, color = {80,200,140}, decay = {40,150,90}, glare = 1.8, haze = 2.2}, clouds = {cover = 0.5, dens = 0.5, color = {200,255,220}} },
+    ["Volcanic"] = { clock = 19, brightness = 2, ambient = {180,80,40}, outAmb = {200,90,50}, sky = {stars = 200, sun = 12, moon = 0}, atm = {dens = 0.75, color = {255,60,0}, decay = {180,20,0}, glare = 3, haze = 3.5}, clouds = {cover = 0.8, dens = 0.9, color = {120,40,20}} },
+    ["Arctic"] = { clock = 9, brightness = 3.2, ambient = {200,220,235}, outAmb = {210,230,245}, sky = {sun = 10, stars = 0, moon = 0}, atm = {dens = 0.3, color = {180,220,255}, decay = {140,200,240}, glare = 1.5, haze = 1.8}, clouds = {cover = 0.7, dens = 0.6, color = {250,253,255}} },
+    ["Midnight Ocean"] = { clock = 1.5, brightness = 1.7, ambient = {60,90,130}, outAmb = {70,100,140}, sky = {stars = 6000, moon = 24, sun = 0, moonTex = true}, atm = {dens = 0.5, color = {20,60,140}, decay = {10,30,90}, glare = 0.6, haze = 1.5} },
+    ["Vaporwave"] = { clock = 19.5, brightness = 2.4, ambient = {180,120,200}, outAmb = {190,130,210}, sky = {stars = 1000, moon = 14}, atm = {dens = 0.45, color = {255,100,220}, decay = {120,60,255}, glare = 2.2, haze = 2.4}, clouds = {cover = 0.5, dens = 0.55, color = {200,150,255}} },
+    ["Toxic"] = { clock = 13, brightness = 2.5, ambient = {140,180,80}, outAmb = {150,190,90}, atm = {dens = 0.55, color = {100,220,40}, decay = {60,150,20}, glare = 1.8, haze = 2.6}, clouds = {cover = 0.65, dens = 0.7, color = {180,255,120}} },
+    ["Solar Eclipse"] = { clock = 12, brightness = 0.9, ambient = {50,40,60}, outAmb = {60,50,70}, sky = {stars = 3500, sun = 22, moon = 0}, atm = {dens = 0.5, color = {255,140,40}, decay = {30,20,40}, glare = 2.8, haze = 1.8} },
+    ["Hellscape"] = { clock = 18, brightness = 1.8, ambient = {200,60,30}, outAmb = {220,70,40}, sky = {stars = 100, sun = 30, moon = 0}, atm = {dens = 0.85, color = {255,30,0}, decay = {120,0,0}, glare = 3.5, haze = 4}, clouds = {cover = 0.95, dens = 0.95, color = {80,20,10}} },
+    ["Heaven"] = { clock = 12, brightness = 4, ambient = {240,235,210}, outAmb = {250,245,220}, sky = {sun = 16, moon = 0, stars = 0}, atm = {dens = 0.25, color = {255,250,220}, decay = {255,240,200}, glare = 3, haze = 1.5}, clouds = {cover = 0.85, dens = 0.5, color = {255,255,255}} },
+    ["Storm"] = { clock = 15, brightness = 1.4, ambient = {90,90,110}, outAmb = {100,100,120}, sky = {stars = 0, sun = 6, moon = 0}, atm = {dens = 0.65, color = {80,90,120}, decay = {40,50,80}, glare = 0.5, haze = 3}, clouds = {cover = 0.95, dens = 0.95, color = {60,65,80}} },
+    ["Sunrise"] = { clock = 6.2, brightness = 2.8, ambient = {220,180,130}, outAmb = {230,190,140}, sky = {sun = 22, stars = 0, moon = 0}, atm = {dens = 0.45, color = {255,180,100}, decay = {255,140,80}, glare = 2.4, haze = 2.2}, clouds = {cover = 0.4, dens = 0.4, color = {255,220,180}} },
+    ["Deep Space"] = { clock = 0, brightness = 1, ambient = {30,25,50}, outAmb = {40,35,60}, sky = {stars = 15000, moon = 0, sun = 0}, atm = {dens = 0.08, color = {15,5,40}, decay = {5,0,20}, glare = 0.2, haze = 0.3} },
+    ["Lavender Dream"] = { clock = 18.5, brightness = 2.6, ambient = {180,160,220}, outAmb = {190,170,230}, sky = {stars = 800, moon = 16, sun = 0}, atm = {dens = 0.4, color = {200,160,255}, decay = {160,120,220}, glare = 1.4, haze = 1.8}, clouds = {cover = 0.55, dens = 0.5, color = {220,200,255}} },
+    ["Inferno"] = { clock = 17.5, brightness = 2.2, ambient = {220,100,40}, outAmb = {235,110,50}, sky = {sun = 26, moon = 0, stars = 0}, atm = {dens = 0.6, color = {255,90,20}, decay = {200,40,0}, glare = 3, haze = 3.2}, clouds = {cover = 0.7, dens = 0.7, color = {200,80,40}} },
+    ["Mint Sky"] = { clock = 10, brightness = 3.2, ambient = {180,230,210}, outAmb = {190,240,220}, sky = {sun = 10}, atm = {dens = 0.32, color = {150,255,210}, decay = {100,220,180}, glare = 1.6, haze = 1.6}, clouds = {cover = 0.55, dens = 0.45, color = {240,255,250}} },
+}
+
+local CANDY_SKY_ORDER = {
+    {"Off","Off"}, {"Night","Night"}, {"Aurora","Aurora"}, {"Sunset","Sunset"},
+    {"Galaxy","Galaxy"}, {"Cyber","Cyber"}, {"Sakura","Sakura"},
+    {"Pink Night","Pink Night"}, {"Blood Moon","Blood Moon"},
+    {"Emerald Dawn","Emerald Dawn"}, {"Volcanic","Volcanic"},
+    {"Arctic","Arctic"}, {"Midnight Ocean","Midnight Ocean"},
+    {"Vaporwave","Vaporwave"}, {"Toxic","Toxic"},
+    {"Solar Eclipse","Solar Eclipse"}, {"Hellscape","Hellscape"},
+    {"Heaven","Heaven"}, {"Storm","Storm"}, {"Sunrise","Sunrise"},
+    {"Deep Space","Deep Space"}, {"Lavender Dream","Lavender Dream"},
+    {"Inferno","Inferno"}, {"Mint Sky","Mint Sky"}
+}
+local function candySaveOriginalLighting()
+    if candyOriginalLighting then return end
+    candyOriginalLighting = {
+        ClockTime = Lighting.ClockTime,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        Ambient = Lighting.Ambient,
+        Brightness = Lighting.Brightness,
+        FogStart = Lighting.FogStart,
+        FogEnd = Lighting.FogEnd,
+        FogColor = Lighting.FogColor,
+        ColorShift_Top = Lighting.ColorShift_Top,
+        ColorShift_Bottom = Lighting.ColorShift_Bottom,
+        GeographicLatitude = Lighting.GeographicLatitude,
+        GlobalShadows = Lighting.GlobalShadows,
+        LightingChildren = {},
+        TerrainChildren = {}
+    }
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") or child:IsA("Atmosphere") then
+            table.insert(candyOriginalLighting.LightingChildren, child:Clone())
+        end
+    end
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        for _, child in ipairs(terrain:GetChildren()) do
+            if child:IsA("Clouds") then
+                table.insert(candyOriginalLighting.TerrainChildren, child:Clone())
+            end
+        end
+    end
+end
+
+local function candyClearSky(removeAll)
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:GetAttribute(CANDY_SKY_TAG) or (removeAll and (child:IsA("Sky") or child:IsA("Atmosphere"))) then
+            pcall(function() child:Destroy() end)
+        end
+    end
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        for _, child in ipairs(terrain:GetChildren()) do
+            if child:GetAttribute(CANDY_SKY_TAG) or (removeAll and child:IsA("Clouds")) then
+                pcall(function() child:Destroy() end)
+            end
+        end
+    end
+end
+
+local function candyInstance(className, parent, props)
+    local inst = Instance.new(className)
+    inst:SetAttribute(CANDY_SKY_TAG, true)
+    for k, v in pairs(props or {}) do pcall(function() inst[k] = v end) end
+    inst.Parent = parent
+    return inst
+end
+
+local function candyColor(rgb)
+    return Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+end
+
+local function CandyApplyCustomSky(mode)
+    candySaveOriginalLighting()
+    candyClearSky(true)
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    local preset = CANDY_SKY_PRESETS[mode]
+    if not preset or preset.kind == "off" then
+        if candyOriginalLighting then
+            for k, v in pairs(candyOriginalLighting) do
+                if k ~= "LightingChildren" and k ~= "TerrainChildren" then
+                    pcall(function() Lighting[k] = v end)
+                end
+            end
+            for _, child in ipairs(candyOriginalLighting.LightingChildren or {}) do
+                child:Clone().Parent = Lighting
+            end
+            local offTerrain = workspace:FindFirstChildOfClass("Terrain")
+            if offTerrain then
+                for _, child in ipairs(candyOriginalLighting.TerrainChildren or {}) do
+                    child:Clone().Parent = offTerrain
+                end
+            end
+        end
+        currentSkyTheme = "Off"
+        return
+    end
+
+    Lighting.FogStart = 0
+    Lighting.FogEnd = 100000
+    Lighting.FogColor = Color3.fromRGB(200,200,200)
+    Lighting.ColorShift_Top = Color3.fromRGB(0,0,0)
+    Lighting.ColorShift_Bottom = Color3.fromRGB(0,0,0)
+    Lighting.GlobalShadows = true
+    Lighting.ClockTime = preset.clock or 14
+    Lighting.Brightness = preset.brightness or 2
+    if preset.outAmb then Lighting.OutdoorAmbient = candyColor(preset.outAmb) end
+    if preset.ambient then Lighting.Ambient = candyColor(preset.ambient) end
+
+    if preset.sky then
+        local skyProps = {}
+        if preset.sky.stars then skyProps.StarCount = preset.sky.stars end
+        if preset.sky.moon then skyProps.MoonAngularSize = preset.sky.moon end
+        if preset.sky.sun then skyProps.SunAngularSize = preset.sky.sun end
+        if preset.sky.moonTex then skyProps.MoonTextureId = "rbxasset://sky/moon.jpg" end
+        candyInstance("Sky", Lighting, skyProps)
+    end
+
+    if preset.atm then
+        candyInstance("Atmosphere", Lighting, {
+            Density = preset.atm.dens or 0.3,
+            Color = candyColor(preset.atm.color),
+            Decay = candyColor(preset.atm.decay),
+            Glare = preset.atm.glare or 1,
+            Haze = preset.atm.haze or 1
+        })
+    end
+
+    if preset.clouds and terrain then
+        candyInstance("Clouds", terrain, {
+            Cover = preset.clouds.cover or 0.5,
+            Density = preset.clouds.dens or 0.5,
+            Color = candyColor(preset.clouds.color)
+        })
+    end
+
+    currentSkyTheme = mode
+end
+
+
+
+local function setSkyTheme(theme)
+    currentSkyTheme = theme
+    CandyApplyCustomSky(theme)
+    if skySelectorLabel then
+        skySelectorLabel.Text = theme
+    end
+    Config.SkyTheme = theme
+    saveConfig()
+end
+
+local candySkyGuardConnection = Lighting.DescendantAdded:Connect(function(obj)
+    if currentSkyTheme == "Off" then return end
+    if obj:GetAttribute(CANDY_SKY_TAG) then return end
+    task.defer(function()
+        if currentSkyTheme == "Off" or not Lighting.Parent then return end
+        local preset = CANDY_SKY_PRESETS[currentSkyTheme]
+        if not preset then return end
+        local needSky = preset.sky ~= nil
+        local hasTaggedSky, hasTaggedAtmosphere = false, false
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if child:IsA("Sky") and child:GetAttribute(CANDY_SKY_TAG) then hasTaggedSky = true end
+            if child:IsA("Atmosphere") and child:GetAttribute(CANDY_SKY_TAG) then hasTaggedAtmosphere = true end
+        end
+        if (needSky and not hasTaggedSky) or (preset.atm and not hasTaggedAtmosphere) then
+            CandyApplyCustomSky(currentSkyTheme)
+        end
+    end)
+end)
+
+local texturePage = sections.TEXTURAS
+if texturePage then
+    local row = Instance.new("Frame", texturePage)
+    row.Name = "SkyThemeSelector"
+    row.Size = UDim2.new(1,0,0,38)
+    row.BackgroundColor3 = Color3.fromRGB(17,27,46)
+    row.BorderSizePixel = 0
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0,9)
+
+    local rowStroke = Instance.new("UIStroke", row)
+    rowStroke.Thickness = 1
+    rowStroke.Transparency = .68
+    rowStroke.Color = Color3.fromRGB(53,117,184)
+
+    local label = Instance.new("TextLabel", row)
+    label.Size = UDim2.new(1,-175,1,0)
+    label.Position = UDim2.new(0,10,0,0)
+    label.BackgroundTransparency = 1
+    label.Text = "Sky Theme"
+    label.TextColor3 = Color3.fromRGB(245,248,255)
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 10
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local container = Instance.new("Frame", row)
+    container.Size = UDim2.new(0,160,1,0)
+    container.Position = UDim2.new(1,-168,0,0)
+    container.BackgroundTransparency = 1
+
+    local leftBtn = Instance.new("TextButton", container)
+    leftBtn.Size = UDim2.new(0,32,0,26)
+    leftBtn.Position = UDim2.new(0,0,.5,-13)
+    leftBtn.BackgroundColor3 = Color3.fromRGB(10,42,80)
+    leftBtn.BorderSizePixel = 0
+    leftBtn.Text = "<"
+    leftBtn.TextColor3 = Color3.fromRGB(235,248,255)
+    leftBtn.Font = Enum.Font.GothamBlack
+    leftBtn.TextSize = 13
+    leftBtn.AutoButtonColor = false
+    Instance.new("UICorner", leftBtn).CornerRadius = UDim.new(0,6)
+    local leftStroke = Instance.new("UIStroke", leftBtn)
+    leftStroke.Thickness = 1
+    leftStroke.Transparency = .45
+    leftStroke.Color = Color3.fromRGB(60,160,235)
+
+    skySelectorLabel = Instance.new("TextLabel", container)
+    skySelectorLabel.Size = UDim2.new(0,80,0,26)
+    skySelectorLabel.Position = UDim2.new(.5,-40,.5,-13)
+    skySelectorLabel.BackgroundTransparency = 1
+    skySelectorLabel.Text = CANDY_SKY_PRESETS[currentSkyTheme] and currentSkyTheme or "Off"
+    skySelectorLabel.TextColor3 = Color3.fromRGB(245,248,255)
+    skySelectorLabel.Font = Enum.Font.GothamBlack
+    skySelectorLabel.TextSize = 11
+    skySelectorLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+    local rightBtn = Instance.new("TextButton", container)
+    rightBtn.Size = UDim2.new(0,32,0,26)
+    rightBtn.Position = UDim2.new(1,-32,.5,-13)
+    rightBtn.BackgroundColor3 = Color3.fromRGB(10,42,80)
+    rightBtn.BorderSizePixel = 0
+    rightBtn.Text = ">"
+    rightBtn.TextColor3 = Color3.fromRGB(235,248,255)
+    rightBtn.Font = Enum.Font.GothamBlack
+    rightBtn.TextSize = 13
+    rightBtn.AutoButtonColor = false
+    Instance.new("UICorner", rightBtn).CornerRadius = UDim.new(0,6)
+    local rightStroke = Instance.new("UIStroke", rightBtn)
+    rightStroke.Thickness = 1
+    rightStroke.Transparency = .45
+    rightStroke.Color = Color3.fromRGB(60,160,235)
+
+    local function updateSkySelector(direction)
+        local idx = 1
+        for i,entry in ipairs(CANDY_SKY_ORDER) do
+            if entry[2] == currentSkyTheme then idx = i; break end
+        end
+        local newIdx = idx + direction
+        if newIdx < 1 then newIdx = #CANDY_SKY_ORDER end
+        if newIdx > #CANDY_SKY_ORDER then newIdx = 1 end
+        setSkyTheme(CANDY_SKY_ORDER[newIdx][2])
+    end
+
+    leftBtn.Activated:Connect(function() updateSkySelector(-1) end)
+    rightBtn.Activated:Connect(function() updateSkySelector(1) end)
+end
+
+if CANDY_SKY_PRESETS[currentSkyTheme] == nil then
+    currentSkyTheme = "Off"
+end
+Config.SkyTheme = currentSkyTheme
+if skySelectorLabel and skySelectorLabel.Parent then
+    skySelectorLabel.Text = currentSkyTheme
+end
+if currentSkyTheme ~= "Off" then
+    task.defer(function()
+        CandyApplyCustomSky(currentSkyTheme)
+        if skySelectorLabel and skySelectorLabel.Parent then
+            skySelectorLabel.Text = currentSkyTheme
+        end
+    end)
+end
+
+-- ============================================================
+-- TOAST NOTIFICATIONS / MICRO-INTERACTIONS
+-- ============================================================
+local toastHolder = Instance.new("Frame")
+toastHolder.Name = "ToastHolder"
+toastHolder.Size = UDim2.new(0, 300, 0, 260)
+toastHolder.Position = UDim2.new(1, -18, 1, -18)
+toastHolder.AnchorPoint = Vector2.new(1, 1)
+toastHolder.BackgroundTransparency = 1
+toastHolder.BorderSizePixel = 0
+toastHolder.ZIndex = 100
+toastHolder.Parent = gui
+
+local toastLayout = Instance.new("UIListLayout", toastHolder)
+toastLayout.Padding = UDim.new(0, 7)
+toastLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+toastLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+toastLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local toastSerial = 0
+
+local function showToast(titleText, bodyText, state)
+ toastSerial += 1
+
+ local toast = Instance.new("Frame")
+ toast.Name = "Toast_" .. tostring(toastSerial)
+ toast.Size = UDim2.new(0, 274, 0, 50)
+ toast.BackgroundColor3 = Color3.fromRGB(10, 18, 31)
+ toast.BackgroundTransparency = 0.05
+ toast.BorderSizePixel = 0
+ toast.ZIndex = 101
+ toast.Parent = toastHolder
+ Instance.new("UICorner", toast).CornerRadius = UDim.new(0, 11)
+
+ local toastStroke = Instance.new("UIStroke", toast)
+ toastStroke.Thickness = 1.15
+ toastStroke.Transparency = .38
+ toastStroke.Color = state and Color3.fromRGB(65, 220, 165) or Color3.fromRGB(245, 92, 112)
+
+ local toastAccent = Instance.new("Frame", toast)
+ toastAccent.Size = UDim2.new(0, 3, 1, -14)
+ toastAccent.Position = UDim2.new(0, 6, 0, 7)
+ toastAccent.BackgroundColor3 = state and Color3.fromRGB(55, 230, 160) or Color3.fromRGB(245, 80, 105)
+ toastAccent.BorderSizePixel = 0
+ toastAccent.ZIndex = 102
+ Instance.new("UICorner", toastAccent).CornerRadius = UDim.new(1, 0)
+
+ local toastDot = Instance.new("Frame", toast)
+ toastDot.Size = UDim2.new(0, 18, 0, 18)
+ toastDot.Position = UDim2.new(0, 18, .5, -9)
+ toastDot.BackgroundColor3 = state and Color3.fromRGB(38, 205, 144) or Color3.fromRGB(210, 58, 84)
+ toastDot.BackgroundTransparency = .12
+ toastDot.BorderSizePixel = 0
+ toastDot.ZIndex = 102
+ Instance.new("UICorner", toastDot).CornerRadius = UDim.new(1, 0)
+
+ local toastDotText = Instance.new("TextLabel", toastDot)
+ toastDotText.Size = UDim2.new(1, 0, 1, 0)
+ toastDotText.BackgroundTransparency = 1
+ toastDotText.Text = state and "✓" or "×"
+ toastDotText.TextColor3 = Color3.fromRGB(255, 255, 255)
+ toastDotText.Font = Enum.Font.GothamBold
+ toastDotText.TextSize = 11
+ toastDotText.ZIndex = 103
+
+ local toastTitle = Instance.new("TextLabel", toast)
+ toastTitle.Size = UDim2.new(1, -92, 0, 17)
+ toastTitle.Position = UDim2.new(0, 44, 0, 8)
+ toastTitle.BackgroundTransparency = 1
+ toastTitle.Text = tostring(titleText)
+ toastTitle.TextColor3 = Color3.fromRGB(245, 249, 255)
+ toastTitle.Font = Enum.Font.GothamBold
+ toastTitle.TextSize = 11
+ toastTitle.TextXAlignment = Enum.TextXAlignment.Left
+ toastTitle.TextTruncate = Enum.TextTruncate.AtEnd
+ toastTitle.ZIndex = 102
+
+ local toastBody = Instance.new("TextLabel", toast)
+ toastBody.Size = UDim2.new(1, -58, 0, 16)
+ toastBody.Position = UDim2.new(0, 44, 0, 25)
+ toastBody.BackgroundTransparency = 1
+ toastBody.Text = tostring(bodyText)
+ toastBody.TextColor3 = Color3.fromRGB(155, 176, 202)
+ toastBody.Font = Enum.Font.GothamMedium
+ toastBody.TextSize = 9
+ toastBody.TextXAlignment = Enum.TextXAlignment.Left
+ toastBody.TextTruncate = Enum.TextTruncate.AtEnd
+ toastBody.ZIndex = 102
+
+ local toastScale = Instance.new("UIScale", toast)
+ toastScale.Scale = .92
+
+ TweenService:Create(
+  toast,
+  TweenInfo.new(.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+  {BackgroundTransparency=.05}
+ ):Play()
+ TweenService:Create(
+  toastScale,
+  TweenInfo.new(.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+  {Scale=1}
+ ):Play()
+
+ task.delay(1.65, function()
+  if not toast or not toast.Parent then
+   return
+  end
+
+  local out = TweenService:Create(
+   toastScale,
+   TweenInfo.new(.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+   {Scale=.92}
+  )
+  TweenService:Create(
+   toast,
+   TweenInfo.new(.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+   {BackgroundTransparency=1}
+  ):Play()
+  out.Completed:Connect(function()
+   if toast and toast.Parent then
+    toast:Destroy()
+   end
+  end)
+  out:Play()
+ end)
+end
+
 local function classify(name)
  local n=string.lower(tostring(name))
  if n=="skip intro" then return "GENERAL" end
  if n:find("fps") or n:find("booster") or n:find("anti lag") then return "OPTIMIZACIÓN" end
- if n:find("xray") or n:find("esp") or n:find("aimbot") or n:find("capa laser") then return "VISUALES" end
- if n:find("speed") or n:find("invisible") or n:find("infinite jump") then return "MOVILIDAD" end
+ if n:find("xray") or n:find("esp") then return "VISUALES" end
+ if n:find("hold jump") or n:find("infinite jump") then return "STEAL" end
+ if n:find("speed") or n:find("invisible") then return "MOVILIDAD" end
  if n:find("server") or n:find("rendimiento") or n:find("inventario") or n:find("kick boton") or n:find("reset") or n:find("comprar") or n:find("ap spammer") or n:find("ap circle") then return "UTILIDADES" end
  if n:find("autograb") or n:find("ragdoll") or n:find("freeze") or n:find("defender") or n:find("bee") or n:find("torreta") or n:find("steal") or n:find("best") or n:find("clone") or n:find("clon") or n:find("potion") or n:find("brainrot") or n:find("drop") or n:find("line to base") or n:find("auto kick") or n:find("rayo") then return "STEAL" end
  return "GENERAL"
 end
 local function addHover(b)
- b.MouseEnter:Connect(function() TweenService:Create(b,TweenInfo.new(.12,Enum.EasingStyle.Quad),{BackgroundColor3=Color3.fromRGB(23,38,63)}):Play() end)
- b.MouseLeave:Connect(function() TweenService:Create(b,TweenInfo.new(.16,Enum.EasingStyle.Quad),{BackgroundColor3=Color3.fromRGB(17,27,46)}):Play() end)
+ local scale = b:FindFirstChild("InteractionScale")
+ if not scale then
+  scale = Instance.new("UIScale")
+  scale.Name = "InteractionScale"
+  scale.Scale = 1
+  scale.Parent = b
+ end
+
+ b.MouseEnter:Connect(function()
+  TweenService:Create(
+   b,
+   TweenInfo.new(.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {BackgroundColor3=Color3.fromRGB(23,38,63)}
+  ):Play()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=1.018}
+  ):Play()
+ end)
+
+ b.MouseLeave:Connect(function()
+  TweenService:Create(
+   b,
+   TweenInfo.new(.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {BackgroundColor3=Color3.fromRGB(17,27,46)}
+  ):Play()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=1}
+  ):Play()
+ end)
+
+ b.MouseButton1Down:Connect(function()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.07, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=.965}
+  ):Play()
+ end)
+
+ b.MouseButton1Up:Connect(function()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.09, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=1.018}
+  ):Play()
+ end)
 end
+
+local function styleCompactButton(b, hoverColor, normalColor)
+ b.AutoButtonColor = false
+ local scale = b:FindFirstChild("InteractionScale")
+ if not scale then
+  scale = Instance.new("UIScale")
+  scale.Name = "InteractionScale"
+  scale.Scale = 1
+  scale.Parent = b
+ end
+
+ b.MouseEnter:Connect(function()
+  TweenService:Create(
+   b,
+   TweenInfo.new(.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {BackgroundColor3=hoverColor}
+  ):Play()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=1.06}
+  ):Play()
+ end)
+
+ b.MouseLeave:Connect(function()
+  TweenService:Create(
+   b,
+   TweenInfo.new(.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {BackgroundColor3=normalColor}
+  ):Play()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=1}
+  ):Play()
+ end)
+
+ b.MouseButton1Down:Connect(function()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+   {Scale=.91}
+  ):Play()
+ end)
+
+ b.MouseButton1Up:Connect(function()
+  TweenService:Create(
+   scale,
+   TweenInfo.new(.10, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+   {Scale=1.06}
+  ):Play()
+ end)
+end
+
+for _, b in pairs(buttons) do
+ styleCompactButton(b, Color3.fromRGB(31,59,94), Color3.fromRGB(24,35,58))
+end
+
+local SoundService = game:GetService("SoundService")
+local toggleNotificationSound = Instance.new("Sound")
+toggleNotificationSound.Name = "TokitoToggleNotification"
+toggleNotificationSound.SoundId = "rbxassetid://255881176"
+toggleNotificationSound.Volume = 0.6
+toggleNotificationSound.Looped = false
+toggleNotificationSound.Parent = SoundService
+
+local function playToggleNotificationSound()
+ pcall(function()
+  toggleNotificationSound:Stop()
+  toggleNotificationSound.TimePosition = 0
+  toggleNotificationSound:Play()
+ end)
+end
+
 function UI.createToggle(name,callback)
  local page=sections[classify(name)] or sections.GENERAL
  local row=Instance.new("TextButton",page)
@@ -392,6 +1032,17 @@ function UI.createToggle(name,callback)
  row.Selectable=false
  row.AutoButtonColor=false
  Instance.new("UICorner",row).CornerRadius=UDim.new(0,9)
+ local rowStroke=Instance.new("UIStroke",row)
+ rowStroke.Thickness=1
+ rowStroke.Transparency=.78
+ rowStroke.Color=Color3.fromRGB(53,117,184)
+ local rowGrad=Instance.new("UIGradient",row)
+ rowGrad.Rotation=0
+ rowGrad.Color=ColorSequence.new({
+  ColorSequenceKeypoint.new(0,Color3.fromRGB(19,31,52)),
+  ColorSequenceKeypoint.new(.5,Color3.fromRGB(15,26,45)),
+  ColorSequenceKeypoint.new(1,Color3.fromRGB(19,31,52))
+ })
  addHover(row)
 
  local label=Instance.new("TextLabel",row)
@@ -405,6 +1056,23 @@ function UI.createToggle(name,callback)
  label.TextXAlignment=Enum.TextXAlignment.Left
  label.Active=false
 
+ local stateBadge=Instance.new("TextLabel",row)
+ stateBadge.Name="StateBadge"
+ stateBadge.Size=UDim2.new(0,28,0,16)
+ stateBadge.Position=UDim2.new(1,-78,0.5,-8)
+ stateBadge.BackgroundColor3=Color3.fromRGB(31,40,54)
+ stateBadge.BorderSizePixel=0
+ stateBadge.Text="OFF"
+ stateBadge.TextColor3=Color3.fromRGB(126,142,164)
+ stateBadge.Font=Enum.Font.GothamBold
+ stateBadge.TextSize=8
+ stateBadge.ZIndex=6
+ Instance.new("UICorner",stateBadge).CornerRadius=UDim.new(0,6)
+ local badgeStroke=Instance.new("UIStroke",stateBadge)
+ badgeStroke.Thickness=1
+ badgeStroke.Transparency=.55
+ badgeStroke.Color=Color3.fromRGB(76,92,115)
+
  local sw=Instance.new("Frame",row)
  sw.Size=UDim2.new(0,34,0,17)
  sw.Position=UDim2.new(1,-44,0.5,-8.5)
@@ -412,6 +1080,10 @@ function UI.createToggle(name,callback)
  sw.BorderSizePixel=0
  sw.Active=false
  Instance.new("UICorner",sw).CornerRadius=UDim.new(1,0)
+ local swStroke=Instance.new("UIStroke",sw)
+ swStroke.Thickness=1
+ swStroke.Transparency=.35
+ swStroke.Color=Color3.fromRGB(100,170,225)
 
  local dot=Instance.new("Frame",sw)
  dot.Size=UDim2.new(0,13,0,13)
@@ -420,13 +1092,43 @@ function UI.createToggle(name,callback)
  dot.BorderSizePixel=0
  dot.Active=false
  Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
+ local dotStroke=Instance.new("UIStroke",dot)
+ dotStroke.Thickness=1
+ dotStroke.Transparency=.45
+ dotStroke.Color=Color3.fromRGB(205,240,255)
 
  local state=Config[name]==true
- local function paint()
-  sw.BackgroundColor3=state and Color3.fromRGB(0,170,255) or Color3.fromRGB(55,62,76)
-  dot.Position=state and UDim2.new(1,-15,0.5,-6.5) or UDim2.new(0,2,0.5,-6.5)
+ local function paint(animated)
+  local onBg = state and Color3.fromRGB(0,170,255) or Color3.fromRGB(46,57,74)
+  local onStroke = state and Color3.fromRGB(90,220,255) or Color3.fromRGB(76,105,136)
+  local onDot = state and Color3.fromRGB(238,252,255) or Color3.fromRGB(218,228,240)
+  local onBadge = state and Color3.fromRGB(27,73,66) or Color3.fromRGB(31,40,54)
+  local onBadgeText = state and Color3.fromRGB(110,255,200) or Color3.fromRGB(126,142,164)
+  local onBadgeStroke = state and Color3.fromRGB(62,208,163) or Color3.fromRGB(76,92,115)
+  local targetDot = state and UDim2.new(1,-15,0.5,-6.5) or UDim2.new(0,2,0.5,-6.5)
+
+  stateBadge.Text=state and "ON" or "OFF"
+  if animated then
+   local t = TweenInfo.new(.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+   TweenService:Create(sw, t, {BackgroundColor3=onBg}):Play()
+   TweenService:Create(swStroke, t, {Color=onStroke, Transparency=state and .12 or .42, Thickness=state and 1.25 or 1}):Play()
+   TweenService:Create(dot, t, {BackgroundColor3=onDot, Position=targetDot}):Play()
+   TweenService:Create(stateBadge, t, {BackgroundColor3=onBadge, TextColor3=onBadgeText}):Play()
+   TweenService:Create(badgeStroke, t, {Color=onBadgeStroke, Transparency=state and .22 or .55}):Play()
+  else
+   sw.BackgroundColor3=onBg
+   swStroke.Color=onStroke
+   swStroke.Transparency=state and .12 or .42
+   swStroke.Thickness=state and 1.25 or 1
+   dot.BackgroundColor3=onDot
+   dot.Position=targetDot
+   stateBadge.BackgroundColor3=onBadge
+   stateBadge.TextColor3=onBadgeText
+   badgeStroke.Color=onBadgeStroke
+   badgeStroke.Transparency=state and .22 or .55
+  end
  end
- paint()
+ paint(false)
 
  local locked=false
  local function toggle()
@@ -436,7 +1138,9 @@ function UI.createToggle(name,callback)
   state=not state
   Config[name]=state
   saveConfig()
-  paint()
+  paint(true)
+  playToggleNotificationSound()
+  showToast(state and "Opción activada" or "Opción desactivada", name, state)
 
   local ok,err=pcall(callback,state)
   if not ok and statusText and statusText.Parent then
@@ -472,6 +1176,31 @@ function UI.createToggle(name,callback)
  -- toggle al comenzar un swipe. Eso permite deslizar el menú sin activar opciones.
  hit.Activated:Connect(toggle)
 
+ hit.MouseEnter:Connect(function()
+  TweenService:Create(rowStroke, TweenInfo.new(.10, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+   Transparency=.46,
+   Color=Color3.fromRGB(75,168,235)
+  }):Play()
+ end)
+ hit.MouseLeave:Connect(function()
+  TweenService:Create(rowStroke, TweenInfo.new(.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+   Transparency=.78,
+   Color=Color3.fromRGB(53,117,184)
+  }):Play()
+ end)
+ hit.MouseButton1Down:Connect(function()
+  local scale = row:FindFirstChild("InteractionScale")
+  if scale then
+   TweenService:Create(scale, TweenInfo.new(.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Scale=.975}):Play()
+  end
+ end)
+ hit.MouseButton1Up:Connect(function()
+  local scale = row:FindFirstChild("InteractionScale")
+  if scale then
+   TweenService:Create(scale, TweenInfo.new(.10, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Scale=1.018}):Play()
+  end
+ end)
+
  if state then
   task.defer(function() pcall(callback,true) end)
  end
@@ -487,10 +1216,20 @@ function UI.createButton(name,callback)
  row.Font=Enum.Font.GothamMedium
  row.TextSize=12
  Instance.new("UICorner",row).CornerRadius=UDim.new(0,9)
+ local rowStroke=Instance.new("UIStroke",row)
+ rowStroke.Thickness=1
+ rowStroke.Transparency=.78
+ rowStroke.Color=Color3.fromRGB(53,117,184)
+ local rowGrad=Instance.new("UIGradient",row)
+ rowGrad.Rotation=0
+ rowGrad.Color=ColorSequence.new({
+  ColorSequenceKeypoint.new(0,Color3.fromRGB(19,31,52)),
+  ColorSequenceKeypoint.new(.5,Color3.fromRGB(15,26,45)),
+  ColorSequenceKeypoint.new(1,Color3.fromRGB(19,31,52))
+ })
  addHover(row)
  row.MouseButton1Click:Connect(function() pcall(callback) end)
 end
-local minimized=false
 local mini=Instance.new("ImageButton",gui)
 mini.Name="MiniButton"
 mini.Size=UDim2.new(0,56,0,56)
@@ -500,13 +1239,71 @@ mini.BorderSizePixel=0
 mini.Image=ICON or ""
 mini.Visible=false
 mini.Active=true
+mini.AutoButtonColor=false
+mini.Selectable=true
+mini.ZIndex=1000000
+pcall(function() mini.Interactable=true end)
 Instance.new("UICorner",mini).CornerRadius=UDim.new(1,0)
+local miniInner=Instance.new("UIStroke",mini)
+miniInner.Thickness=1
+miniInner.Transparency=.55
+miniInner.Color=Color3.fromRGB(115,225,255)
 local ms=Instance.new("UIStroke",mini);ms.Thickness=2
 local mg=Instance.new("UIGradient",ms);mg.Color=grad.Color
+local miniAnimScale = Instance.new("UIScale", mini)
+miniAnimScale.Scale = 1
+mini.Visible = false
+mini.ZIndex = 1000000
+
+local minimized=false
+local minimizeBusy=false
+
+local function setNormalGeometry()
+ border.Size = normalBorderSize
+ border.Position = normalBorderPosition
+ glow.Size = normalGlowSize
+ glow.Position = normalGlowPosition
+end
+
+local function animateChromeOpen()
+ setNormalGeometry()
+ border.Visible = true
+ glow.Visible = true
+ mini.Visible = false
+ miniAnimScale.Scale = 1
+end
+
+local function animateChromeClose()
+ setNormalGeometry()
+ border.Visible = false
+ glow.Visible = false
+ mini.Visible = true
+ miniAnimScale.Scale = 1
+end
+
 local function setMini(v)
- minimized=v
- border.Visible=not v
- mini.Visible=v
+ if minimizeBusy or minimized == v then
+  return
+ end
+
+ minimizeBusy = true
+ minimized = v
+
+ setNormalGeometry()
+
+ if v then
+  border.Visible = false
+  glow.Visible = false
+  mini.Visible = true
+  miniAnimScale.Scale = 1
+ else
+  mini.Visible = false
+  border.Visible = true
+  glow.Visible = true
+  miniAnimScale.Scale = 1
+ end
+
+ minimizeBusy = false
 end
 local minBtn=Instance.new("TextButton",top)
 minBtn.Size=UDim2.new(0,24,0,22)
@@ -518,9 +1315,51 @@ minBtn.Font=Enum.Font.GothamBold
 minBtn.TextSize=15
 minBtn.BorderSizePixel=0
 Instance.new("UICorner",minBtn).CornerRadius=UDim.new(0,8)
-minBtn.MouseButton1Click:Connect(function() setMini(true) end)
-mini.MouseButton1Click:Connect(function() setMini(false) end)
-close.MouseButton1Click:Connect(function() gui.Enabled=false end)
+local minStroke=Instance.new("UIStroke",minBtn)
+minStroke.Thickness=1
+minStroke.Transparency=.45
+minStroke.Color=Color3.fromRGB(76,165,235)
+styleCompactButton(minBtn, Color3.fromRGB(38,72,109), Color3.fromRGB(29,47,78))
+
+mini.MouseEnter:Connect(function()
+ TweenService:Create(mini, TweenInfo.new(.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+  BackgroundColor3=Color3.fromRGB(15,34,56)
+ }):Play()
+end)
+mini.MouseLeave:Connect(function()
+ TweenService:Create(mini, TweenInfo.new(.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+  BackgroundColor3=Color3.fromRGB(10,20,36)
+ }):Play()
+end)
+mini.MouseButton1Down:Connect(function()
+ TweenService:Create(miniAnimScale, TweenInfo.new(.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Scale=.88}):Play()
+end)
+mini.MouseButton1Up:Connect(function()
+ TweenService:Create(miniAnimScale, TweenInfo.new(.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Scale=1}):Play()
+end)
+
+close.Activated:Connect(function()
+ setMini(true)
+end)
+
+local function openFromMini()
+ minimized = false
+ minimizeBusy = false
+ Config["UIScale"] = 1
+ miniAnimScale.Scale = 1
+ mini.Visible = false
+ border.Size = normalBorderSize
+ border.Position = normalBorderPosition
+ glow.Size = normalGlowSize
+ glow.Position = normalGlowPosition
+ border.Visible = true
+ glow.Visible = true
+ gui.Enabled = true
+end
+
+minBtn.Activated:Connect(function() setMini(true) end)
+styleCompactButton(close, Color3.fromRGB(92,39,70), Color3.fromRGB(70,32,54))
+
 local function drag(handle,root)
  local dragging=false
  local start
@@ -537,11 +1376,68 @@ local function drag(handle,root)
   if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
    local d=i.Position-start
    root.Position=UDim2.new(pos.X.Scale,pos.X.Offset+d.X,pos.Y.Scale,pos.Y.Offset+d.Y)
+   if root==border then
+    local dx=(glow.AbsoluteSize.X-root.AbsoluteSize.X)/2
+    local dy=(glow.AbsoluteSize.Y-root.AbsoluteSize.Y)/2
+    glow.Position=UDim2.new(root.Position.X.Scale,root.Position.X.Offset-dx,root.Position.Y.Scale,root.Position.Y.Offset-dy)
+    normalBorderPosition = root.Position
+    normalGlowPosition = glow.Position
+   end
   end
  end)
 end
 drag(top,border)
-drag(mini,mini)
+
+local miniDragging = false
+local miniMoved = false
+local miniStartInput = nil
+local miniStartPosition = nil
+local MINI_DRAG_THRESHOLD = 8
+
+mini.InputBegan:Connect(function(input)
+ if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+  miniDragging = true
+  miniMoved = false
+  miniStartInput = input.Position
+  miniStartPosition = mini.Position
+  miniAnimScale.Scale = 1
+ end
+end)
+
+UIS.InputChanged:Connect(function(input)
+ if not miniDragging then return end
+ if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+ if not miniStartInput or not miniStartPosition then return end
+
+ local delta = input.Position - miniStartInput
+ if delta.Magnitude >= MINI_DRAG_THRESHOLD then
+  miniMoved = true
+ end
+
+ mini.Position = UDim2.new(
+  miniStartPosition.X.Scale,
+  miniStartPosition.X.Offset + delta.X,
+  miniStartPosition.Y.Scale,
+  miniStartPosition.Y.Offset + delta.Y
+ )
+end)
+
+UIS.InputEnded:Connect(function(input)
+ if not miniDragging then return end
+ if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+ miniDragging = false
+ miniAnimScale.Scale = 1
+
+ local shouldOpen = not miniMoved
+ miniMoved = false
+ miniStartInput = nil
+ miniStartPosition = nil
+
+ if shouldOpen and minimized then
+  openFromMini()
+ end
+end)
 -- compact RGB decoration + size wheel
 local decoLeft=Instance.new("Frame",main)
 decoLeft.Size=UDim2.new(0,2,0,64)
@@ -598,6 +1494,10 @@ wheelStroke.Thickness=1.5
 wheelStroke.Color=Color3.fromRGB(0,185,255)
 local wheelGrad=Instance.new("UIGradient",wheelStroke)
 wheelGrad.Color=grad.Color
+local wheelInner=Instance.new("UIStroke",wheel)
+wheelInner.Thickness=.7
+wheelInner.Transparency=.55
+wheelInner.Color=Color3.fromRGB(100,220,255)
 local wheelPopup=Instance.new("Frame",gui)
 wheelPopup.Size=UDim2.new(0,146,0,42)
 wheelPopup.BackgroundColor3=Color3.fromRGB(8,16,30)
@@ -635,75 +1535,96 @@ knob.BackgroundColor3=Color3.fromRGB(220,250,255)
 knob.Text=""
 knob.BorderSizePixel=0
 Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
-local scaleVal=tonumber(Config["UIScale"]) or 0.72
-scaleVal=math.clamp(scaleVal,0.58,1.04)
-local function applyScale(v)
- scaleVal=math.clamp(v,0.58,1.04)
- Config["UIScale"]=scaleVal
- saveConfig()
- border.Size=UDim2.new(0,500*scaleVal,0,330*scaleVal)
- border.Position=UDim2.new(0.5,-250*scaleVal,0.5,-165*scaleVal)
- fill.Size=UDim2.new((scaleVal-.58)/.46,0,1,0)
- knob.Position=UDim2.new((scaleVal-.58)/.46,-7,.5,-7)
-end
-applyScale(scaleVal)
-local popupOpen=false
-local function positionPopup()
- local p=border.AbsolutePosition
- local x=p.X+border.AbsoluteSize.X-158
- local y=p.Y+border.AbsoluteSize.Y+8
- wheelPopup.Position=UDim2.fromOffset(x,y)
-end
-wheel.MouseButton1Click:Connect(function()
- popupOpen=not popupOpen
- wheelPopup.Visible=popupOpen
- if popupOpen then positionPopup() end
-end)
-local draggingSize=false
-local function updateSizeFromX(x)
- local pct=math.clamp((x-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
- applyScale(.58 + pct*.46)
-end
-knob.InputBegan:Connect(function(i)
- if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-  draggingSize=true
- end
-end)
-UIS.InputChanged:Connect(function(i)
- if draggingSize and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then updateSizeFromX(i.Position.X) end
-end)
-UIS.InputEnded:Connect(function(i)
- if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then draggingSize=false end
-end)
--- mouse wheel on the knob/popup changes size too
-track.InputChanged:Connect(function(i)
- if i.UserInputType==Enum.UserInputType.MouseMovement then
-  -- handled by knob; keep the track as a click target
- end
-end)
-wheel.MouseEnter:Connect(function() TweenService:Create(wheel,{BackgroundColor3=Color3.fromRGB(22,66,105)},TweenInfo.new(.12)):Play() end)
-wheel.MouseLeave:Connect(function() TweenService:Create(wheel,{BackgroundColor3=Color3.fromRGB(18,42,72)},TweenInfo.new(.12)):Play() end)
+local scaleVal=1
+local normalBorderSize = UDim2.new(0,400,0,265)
+local normalBorderPosition = UDim2.new(0.5,-200,0.5,-132.5)
+local normalGlowSize = UDim2.new(0,416,0,281)
+local normalGlowPosition = UDim2.new(0.5,-208,0.5,-140.5)
+
+Config["UIScale"]=1
+wheel.Visible=false
+wheel.Active=false
+wheelPopup.Visible=false
+wheelPopup.Active=false
+-- Hub scale is permanently locked at 100%.
+Config["UIScale"] = 1
+
+border.Size=normalBorderSize
+border.Position=normalBorderPosition
+glow.Size=normalGlowSize
+glow.Position=normalGlowPosition
 
 local function finish()
  task.spawn(function()
   while gui.Parent do
+   gui.Enabled = true
+   mini.ZIndex = 1000000
+   if minimized then
+    border.Size = normalBorderSize
+    glow.Size = normalGlowSize
+    border.Visible = false
+    glow.Visible = false
+    mini.Visible = true
+   else
+    border.Size = normalBorderSize
+    glow.Size = normalGlowSize
+    border.Visible = true
+    glow.Visible = true
+    mini.Visible = false
+   end
    grad.Rotation=(grad.Rotation+0.65)%360
+   glowGrad.Rotation=(glowGrad.Rotation-0.45)%360
    mg.Rotation=(mg.Rotation-0.9)%360
+   topGrad.Rotation=(topGrad.Rotation+0.22)%360
    topGlowGrad.Rotation=(topGlowGrad.Rotation+1.15)%360
+   sideGrad.Offset=Vector2.new(0,math.sin(os.clock()*0.65)*0.025)
+   contentGrad.Offset=Vector2.new(0,math.sin(os.clock()*0.8)*0.020)
+   mainGrad.Offset=Vector2.new(0,math.sin(os.clock()*0.7)*0.035)
    decoGrad.Rotation=(decoGrad.Rotation-0.8)%360
    wheelGrad.Rotation=(wheelGrad.Rotation+1.1)%360
    headerLineGrad.Offset=Vector2.new((math.sin(os.clock()*0.9)*0.12),0)
    contentAccentGrad.Offset=Vector2.new((math.sin(os.clock()*0.75)*0.10),0)
    wheelStroke.Transparency=.20+.07*math.sin(os.clock()*2.3)
    statusDot.BackgroundTransparency=.05+.18*(0.5+0.5*math.sin(os.clock()*2.8))
+   glowStroke.Transparency=.76+.055*math.sin(os.clock()*1.55)
+   stroke.Transparency=.035+.018*(0.5+0.5*math.sin(os.clock()*1.25))
+   contentStroke.Transparency=.54+.035*(0.5+0.5*math.sin(os.clock()*1.65))
    task.wait(.02)
   end
  end)
 end
+local function openVisual()
+ if not gui or not gui.Parent then
+  return
+ end
+ minimized=false
+ minimizeBusy=false
+ mini.Visible=false
+ miniAnimScale.Scale=1
+ border.Visible=true
+ glow.Visible=true
+ setNormalGeometry()
+ gui.Enabled=true
+ Config["UIScale"]=1
+ border.Size = UDim2.new(0,400,0,265)
+ glow.Size = UDim2.new(0,416,0,281)
+
+ task.defer(function()
+  if gui and gui.Parent then
+   animateChromeOpen()
+  end
+ end)
+end
+
+UI.open=openVisual
 UI.finish=finish
 UI.border=border
 UI.mini=mini
 UI.setMini=setMini
+UI.cleanup=function()
+ pcall(function() toggleNotificationSound:Destroy() end)
+end
+__TOKITO_ENV.__TokitoHubOpenVisual = openVisual
 return UI
 end
 
@@ -711,6 +1632,7 @@ local function createMenu()
 local UI = __TokitoBuildUI(gui, Config, saveConfig, UIS, TweenService, ICON)
 local createToggle = UI.createToggle
 local createButton = UI.createButton
+__TOKITO_ENV.__TokitoHubCleanup = UI.cleanup
 local antiLagEnabled = false  
 local antiLagConn  
 local savedLighting = nil  
@@ -2145,1541 +3067,6 @@ do
 end
 -- ============================================================
 
--- ============================================================
--- TOKITO AIMBOT LASER CAPA (Con Memoria de Posición Segura)
--- ============================================================
-
-do
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local Camera = game.Workspace.CurrentCamera
-    local UserInputService = game:GetService("UserInputService")
-    local RunService = game:GetService("RunService")
-    local Mouse = LocalPlayer:GetMouse()
-
-    Config = Config or {}
-
-    local AimbotEnabled = false
-    local Minimized = false
-    local CurrentTarget = nil
-    local SettingsOpen = false
-
-    -- ============================================================
-    -- CONFIGURACIÓN DE ESCALA
-    -- ============================================================
-
-    local DefaultScale = 1
-    local MinScale = 0.70
-    local MaxScale = 1.50
-
-    local SavedScale = DefaultScale
-
-    pcall(function()
-        if Config and tonumber(Config["CapaAimbotScale"]) then
-            SavedScale = tonumber(Config["CapaAimbotScale"])
-        end
-    end)
-
-    SavedScale = math.clamp(SavedScale, MinScale, MaxScale)
-
-    local WhitelistedUsers = {
-        ["Toki"] = true,
-        ["Tokito"] = true,
-        ["DavidAlejandro78892"] = true,
-        ["davidalejandro78892"] = true,
-        ["KenalGotas789"] = true
-    }
-
-    -- ============================================================
-    -- SCREEN GUI
-    -- ============================================================
-
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "TokitoLaserGui"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.IgnoreGuiInset = true
-
-    local success, result = pcall(function()
-        return gethui() or game:GetService("CoreGui")
-    end)
-
-    ScreenGui.Parent = success and result or game:GetService("CoreGui")
-
-    -- ============================================================
-    -- CARGAR POSICIÓN
-    -- ============================================================
-
-    local defaultPos = UDim2.new(0.5, -80, 0.15, 0)
-    local framePos = defaultPos
-
-    pcall(function()
-        if Config and Config["CapaAimbotPos"] then
-            local p = Config["CapaAimbotPos"]
-
-            if type(p) == "table" and #p >= 4 then
-                framePos = UDim2.new(
-                    p[1],
-                    p[2],
-                    p[3],
-                    p[4]
-                )
-            end
-        end
-    end)
-
-    -- ============================================================
-    -- MARCO PRINCIPAL
-    -- ============================================================
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 160, 0, 75)
-    MainFrame.Position = framePos
-    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
-    MainFrame.BackgroundTransparency = 0.15
-    MainFrame.BorderSizePixel = 0
-
-    -- IMPORTANTE:
-    -- Ahora puede mostrar el panel de configuración fuera de su
-    -- tamaño normal sin cortarlo.
-    MainFrame.ClipsDescendants = false
-
-    MainFrame.Visible = false
-    MainFrame.Active = true
-    MainFrame.Parent = ScreenGui
-
-    -- ============================================================
-    -- UISCALE
-    -- ============================================================
-
-    local UIScale = Instance.new("UIScale")
-    UIScale.Name = "ResponsiveScale"
-    UIScale.Scale = SavedScale
-    UIScale.Parent = MainFrame
-
-    -- ============================================================
-    -- CORNER / STROKE
-    -- ============================================================
-
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
-    UICorner.Parent = MainFrame
-
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Parent = MainFrame
-    MainStroke.Thickness = 2
-    MainStroke.Color = Color3.fromRGB(0, 170, 255)
-    MainStroke.Transparency = 0.2
-
-    -- ============================================================
-    -- TÍTULO
-    -- ============================================================
-
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Size = UDim2.new(0, 102, 0, 25)
-    Title.Position = UDim2.new(0, 8, 0, 4)
-    Title.Text = "Capa laser aim"
-    Title.TextColor3 = Color3.fromRGB(0, 220, 255)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 12
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.BackgroundTransparency = 1
-    Title.Parent = MainFrame
-
-    -- ============================================================
-    -- BOTÓN CONFIGURACIÓN ⚙
-    -- ============================================================
-
-    local SettingsBtn = Instance.new("TextButton")
-    SettingsBtn.Name = "SettingsBtn"
-    SettingsBtn.Size = UDim2.new(0, 20, 0, 20)
-    SettingsBtn.Position = UDim2.new(1, -48, 0, 4)
-
-    -- Símbolo típico de configuración
-    SettingsBtn.Text = "⚙"
-    SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
-    SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-    SettingsBtn.Font = Enum.Font.GothamBold
-    SettingsBtn.TextSize = 13
-    SettingsBtn.AutoButtonColor = false
-    SettingsBtn.Parent = MainFrame
-
-    local SettingsCorner = Instance.new("UICorner")
-    SettingsCorner.CornerRadius = UDim.new(0, 5)
-    SettingsCorner.Parent = SettingsBtn
-
-    local SettingsStroke = Instance.new("UIStroke")
-    SettingsStroke.Parent = SettingsBtn
-    SettingsStroke.Color = Color3.fromRGB(0, 170, 255)
-    SettingsStroke.Thickness = 1
-
-    -- ============================================================
-    -- BOTÓN MINIMIZAR
-    -- ============================================================
-
-    local MinimizeBtn = Instance.new("TextButton")
-    MinimizeBtn.Name = "MinimizeBtn"
-    MinimizeBtn.Size = UDim2.new(0, 20, 0, 20)
-    MinimizeBtn.Position = UDim2.new(1, -24, 0, 4)
-    MinimizeBtn.Text = "—"
-    MinimizeBtn.TextColor3 = Color3.fromRGB(0, 170, 255)
-    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-    MinimizeBtn.Font = Enum.Font.GothamBold
-    MinimizeBtn.TextSize = 10
-    MinimizeBtn.Parent = MainFrame
-
-    local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 5)
-    MinCorner.Parent = MinimizeBtn
-
-    local MinStroke = Instance.new("UIStroke")
-    MinStroke.Parent = MinimizeBtn
-    MinStroke.Color = Color3.fromRGB(0, 170, 255)
-    MinStroke.Thickness = 1
-
-    -- ============================================================
-    -- BOTÓN TOGGLE
-    -- ============================================================
-
-    local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Name = "ToggleBtn"
-    ToggleBtn.Size = UDim2.new(0, 144, 0, 32)
-    ToggleBtn.Position = UDim2.new(0, 8, 0, 35)
-    ToggleBtn.Text = "AIMBOT: OFF"
-    ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
-    ToggleBtn.Font = Enum.Font.GothamBold
-    ToggleBtn.TextSize = 12
-    ToggleBtn.Parent = MainFrame
-
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0, 6)
-    ToggleCorner.Parent = ToggleBtn
-
-    local ToggleStroke = Instance.new("UIStroke")
-    ToggleStroke.Parent = ToggleBtn
-    ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
-    ToggleStroke.Thickness = 1.5
-
-    -- ============================================================
-    -- PANEL DE CONFIGURACIÓN
-    -- ============================================================
-
-    local SettingsFrame = Instance.new("Frame")
-    SettingsFrame.Name = "SettingsFrame"
-    SettingsFrame.Size = UDim2.new(0, 190, 0, 128)
-    SettingsFrame.Position = UDim2.new(0, -15, 0, 82)
-
-    SettingsFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
-    SettingsFrame.BackgroundTransparency = 0.05
-    SettingsFrame.BorderSizePixel = 0
-    SettingsFrame.Visible = false
-    SettingsFrame.ZIndex = 20
-    SettingsFrame.Parent = MainFrame
-
-    local SettingsCorner2 = Instance.new("UICorner")
-    SettingsCorner2.CornerRadius = UDim.new(0, 8)
-    SettingsCorner2.Parent = SettingsFrame
-
-    local SettingsStroke2 = Instance.new("UIStroke")
-    SettingsStroke2.Parent = SettingsFrame
-    SettingsStroke2.Color = Color3.fromRGB(0, 170, 255)
-    SettingsStroke2.Thickness = 1.5
-
-    -- Título del panel
-    local SettingsTitle = Instance.new("TextLabel")
-    SettingsTitle.Name = "SettingsTitle"
-    SettingsTitle.Size = UDim2.new(1, -20, 0, 24)
-    SettingsTitle.Position = UDim2.new(0, 10, 0, 8)
-    SettingsTitle.BackgroundTransparency = 1
-    SettingsTitle.Text = "⚙ CONFIGURACIÓN"
-    SettingsTitle.TextColor3 = Color3.fromRGB(0, 220, 255)
-    SettingsTitle.Font = Enum.Font.GothamBold
-    SettingsTitle.TextSize = 12
-    SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
-    SettingsTitle.ZIndex = 21
-    SettingsTitle.Parent = SettingsFrame
-
-    -- Texto escala
-    local ScaleLabel = Instance.new("TextLabel")
-    ScaleLabel.Name = "ScaleLabel"
-    ScaleLabel.Size = UDim2.new(1, -20, 0, 22)
-    ScaleLabel.Position = UDim2.new(0, 10, 0, 36)
-    ScaleLabel.BackgroundTransparency = 1
-    ScaleLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
-    ScaleLabel.Font = Enum.Font.GothamBold
-    ScaleLabel.TextSize = 11
-    ScaleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ScaleLabel.ZIndex = 21
-    ScaleLabel.Parent = SettingsFrame
-
-    -- Barra
-    local SliderBar = Instance.new("Frame")
-    SliderBar.Name = "SliderBar"
-    SliderBar.Size = UDim2.new(1, -40, 0, 7)
-    SliderBar.Position = UDim2.new(0, 20, 0, 69)
-    SliderBar.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
-    SliderBar.BorderSizePixel = 0
-    SliderBar.ZIndex = 21
-    SliderBar.Parent = SettingsFrame
-
-    local SliderCorner = Instance.new("UICorner")
-    SliderCorner.CornerRadius = UDim.new(1, 0)
-    SliderCorner.Parent = SliderBar
-
-    -- Fill
-    local SliderFill = Instance.new("Frame")
-    SliderFill.Name = "SliderFill"
-    SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-    SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-    SliderFill.BorderSizePixel = 0
-    SliderFill.ZIndex = 22
-    SliderFill.Parent = SliderBar
-
-    local SliderFillCorner = Instance.new("UICorner")
-    SliderFillCorner.CornerRadius = UDim.new(1, 0)
-    SliderFillCorner.Parent = SliderFill
-
-    -- Knob
-    local SliderKnob = Instance.new("TextButton")
-    SliderKnob.Name = "SliderKnob"
-    SliderKnob.Size = UDim2.new(0, 16, 0, 16)
-    SliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
-    SliderKnob.Position = UDim2.new(0.5, 0, 0.5, 0)
-    SliderKnob.Text = ""
-    SliderKnob.AutoButtonColor = false
-    SliderKnob.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
-    SliderKnob.ZIndex = 23
-    SliderKnob.Parent = SliderBar
-
-    local KnobCorner = Instance.new("UICorner")
-    KnobCorner.CornerRadius = UDim.new(1, 0)
-    KnobCorner.Parent = SliderKnob
-
-    local KnobStroke = Instance.new("UIStroke")
-    KnobStroke.Color = Color3.fromRGB(255, 255, 255)
-    KnobStroke.Thickness = 1
-    KnobStroke.Transparency = 0.4
-    KnobStroke.Parent = SliderKnob
-
-    -- ============================================================
-    -- BOTONES - / +
-    -- ============================================================
-
-    local MinusBtn = Instance.new("TextButton")
-    MinusBtn.Name = "MinusBtn"
-    MinusBtn.Size = UDim2.new(0, 34, 0, 24)
-    MinusBtn.Position = UDim2.new(0, 20, 0, 88)
-    MinusBtn.Text = "−"
-    MinusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    MinusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
-    MinusBtn.Font = Enum.Font.GothamBold
-    MinusBtn.TextSize = 15
-    MinusBtn.ZIndex = 21
-    MinusBtn.Parent = SettingsFrame
-
-    local MinusCorner = Instance.new("UICorner")
-    MinusCorner.CornerRadius = UDim.new(0, 5)
-    MinusCorner.Parent = MinusBtn
-
-    local MinusStroke = Instance.new("UIStroke")
-    MinusStroke.Color = Color3.fromRGB(0, 120, 180)
-    MinusStroke.Thickness = 1
-    MinusStroke.Parent = MinusBtn
-
-    local PlusBtn = Instance.new("TextButton")
-    PlusBtn.Name = "PlusBtn"
-    PlusBtn.Size = UDim2.new(0, 34, 0, 24)
-    PlusBtn.Position = UDim2.new(1, -54, 0, 88)
-    PlusBtn.Text = "+"
-    PlusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    PlusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
-    PlusBtn.Font = Enum.Font.GothamBold
-    PlusBtn.TextSize = 15
-    PlusBtn.ZIndex = 21
-    PlusBtn.Parent = SettingsFrame
-
-    local PlusCorner = Instance.new("UICorner")
-    PlusCorner.CornerRadius = UDim.new(0, 5)
-    PlusCorner.Parent = PlusBtn
-
-    local PlusStroke = Instance.new("UIStroke")
-    PlusStroke.Color = Color3.fromRGB(0, 120, 180)
-    PlusStroke.Thickness = 1
-    PlusStroke.Parent = PlusBtn
-
-    -- ============================================================
-    -- FUNCIÓN PARA ACTUALIZAR LA ESCALA
-    -- ============================================================
-
-    local function UpdateScale(newScale, shouldSave)
-        newScale = tonumber(newScale)
-
-        if not newScale then
-            return
-        end
-
-        newScale = math.clamp(newScale, MinScale, MaxScale)
-
-        SavedScale = newScale
-        UIScale.Scale = newScale
-
-        -- Porcentaje
-        local percent = math.floor(newScale * 100 + 0.5)
-        ScaleLabel.Text = "Tamaño de interfaz: " .. percent .. "%"
-
-        -- Convertir a 0-1
-        local alpha = (newScale - MinScale) / (MaxScale - MinScale)
-
-        SliderFill.Size = UDim2.new(alpha, 0, 1, 0)
-        SliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
-
-        if shouldSave ~= false then
-            pcall(function()
-                if Config then
-                    Config["CapaAimbotScale"] = SavedScale
-
-                    if saveConfig then
-                        saveConfig()
-                    end
-                end
-            end)
-        end
-    end
-
-    UpdateScale(SavedScale, false)
-
-    -- ============================================================
-    -- SLIDER
-    -- ============================================================
-
-    local SliderDragging = false
-
-    local function UpdateSliderFromInput(inputPositionX)
-        local barAbsolutePosition = SliderBar.AbsolutePosition.X
-        local barAbsoluteSize = SliderBar.AbsoluteSize.X
-
-        if barAbsoluteSize <= 0 then
-            return
-        end
-
-        local alpha = (inputPositionX - barAbsolutePosition) / barAbsoluteSize
-        alpha = math.clamp(alpha, 0, 1)
-
-        local newScale = MinScale + ((MaxScale - MinScale) * alpha)
-
-        UpdateScale(newScale, true)
-    end
-
-    SliderKnob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            SliderDragging = true
-        end
-    end)
-
-    SliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            SliderDragging = true
-            UpdateSliderFromInput(input.Position.X)
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if SliderDragging then
-            if input.UserInputType == Enum.UserInputType.MouseMovement
-                or input.UserInputType == Enum.UserInputType.Touch then
-
-                UpdateSliderFromInput(input.Position.X)
-            end
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            SliderDragging = false
-        end
-    end)
-
-    -- ============================================================
-    -- BOTONES DE TAMAÑO
-    -- ============================================================
-
-    MinusBtn.MouseButton1Click:Connect(function()
-        UpdateScale(SavedScale - 0.05, true)
-    end)
-
-    PlusBtn.MouseButton1Click:Connect(function()
-        UpdateScale(SavedScale + 0.05, true)
-    end)
-
-    -- ============================================================
-    -- ABRIR / CERRAR CONFIGURACIÓN
-    -- ============================================================
-
-    SettingsBtn.MouseButton1Click:Connect(function()
-        SettingsOpen = not SettingsOpen
-        SettingsFrame.Visible = SettingsOpen
-
-        if SettingsOpen then
-            SettingsBtn.BackgroundColor3 = Color3.fromRGB(0, 70, 110)
-            SettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        else
-            SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-            SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
-        end
-    end)
-
-    -- ============================================================
-    -- ANIMACIÓN RGB AZUL
-    -- ============================================================
-
-    RunService.RenderStepped:Connect(function()
-        pcall(function()
-            if AimbotEnabled then
-                local timePos = tick() * 3
-                local glow = math.abs(math.sin(timePos)) * 0.5 + 0.5
-
-                MainStroke.Color = Color3.fromRGB(
-                    0,
-                    math.floor(150 * glow) + 100,
-                    255
-                )
-
-                ToggleStroke.Color = Color3.fromRGB(
-                    0,
-                    math.floor(150 * glow) + 100,
-                    255
-                )
-            else
-                MainStroke.Color = Color3.fromRGB(0, 120, 200)
-            end
-        end)
-    end)
-
-    -- ============================================================
-    -- SISTEMA DE ARRASTRE TÁCTIL / MOUSE
-    -- ============================================================
-
-    local dragging = false
-    local dragInput
-    local dragStart
-    local startPos
-
-    MainFrame.InputBegan:Connect(function(input)
-        -- Evita arrastrar cuando se esté usando el slider
-        if SliderDragging then
-            return
-        end
-
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-
-                    pcall(function()
-                        if Config then
-                            Config["CapaAimbotPos"] = {
-                                MainFrame.Position.X.Scale,
-                                MainFrame.Position.X.Offset,
-                                MainFrame.Position.Y.Scale,
-                                MainFrame.Position.Y.Offset
-                            }
-
-                            if saveConfig then
-                                saveConfig()
-                            end
-                        end
-                    end)
-                end
-            end)
-        end
-    end)
-
-    MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging and not SliderDragging then
-            local delta = input.Position - dragStart
-
-            MainFrame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-
-    -- ============================================================
-    -- MINIMIZAR
-    -- ============================================================
-
-    MinimizeBtn.MouseButton1Click:Connect(function()
-        Minimized = not Minimized
-
-        -- Cerrar settings al minimizar
-        if Minimized then
-            SettingsOpen = false
-            SettingsFrame.Visible = false
-
-            SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-            SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
-
-            MainFrame:TweenSize(
-                UDim2.new(0, 160, 0, 30),
-                "Out",
-                "Quad",
-                0.2,
-                true
-            )
-
-            ToggleBtn.Visible = false
-            MinimizeBtn.Text = "+"
-        else
-            MainFrame:TweenSize(
-                UDim2.new(0, 160, 0, 75),
-                "Out",
-                "Quad",
-                0.2,
-                true
-            )
-
-            ToggleBtn.Visible = true
-            MinimizeBtn.Text = "—"
-        end
-    end)
-
-    -- ============================================================
-    -- BOTÓN AIMBOT
-    -- ============================================================
-
-    ToggleBtn.Activated:Connect(function()
-        AimbotEnabled = not AimbotEnabled
-
-        if AimbotEnabled then
-            ToggleBtn.Text = "AIMBOT: ON"
-            ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 180)
-            ToggleStroke.Color = Color3.fromRGB(0, 200, 255)
-        else
-            ToggleBtn.Text = "AIMBOT: OFF"
-            ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
-            ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
-
-            CurrentTarget = nil
-        end
-    end)
-
-    -- ============================================================
-    -- BÚSQUEDA DEL OBJETIVO
-    -- ============================================================
-
-    RunService.RenderStepped:Connect(function()
-        pcall(function()
-            if not AimbotEnabled then
-                return
-            end
-
-            local Target = nil
-            local ShortestDistance = math.huge
-
-            local MyCharacter = LocalPlayer.Character
-            local MyRoot = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")
-
-            for _, v in pairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer
-                    and not WhitelistedUsers[v.Name]
-                    and not WhitelistedUsers[v.DisplayName]
-                    and v.Character
-                    and v.Character:FindFirstChild("Humanoid")
-                    and v.Character.Humanoid.Health > 0 then
-
-                    local Hitbox =
-                        v.Character:FindFirstChild("Head")
-                        or v.Character:FindFirstChild("HumanoidRootPart")
-
-                    if Hitbox
-                        and (v.Team ~= LocalPlayer.Team or v.Team == nil) then
-
-                        if MyRoot then
-                            local Distance =
-                                (Hitbox.Position - MyRoot.Position).Magnitude
-
-                            if Distance < ShortestDistance then
-                                Target = Hitbox
-                                ShortestDistance = Distance
-                            end
-                        end
-                    end
-                end
-            end
-
-            CurrentTarget = Target
-        end)
-    end)
-
-    -- ============================================================
-    -- INTEGRACIÓN CON createToggle
-    -- ============================================================
-    createToggle("Capa laser aim", function(state)
-        MainFrame.Visible = state
-
-        if not state then
-            AimbotEnabled = false
-
-            ToggleBtn.Text = "AIMBOT: OFF"
-            ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
-            ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
-
-            CurrentTarget = nil
-
-            SettingsOpen = false
-            SettingsFrame.Visible = false
-
-            SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-            SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
-        end
-    end)
-end
-
--- AIMBOT OPTIMIZED
-do
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
-    local UserInputService = game:GetService("UserInputService")
-    local RunService = game:GetService("RunService")
-    local Mouse = LocalPlayer:GetMouse()
-
-    Config = Config or {}
-
-    local AimbotEnabled = false
-    local Minimized = false
-    local CurrentTarget = nil
-    local SettingsOpen = false
-
-    -- ============================================================
-    -- CONFIGURACIÓN DE ESCALA
-    -- ============================================================
-
-    local DefaultScale = 1
-    local MinScale = 0.70
-    local MaxScale = 1.50
-
-    local SavedScale = DefaultScale
-
-    pcall(function()
-        local saved = tonumber(Config["CapaAimbotScale"])
-
-        if saved then
-            SavedScale = saved
-        end
-    end)
-
-    SavedScale = math.clamp(SavedScale, MinScale, MaxScale)
-
-    -- ============================================================
-    -- USUARIOS EXCLUIDOS
-    -- ============================================================
-
-    local WhitelistedUsers = {
-        ["Toki"] = true,
-        ["Tokito"] = true,
-        ["DavidAlejandro78892"] = true,
-        ["davidalejandro78892"] = true,
-        ["KenalGotas789"] = true
-    }
-
-    -- ============================================================
-    -- SCREEN GUI
-    -- ============================================================
-
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "TokitoLaserGui"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.IgnoreGuiInset = true
-
-    local GuiParent
-
-    pcall(function()
-        GuiParent = gethui()
-    end)
-
-    if not GuiParent then
-        GuiParent = game:GetService("CoreGui")
-    end
-
-    ScreenGui.Parent = GuiParent
-
-    -- ============================================================
-    -- CARGAR POSICIÓN
-    -- ============================================================
-
-    local defaultPos = UDim2.new(0.5, -80, 0.15, 0)
-    local framePos = defaultPos
-
-    pcall(function()
-        local p = Config["CapaAimbotPos"]
-
-        if type(p) == "table" and #p >= 4 then
-            framePos = UDim2.new(
-                tonumber(p[1]) or 0.5,
-                tonumber(p[2]) or -80,
-                tonumber(p[3]) or 0.15,
-                tonumber(p[4]) or 0
-            )
-        end
-    end)
-
-    -- ============================================================
-    -- MARCO PRINCIPAL
-    -- ============================================================
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 160, 0, 75)
-    MainFrame.Position = framePos
-    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
-    MainFrame.BackgroundTransparency = 0.15
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = false
-    MainFrame.Visible = false
-    MainFrame.Active = true
-    MainFrame.Parent = ScreenGui
-
-    -- ============================================================
-    -- UI SCALE
-    -- ============================================================
-
-    local UIScale = Instance.new("UIScale")
-    UIScale.Name = "ResponsiveScale"
-    UIScale.Scale = SavedScale
-    UIScale.Parent = MainFrame
-
-    -- ============================================================
-    -- CORNER / STROKE
-    -- ============================================================
-
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
-    UICorner.Parent = MainFrame
-
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Thickness = 2
-    MainStroke.Color = Color3.fromRGB(0, 170, 255)
-    MainStroke.Transparency = 0.2
-    MainStroke.Parent = MainFrame
-
-    -- ============================================================
-    -- TÍTULO
-    -- ============================================================
-
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Size = UDim2.new(0, 102, 0, 25)
-    Title.Position = UDim2.new(0, 8, 0, 4)
-    Title.Text = "Capa laser aim"
-    Title.TextColor3 = Color3.fromRGB(0, 220, 255)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 12
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.BackgroundTransparency = 1
-    Title.Parent = MainFrame
-
-    -- ============================================================
-    -- BOTÓN CONFIGURACIÓN
-    -- ============================================================
-
-    local SettingsBtn = Instance.new("TextButton")
-    SettingsBtn.Name = "SettingsBtn"
-    SettingsBtn.Size = UDim2.new(0, 20, 0, 20)
-    SettingsBtn.Position = UDim2.new(1, -48, 0, 4)
-    SettingsBtn.Text = "⚙"
-    SettingsBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
-    SettingsBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-    SettingsBtn.Font = Enum.Font.GothamBold
-    SettingsBtn.TextSize = 13
-    SettingsBtn.AutoButtonColor = false
-    SettingsBtn.Parent = MainFrame
-
-    local SettingsCorner = Instance.new("UICorner")
-    SettingsCorner.CornerRadius = UDim.new(0, 5)
-    SettingsCorner.Parent = SettingsBtn
-
-    local SettingsStroke = Instance.new("UIStroke")
-    SettingsStroke.Color = Color3.fromRGB(0, 170, 255)
-    SettingsStroke.Thickness = 1
-    SettingsStroke.Parent = SettingsBtn
-
-    -- ============================================================
-    -- BOTÓN MINIMIZAR
-    -- ============================================================
-
-    local MinimizeBtn = Instance.new("TextButton")
-    MinimizeBtn.Name = "MinimizeBtn"
-    MinimizeBtn.Size = UDim2.new(0, 20, 0, 20)
-    MinimizeBtn.Position = UDim2.new(1, -24, 0, 4)
-    MinimizeBtn.Text = "—"
-    MinimizeBtn.TextColor3 = Color3.fromRGB(0, 170, 255)
-    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-    MinimizeBtn.Font = Enum.Font.GothamBold
-    MinimizeBtn.TextSize = 10
-    MinimizeBtn.Parent = MainFrame
-
-    local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 5)
-    MinCorner.Parent = MinimizeBtn
-
-    local MinStroke = Instance.new("UIStroke")
-    MinStroke.Color = Color3.fromRGB(0, 170, 255)
-    MinStroke.Thickness = 1
-    MinStroke.Parent = MinimizeBtn
-
-    -- ============================================================
-    -- BOTÓN TOGGLE
-    -- ============================================================
-
-    local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Name = "ToggleBtn"
-    ToggleBtn.Size = UDim2.new(0, 144, 0, 32)
-    ToggleBtn.Position = UDim2.new(0, 8, 0, 35)
-    ToggleBtn.Text = "AIMBOT: OFF"
-    ToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
-    ToggleBtn.Font = Enum.Font.GothamBold
-    ToggleBtn.TextSize = 12
-    ToggleBtn.Parent = MainFrame
-
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0, 6)
-    ToggleCorner.Parent = ToggleBtn
-
-    local ToggleStroke = Instance.new("UIStroke")
-    ToggleStroke.Color = Color3.fromRGB(100, 100, 100)
-    ToggleStroke.Thickness = 1.5
-    ToggleStroke.Parent = ToggleBtn
-
-    -- ============================================================
-    -- PANEL DE CONFIGURACIÓN
-    -- ============================================================
-
-    local SettingsFrame = Instance.new("Frame")
-    SettingsFrame.Name = "SettingsFrame"
-    SettingsFrame.Size = UDim2.new(0, 190, 0, 128)
-    SettingsFrame.Position = UDim2.new(0, -15, 0, 82)
-    SettingsFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
-    SettingsFrame.BackgroundTransparency = 0.05
-    SettingsFrame.BorderSizePixel = 0
-    SettingsFrame.Visible = false
-    SettingsFrame.ZIndex = 20
-    SettingsFrame.Parent = MainFrame
-
-    local SettingsCorner2 = Instance.new("UICorner")
-    SettingsCorner2.CornerRadius = UDim.new(0, 8)
-    SettingsCorner2.Parent = SettingsFrame
-
-    local SettingsStroke2 = Instance.new("UIStroke")
-    SettingsStroke2.Color = Color3.fromRGB(0, 170, 255)
-    SettingsStroke2.Thickness = 1.5
-    SettingsStroke2.Parent = SettingsFrame
-
-    -- ============================================================
-    -- TÍTULO SETTINGS
-    -- ============================================================
-
-    local SettingsTitle = Instance.new("TextLabel")
-    SettingsTitle.Name = "SettingsTitle"
-    SettingsTitle.Size = UDim2.new(1, -20, 0, 24)
-    SettingsTitle.Position = UDim2.new(0, 10, 0, 8)
-    SettingsTitle.BackgroundTransparency = 1
-    SettingsTitle.Text = "⚙ CONFIGURACIÓN"
-    SettingsTitle.TextColor3 = Color3.fromRGB(0, 220, 255)
-    SettingsTitle.Font = Enum.Font.GothamBold
-    SettingsTitle.TextSize = 12
-    SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
-    SettingsTitle.ZIndex = 21
-    SettingsTitle.Parent = SettingsFrame
-
-    -- ============================================================
-    -- LABEL ESCALA
-    -- ============================================================
-
-    local ScaleLabel = Instance.new("TextLabel")
-    ScaleLabel.Name = "ScaleLabel"
-    ScaleLabel.Size = UDim2.new(1, -20, 0, 22)
-    ScaleLabel.Position = UDim2.new(0, 10, 0, 36)
-    ScaleLabel.BackgroundTransparency = 1
-    ScaleLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
-    ScaleLabel.Font = Enum.Font.GothamBold
-    ScaleLabel.TextSize = 11
-    ScaleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ScaleLabel.ZIndex = 21
-    ScaleLabel.Parent = SettingsFrame
-
-    -- ============================================================
-    -- SLIDER BAR
-    -- ============================================================
-
-    local SliderBar = Instance.new("Frame")
-    SliderBar.Name = "SliderBar"
-    SliderBar.Size = UDim2.new(1, -40, 0, 7)
-    SliderBar.Position = UDim2.new(0, 20, 0, 69)
-    SliderBar.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
-    SliderBar.BorderSizePixel = 0
-    SliderBar.ZIndex = 21
-    SliderBar.Parent = SettingsFrame
-
-    local SliderCorner = Instance.new("UICorner")
-    SliderCorner.CornerRadius = UDim.new(1, 0)
-    SliderCorner.Parent = SliderBar
-
-    local SliderFill = Instance.new("Frame")
-    SliderFill.Name = "SliderFill"
-    SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-    SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-    SliderFill.BorderSizePixel = 0
-    SliderFill.ZIndex = 22
-    SliderFill.Parent = SliderBar
-
-    local SliderFillCorner = Instance.new("UICorner")
-    SliderFillCorner.CornerRadius = UDim.new(1, 0)
-    SliderFillCorner.Parent = SliderFill
-
-    local SliderKnob = Instance.new("TextButton")
-    SliderKnob.Name = "SliderKnob"
-    SliderKnob.Size = UDim2.new(0, 16, 0, 16)
-    SliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
-    SliderKnob.Position = UDim2.new(0.5, 0, 0.5, 0)
-    SliderKnob.Text = ""
-    SliderKnob.AutoButtonColor = false
-    SliderKnob.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
-    SliderKnob.ZIndex = 23
-    SliderKnob.Parent = SliderBar
-
-    local KnobCorner = Instance.new("UICorner")
-    KnobCorner.CornerRadius = UDim.new(1, 0)
-    KnobCorner.Parent = SliderKnob
-
-    local KnobStroke = Instance.new("UIStroke")
-    KnobStroke.Color = Color3.fromRGB(255, 255, 255)
-    KnobStroke.Thickness = 1
-    KnobStroke.Transparency = 0.4
-    KnobStroke.Parent = SliderKnob
-
-    -- ============================================================
-    -- BOTÓN -
-    -- ============================================================
-
-    local MinusBtn = Instance.new("TextButton")
-    MinusBtn.Name = "MinusBtn"
-    MinusBtn.Size = UDim2.new(0, 34, 0, 24)
-    MinusBtn.Position = UDim2.new(0, 20, 0, 88)
-    MinusBtn.Text = "−"
-    MinusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    MinusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
-    MinusBtn.Font = Enum.Font.GothamBold
-    MinusBtn.TextSize = 15
-    MinusBtn.ZIndex = 21
-    MinusBtn.Parent = SettingsFrame
-
-    local MinusCorner = Instance.new("UICorner")
-    MinusCorner.CornerRadius = UDim.new(0, 5)
-    MinusCorner.Parent = MinusBtn
-
-    local MinusStroke = Instance.new("UIStroke")
-    MinusStroke.Color = Color3.fromRGB(0, 120, 180)
-    MinusStroke.Thickness = 1
-    MinusStroke.Parent = MinusBtn
-
-    -- ============================================================
-    -- BOTÓN +
-    -- ============================================================
-
-    local PlusBtn = Instance.new("TextButton")
-    PlusBtn.Name = "PlusBtn"
-    PlusBtn.Size = UDim2.new(0, 34, 0, 24)
-    PlusBtn.Position = UDim2.new(1, -54, 0, 88)
-    PlusBtn.Text = "+"
-    PlusBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    PlusBtn.BackgroundColor3 = Color3.fromRGB(20, 28, 36)
-    PlusBtn.Font = Enum.Font.GothamBold
-    PlusBtn.TextSize = 15
-    PlusBtn.ZIndex = 21
-    PlusBtn.Parent = SettingsFrame
-
-    local PlusCorner = Instance.new("UICorner")
-    PlusCorner.CornerRadius = UDim.new(0, 5)
-    PlusCorner.Parent = PlusBtn
-
-    local PlusStroke = Instance.new("UIStroke")
-    PlusStroke.Color = Color3.fromRGB(0, 120, 180)
-    PlusStroke.Thickness = 1
-    PlusStroke.Parent = PlusBtn
-
-    -- ============================================================
-    -- GUARDAR CONFIG
-    -- ============================================================
-
-    local function SaveScale()
-        pcall(function()
-            Config["CapaAimbotScale"] = SavedScale
-
-            if saveConfig then
-                saveConfig()
-            end
-        end)
-    end
-
-    local function SavePosition()
-        pcall(function()
-            Config["CapaAimbotPos"] = {
-                MainFrame.Position.X.Scale,
-                MainFrame.Position.X.Offset,
-                MainFrame.Position.Y.Scale,
-                MainFrame.Position.Y.Offset
-            }
-
-            if saveConfig then
-                saveConfig()
-            end
-        end)
-    end
-
-    -- ============================================================
-    -- ACTUALIZAR ESCALA
-    -- ============================================================
-
-    local function UpdateScale(newScale, shouldSave)
-        newScale = tonumber(newScale)
-
-        if not newScale then
-            return
-        end
-
-        newScale = math.clamp(newScale, MinScale, MaxScale)
-
-        SavedScale = newScale
-        UIScale.Scale = newScale
-
-        local percent = math.floor(newScale * 100 + 0.5)
-        ScaleLabel.Text = "Tamaño de interfaz: " .. percent .. "%"
-
-        local alpha = (newScale - MinScale) / (MaxScale - MinScale)
-
-        SliderFill.Size = UDim2.new(alpha, 0, 1, 0)
-        SliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
-
-        if shouldSave then
-            SaveScale()
-        end
-    end
-
-    UpdateScale(SavedScale, false)
-
-    -- ============================================================
-    -- SLIDER
-    -- ============================================================
-
-    local SliderDragging = false
-
-    local function UpdateSliderFromInput(inputPositionX)
-        local barAbsolutePosition = SliderBar.AbsolutePosition.X
-        local barAbsoluteSize = SliderBar.AbsoluteSize.X
-
-        if barAbsoluteSize <= 0 then
-            return
-        end
-
-        local alpha =
-            (inputPositionX - barAbsolutePosition) / barAbsoluteSize
-
-        alpha = math.clamp(alpha, 0, 1)
-
-        local newScale =
-            MinScale + ((MaxScale - MinScale) * alpha)
-
-        -- IMPORTANTE:
-        -- Durante el drag NO se guarda la configuración.
-        UpdateScale(newScale, false)
-    end
-
-    SliderKnob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            SliderDragging = true
-        end
-    end)
-
-    SliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            SliderDragging = true
-            UpdateSliderFromInput(input.Position.X)
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if not SliderDragging then
-            return
-        end
-
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            UpdateSliderFromInput(input.Position.X)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            if SliderDragging then
-                SliderDragging = false
-                SaveScale()
-            end
-        end
-    end)
-
-    -- ============================================================
-    -- BOTONES DE ESCALA
-    -- ============================================================
-
-    MinusBtn.MouseButton1Click:Connect(function()
-        UpdateScale(SavedScale - 0.05, true)
-    end)
-
-    PlusBtn.MouseButton1Click:Connect(function()
-        UpdateScale(SavedScale + 0.05, true)
-    end)
-
-    -- ============================================================
-    -- SETTINGS
-    -- ============================================================
-
-    SettingsBtn.MouseButton1Click:Connect(function()
-        SettingsOpen = not SettingsOpen
-        SettingsFrame.Visible = SettingsOpen
-
-        if SettingsOpen then
-            SettingsBtn.BackgroundColor3 =
-                Color3.fromRGB(0, 70, 110)
-
-            SettingsBtn.TextColor3 =
-                Color3.fromRGB(255, 255, 255)
-        else
-            SettingsBtn.BackgroundColor3 =
-                Color3.fromRGB(20, 25, 35)
-
-            SettingsBtn.TextColor3 =
-                Color3.fromRGB(0, 190, 255)
-        end
-    end)
-
-    -- ============================================================
-    -- SISTEMA DE ARRASTRE
-    -- ============================================================
-
-    local dragging = false
-    local dragInput = nil
-    local dragStart = nil
-    local startPos = nil
-
-    MainFrame.InputBegan:Connect(function(input)
-        if SliderDragging then
-            return
-        end
-
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    SavePosition()
-                end
-            end)
-        end
-    end)
-
-    MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput
-            and dragging
-            and not SliderDragging then
-
-            local delta = input.Position - dragStart
-
-            MainFrame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-
-    -- ============================================================
-    -- MINIMIZAR
-    -- ============================================================
-
-    MinimizeBtn.MouseButton1Click:Connect(function()
-        Minimized = not Minimized
-
-        if Minimized then
-            SettingsOpen = false
-            SettingsFrame.Visible = false
-
-            SettingsBtn.BackgroundColor3 =
-                Color3.fromRGB(20, 25, 35)
-
-            SettingsBtn.TextColor3 =
-                Color3.fromRGB(0, 190, 255)
-
-            MainFrame:TweenSize(
-                UDim2.new(0, 160, 0, 30),
-                Enum.EasingDirection.Out,
-                Enum.EasingStyle.Quad,
-                0.2,
-                true
-            )
-
-            ToggleBtn.Visible = false
-            MinimizeBtn.Text = "+"
-        else
-            MainFrame:TweenSize(
-                UDim2.new(0, 160, 0, 75),
-                Enum.EasingDirection.Out,
-                Enum.EasingStyle.Quad,
-                0.2,
-                true
-            )
-
-            ToggleBtn.Visible = true
-            MinimizeBtn.Text = "—"
-        end
-    end)
-
-    -- ============================================================
-    -- ACTUALIZAR TARGET
-    -- ============================================================
-
-    local TargetUpdateInterval = 0.08
-    local TargetUpdateTimer = 0
-
-    local function UpdateAimbotTarget()
-        local MyCharacter = LocalPlayer.Character
-
-        if not MyCharacter then
-            CurrentTarget = nil
-            return
-        end
-
-        local MyRoot =
-            MyCharacter:FindFirstChild("HumanoidRootPart")
-
-        if not MyRoot then
-            CurrentTarget = nil
-            return
-        end
-
-        local MyPosition = MyRoot.Position
-
-        local BestTarget = nil
-        local BestDistanceSquared = math.huge
-
-        for _, Player in ipairs(Players:GetPlayers()) do
-            if Player ~= LocalPlayer
-                and not WhitelistedUsers[Player.Name]
-                and not WhitelistedUsers[Player.DisplayName] then
-
-                local Character = Player.Character
-
-                if Character and Character ~= MyCharacter then
-                    local Humanoid =
-                        Character:FindFirstChildOfClass("Humanoid")
-
-                    if Humanoid
-                        and Humanoid.Health > 0
-                        and (
-                            Player.Team == nil
-                            or Player.Team ~= LocalPlayer.Team
-                        ) then
-
-                        local Hitbox =
-                            Character:FindFirstChild("Head")
-                            or Character:FindFirstChild("HumanoidRootPart")
-
-                        if Hitbox then
-                            local Offset =
-                                Hitbox.Position - MyPosition
-
-                            -- Más barato que Magnitude porque evita sqrt
-                            local DistanceSquared =
-                                Offset.X * Offset.X
-                                + Offset.Y * Offset.Y
-                                + Offset.Z * Offset.Z
-
-                            if DistanceSquared < BestDistanceSquared then
-                                BestDistanceSquared = DistanceSquared
-                                BestTarget = Hitbox
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        CurrentTarget = BestTarget
-    end
-
-    -- ============================================================
-    -- BOTÓN AIMBOT
-    -- ============================================================
-
-    ToggleBtn.Activated:Connect(function()
-        AimbotEnabled = not AimbotEnabled
-
-        if AimbotEnabled then
-            TargetUpdateTimer = TargetUpdateInterval
-            UpdateAimbotTarget()
-
-            ToggleBtn.Text = "AIMBOT: ON"
-            ToggleBtn.TextColor3 =
-                Color3.fromRGB(255, 255, 255)
-
-            ToggleBtn.BackgroundColor3 =
-                Color3.fromRGB(0, 80, 180)
-
-            ToggleStroke.Color =
-                Color3.fromRGB(0, 200, 255)
-        else
-            CurrentTarget = nil
-            TargetUpdateTimer = 0
-
-            ToggleBtn.Text = "AIMBOT: OFF"
-
-            ToggleBtn.TextColor3 =
-                Color3.fromRGB(150, 150, 150)
-
-            ToggleBtn.BackgroundColor3 =
-                Color3.fromRGB(15, 20, 25)
-
-            ToggleStroke.Color =
-                Color3.fromRGB(100, 100, 100)
-        end
-    end)
-
-    -- ============================================================
-    -- ANIMACIÓN + ACTUALIZACIÓN DEL TARGET
-    -- ============================================================
-
-    RunService.RenderStepped:Connect(function(deltaTime)
-        if not AimbotEnabled then
-            MainStroke.Color = Color3.fromRGB(0, 120, 200)
-            return
-        end
-
-        -- Animación visual
-        local glow =
-            math.abs(math.sin(os.clock() * 3)) * 0.5 + 0.5
-
-        local green =
-            math.floor(150 * glow) + 100
-
-        MainStroke.Color =
-            Color3.fromRGB(0, green, 255)
-
-        ToggleStroke.Color =
-            Color3.fromRGB(0, green, 255)
-
-        -- Actualización limitada del objetivo
-        TargetUpdateTimer += deltaTime
-
-        if TargetUpdateTimer >= TargetUpdateInterval then
-            TargetUpdateTimer = 0
-            UpdateAimbotTarget()
-        end
-    end)
-
-    -- ============================================================
-    -- RAYCAST PARAMS REUTILIZABLE
-    -- ============================================================
-
-    local WallbangParams = RaycastParams.new()
-
-    WallbangParams.FilterType =
-        Enum.RaycastFilterType.Include
-
-    WallbangParams.IgnoreWater = true
-
-    -- ============================================================
-    -- INTEGRACIÓN CON createToggle
-    -- ============================================================
-    createToggle("AIMBOT OPTIMIZADO", function(state)
-        MainFrame.Visible = state
-
-        if not state then
-            AimbotEnabled = false
-            CurrentTarget = nil
-            TargetUpdateTimer = 0
-
-            ToggleBtn.Text = "AIMBOT: OFF"
-
-            ToggleBtn.TextColor3 =
-                Color3.fromRGB(150, 150, 150)
-
-            ToggleBtn.BackgroundColor3 =
-                Color3.fromRGB(15, 20, 25)
-
-            ToggleStroke.Color =
-                Color3.fromRGB(100, 100, 100)
-
-            SettingsOpen = false
-            SettingsFrame.Visible = false
-
-            SettingsBtn.BackgroundColor3 =
-                Color3.fromRGB(20, 25, 35)
-
-            SettingsBtn.TextColor3 =
-                Color3.fromRGB(0, 190, 255)
-        end
-    end)
-end
 -- ========================================================
 -- TOKITO PVP SCRIPT V4
 -- AUTO LASER + INTERFAZ RESPONSIVA + ARRASTRE REAL
@@ -12197,6 +11584,35 @@ end
 )
 
 end
+-- HOLD JUMP
+local holdJumpEnabled = false
+
+RunService.Heartbeat:Connect(function()
+	if not holdJumpEnabled then
+		return
+	end
+
+	local char = player.Character
+	if not char then
+		return
+	end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local root = char:FindFirstChild("HumanoidRootPart")
+
+	if root and hum and hum.Jump then
+		root.Velocity = Vector3.new(
+			root.Velocity.X,
+			55,
+			root.Velocity.Z
+		)
+	end
+end)
+
+createToggle("Hold Jump", function(state)
+	holdJumpEnabled = state
+end)
+
 -- INFINITE JUMP
 local infiniteJumpEnabled = false
 
@@ -12752,12 +12168,14 @@ local function OptimizeLightingUltra()
 			pcall(function()
 				v.Enabled = false
 			end)
-		elseif v:IsA("Atmosphere") or v:IsA("Clouds") then
+		elseif (v:IsA("Atmosphere") or v:IsA("Clouds")) and currentSkyTheme == "Off" then
 			v:Destroy()
 		end
 	end
 
-	ApplyGreySkyUltra()
+	if currentSkyTheme == "Off" then
+		ApplyGreySkyUltra()
+	end
 end
 
 local function ApplyTerrainUltra()
@@ -12866,11 +12284,14 @@ local function setFPSBoostUltra(enabled)
 		end))
 
 		AddUltraConnection(Lighting.DescendantAdded:Connect(function(obj)
+			if obj:GetAttribute(CANDY_SKY_TAG) and currentSkyTheme ~= "Off" then
+				return
+			end
 			if obj:IsA("PostEffect") then
 				pcall(function()
 					obj.Enabled = false
 				end)
-			elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then
+			elseif (obj:IsA("Atmosphere") or obj:IsA("Clouds")) and currentSkyTheme == "Off" then
 				SafeDestroyUltra(obj)
 			end
 		end))
@@ -12933,6 +12354,10 @@ local function setFPSBoostUltra(enabled)
 			WorkspaceService.Terrain.WaterTransparency = 0.3
 			WorkspaceService.Terrain.Decoration = true
 		end)
+
+		if currentSkyTheme ~= "Off" then
+			task.defer(function() CandyApplyCustomSky(currentSkyTheme) end)
+		end
 	end
 end
 
@@ -13561,14 +12986,16 @@ do
 					obj.Enabled = false
 				end)
 
-			elseif obj:IsA("Atmosphere")
-				or obj:IsA("Clouds") then
+			elseif (obj:IsA("Atmosphere")
+				or obj:IsA("Clouds")) and currentSkyTheme == "Off" then
 
 				SafeDestroyUltra(obj)
 			end
 		end
 
-		ApplyGreySkyUltra()
+		if currentSkyTheme == "Off" then
+			ApplyGreySkyUltra()
+		end
 	end
 
 	-- =====================================================
@@ -13618,6 +13045,10 @@ do
 			Lighting.Brightness = 2
 			Lighting.FogEnd = 100000
 		end)
+
+		if currentSkyTheme ~= "Off" then
+			task.defer(function() CandyApplyCustomSky(currentSkyTheme) end)
+		end
 
 		pcall(function()
 			local terrain = WorkspaceService.Terrain
@@ -13735,13 +13166,17 @@ do
 					return
 				end
 
+				if obj:GetAttribute(CANDY_SKY_TAG) and currentSkyTheme ~= "Off" then
+					return
+				end
+
 				if obj:IsA("PostEffect") then
 					pcall(function()
 						obj.Enabled = false
 					end)
 
-				elseif obj:IsA("Atmosphere")
-					or obj:IsA("Clouds") then
+				elseif (obj:IsA("Atmosphere")
+					or obj:IsA("Clouds")) and currentSkyTheme == "Off" then
 
 					SafeDestroyUltra(obj)
 				end
@@ -19131,6 +18566,7 @@ end)
 
 -- ================= END SERVER HOPPER =================
 UI.finish()
+UI.open()
 end
 
 if splash then
