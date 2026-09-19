@@ -6782,24 +6782,218 @@ end
 -- GUI
 -- ============================================================
 
+-- ============================================================
+-- GUI
+-- Estilo RGB oscuro premium, mismo tamaño 60x30
+-- ============================================================
+
+local RayoTweenService = game:GetService("TweenService")
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RayoUI"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = PlayerGui
 
+-- Mantiene exactamente el tamaño original: 60x30
 local button = Instance.new("TextButton")
 button.Name = "RayoButton"
-button.Text = "Rayo"
+button.Text = ""
 button.Size = UDim2.new(0, 60, 0, 30)
 button.Position = UDim2.new(1, savedX, 0.5, savedY)
 button.AnchorPoint = Vector2.new(1, 0.5)
-button.BackgroundColor3 = Color3.new(0, 0, 0)
-button.TextColor3 = Color3.new(1, 1, 1)
+
+button.BackgroundColor3 = Color3.fromRGB(5, 12, 25)
+button.BackgroundTransparency = 0
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
 button.Font = Enum.Font.GothamBold
-button.TextSize = 14
+button.TextSize = 11
+button.AutoButtonColor = false
+button.ClipsDescendants = true
+button.Active = true
+button.ZIndex = 10
 button.Parent = screenGui
 
-Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 9)
+buttonCorner.Parent = button
+
+-- ============================================================
+-- SOMBRA EXTERIOR
+-- ============================================================
+
+local shadow = Instance.new("Frame")
+shadow.Name = "RayoShadow"
+shadow.AnchorPoint = button.AnchorPoint
+shadow.Size = button.Size
+shadow.Position = UDim2.new(
+    button.Position.X.Scale,
+    button.Position.X.Offset + 1,
+    button.Position.Y.Scale,
+    button.Position.Y.Offset + 3
+)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.48
+shadow.BorderSizePixel = 0
+shadow.ZIndex = 8
+shadow.Active = false
+shadow.Visible = button.Visible
+shadow.Parent = screenGui
+
+local shadowCorner = Instance.new("UICorner")
+shadowCorner.CornerRadius = UDim.new(0, 9)
+shadowCorner.Parent = shadow
+
+-- ============================================================
+-- BORDE RGB
+-- ============================================================
+
+local stroke = Instance.new("UIStroke")
+stroke.Name = "RGBStroke"
+stroke.Thickness = 1.35
+stroke.Transparency = 0.04
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.LineJoinMode = Enum.LineJoinMode.Round
+stroke.ZIndex = 11
+stroke.Parent = button
+
+local strokeGradient = Instance.new("UIGradient")
+strokeGradient.Name = "RGBGradient"
+strokeGradient.Rotation = 0
+strokeGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 168, 255)),
+    ColorSequenceKeypoint.new(0.24, Color3.fromRGB(58, 105, 255)),
+    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(136, 75, 255)),
+    ColorSequenceKeypoint.new(0.76, Color3.fromRGB(245, 74, 214)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 224, 255))
+})
+strokeGradient.Parent = stroke
+
+-- ============================================================
+-- FONDO AZUL MUY OSCURO
+-- ============================================================
+
+local backgroundGradient = Instance.new("UIGradient")
+backgroundGradient.Name = "DarkBlueGradient"
+backgroundGradient.Rotation = 135
+backgroundGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 29, 53)),
+    ColorSequenceKeypoint.new(0.28, Color3.fromRGB(8, 22, 42)),
+    ColorSequenceKeypoint.new(0.55, Color3.fromRGB(7, 17, 34)),
+    ColorSequenceKeypoint.new(0.78, Color3.fromRGB(13, 15, 42)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(23, 10, 47))
+})
+backgroundGradient.Parent = button
+
+-- ============================================================
+-- HALO RGB INTERIOR
+-- ============================================================
+
+local inner = Instance.new("Frame")
+inner.Name = "InnerGlow"
+inner.Size = UDim2.new(1, -4, 1, -4)
+inner.Position = UDim2.new(0, 2, 0, 2)
+inner.BackgroundColor3 = Color3.fromRGB(49, 160, 255)
+inner.BackgroundTransparency = 0.95
+inner.BorderSizePixel = 0
+inner.ZIndex = 11
+inner.Active = false
+inner.Parent = button
+
+local innerCorner = Instance.new("UICorner")
+innerCorner.CornerRadius = UDim.new(0, 6)
+innerCorner.Parent = inner
+
+local innerGradient = Instance.new("UIGradient")
+innerGradient.Name = "InnerRGB"
+innerGradient.Rotation = 0
+innerGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 210, 255)),
+    ColorSequenceKeypoint.new(0.32, Color3.fromRGB(40, 130, 255)),
+    ColorSequenceKeypoint.new(0.58, Color3.fromRGB(140, 70, 255)),
+    ColorSequenceKeypoint.new(0.82, Color3.fromRGB(255, 70, 210)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 190, 255))
+})
+innerGradient.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0.00, 0.80),
+    NumberSequenceKeypoint.new(0.42, 0.95),
+    NumberSequenceKeypoint.new(1.00, 0.82)
+})
+innerGradient.Parent = inner
+
+-- ============================================================
+-- PUNTO DE ESTADO
+-- A la derecha, separado del texto
+-- ============================================================
+
+local dot = Instance.new("Frame")
+dot.Name = "StatusDot"
+dot.Size = UDim2.new(0, 4, 0, 4)
+dot.Position = UDim2.new(1, -9, 0.5, -2)
+dot.BackgroundColor3 = Color3.fromRGB(0, 221, 255)
+dot.BorderSizePixel = 0
+dot.ZIndex = 13
+dot.Active = false
+dot.Parent = button
+
+local dotCorner = Instance.new("UICorner")
+dotCorner.CornerRadius = UDim.new(1, 0)
+dotCorner.Parent = dot
+
+local dotStroke = Instance.new("UIStroke")
+dotStroke.Thickness = 1
+dotStroke.Transparency = 0.18
+dotStroke.Color = Color3.fromRGB(175, 242, 255)
+dotStroke.Parent = dot
+
+-- ============================================================
+-- TEXTO: CAPA INDEPENDIENTE, CENTRADA Y MUY LEGIBLE
+-- ============================================================
+
+local textLabel = Instance.new("TextLabel")
+textLabel.Name = "RayoText"
+textLabel.BackgroundTransparency = 1
+textLabel.BorderSizePixel = 0
+textLabel.Size = UDim2.new(1, -10, 1, 0)
+textLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+textLabel.Text = "RAYO"
+textLabel.TextColor3 = Color3.fromRGB(248, 253, 255)
+textLabel.TextTransparency = 0
+textLabel.TextStrokeColor3 = Color3.fromRGB(0, 5, 15)
+textLabel.TextStrokeTransparency = 0.18
+textLabel.Font = Enum.Font.GothamBold
+textLabel.TextSize = 11
+textLabel.TextXAlignment = Enum.TextXAlignment.Center
+textLabel.TextYAlignment = Enum.TextYAlignment.Center
+textLabel.ZIndex = 20
+textLabel.Active = false
+textLabel.Parent = button
+
+local textGradient = Instance.new("UIGradient")
+textGradient.Name = "TextGradient"
+textGradient.Rotation = 90
+textGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(225, 248, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(175, 225, 255))
+})
+textGradient.Parent = textLabel
+
+-- ============================================================
+-- SINCRONIZAR SOMBRA
+-- ============================================================
+
+local function updateShadow()
+    if shadow and shadow.Parent then
+        shadow.Position = UDim2.new(
+            button.Position.X.Scale,
+            button.Position.X.Offset + 1,
+            button.Position.Y.Scale,
+            button.Position.Y.Offset + 3
+        )
+    end
+end
 
 -- ============================================================
 -- CLICK = FLASH TP
@@ -6846,6 +7040,8 @@ UserInputService.InputChanged:Connect(function(input)
             startPos.Y.Scale,
             startPos.Y.Offset + delta.Y
         )
+
+        updateShadow()
     end
 end)
 
@@ -6860,13 +7056,184 @@ UserInputService.InputEnded:Connect(function(input)
             local y = button.Position.Y.Offset
 
             if writefile then
-                writefile(
-                    fileName,
-                    tostring(x) .. "," .. tostring(y)
-                )
+                pcall(function()
+                    writefile(
+                        fileName,
+                        tostring(x) .. "," .. tostring(y)
+                    )
+                end)
             end
+
+            updateShadow()
         end
     end
+end)
+
+-- ============================================================
+-- ANIMACIÓN RGB SUAVE
+-- ============================================================
+
+task.spawn(function()
+    while button and button.Parent do
+        local tween = RayoTweenService:Create(
+            strokeGradient,
+            TweenInfo.new(
+                2.8,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.InOut
+            ),
+            {
+                Offset = Vector2.new(1.15, 0)
+            }
+        )
+
+        tween:Play()
+        tween.Completed:Wait()
+
+        if not button or not button.Parent then
+            break
+        end
+
+        strokeGradient.Offset = Vector2.new(-1.15, 0)
+    end
+end)
+
+task.spawn(function()
+    while button and button.Parent do
+        local tween = RayoTweenService:Create(
+            innerGradient,
+            TweenInfo.new(
+                3.6,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.InOut
+            ),
+            {
+                Offset = Vector2.new(-0.75, 0)
+            }
+        )
+
+        tween:Play()
+        tween.Completed:Wait()
+
+        if not button or not button.Parent then
+            break
+        end
+
+        innerGradient.Offset = Vector2.new(0.75, 0)
+    end
+end)
+
+-- ============================================================
+-- HOVER / PRESS
+-- ============================================================
+
+local normalStrokeColor = Color3.fromRGB(88, 210, 255)
+local activeStrokeColor = Color3.fromRGB(150, 108, 255)
+
+button.MouseEnter:Connect(function()
+    RayoTweenService:Create(
+        button,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            BackgroundTransparency = 0.035
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        textLabel,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        stroke,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Thickness = 1.7
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        dot,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            BackgroundColor3 = Color3.fromRGB(105, 238, 255)
+        }
+    ):Play()
+end)
+
+button.MouseLeave:Connect(function()
+    RayoTweenService:Create(
+        button,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            BackgroundTransparency = 0
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        textLabel,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            TextColor3 = Color3.fromRGB(248, 253, 255)
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        stroke,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Thickness = 1.35
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        dot,
+        TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            BackgroundColor3 = Color3.fromRGB(0, 221, 255)
+        }
+    ):Play()
+end)
+
+button.MouseButton1Down:Connect(function()
+    RayoTweenService:Create(
+        button,
+        TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            BackgroundTransparency = 0.10
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        stroke,
+        TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Thickness = 1.8,
+            Color = activeStrokeColor
+        }
+    ):Play()
+end)
+
+button.MouseButton1Up:Connect(function()
+    RayoTweenService:Create(
+        button,
+        TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            BackgroundTransparency = 0.035
+        }
+    ):Play()
+
+    RayoTweenService:Create(
+        stroke,
+        TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Thickness = 1.7,
+            Color = normalStrokeColor
+        }
+    ):Play()
 end)
 
 -- ============================================================
@@ -6878,8 +7245,9 @@ do
         State.RayoEnabled = state
         getgenv().RayoEnabled = state
 
-        -- Mostrar / ocultar botón
+        -- Mostrar / ocultar botón y su sombra
         button.Visible = state
+        shadow.Visible = state
     end
 
     createToggle("Rayo Rayito Rayoso", function(state)
