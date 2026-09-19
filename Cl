@@ -319,50 +319,6 @@ innerGradient.Transparency = NumberSequence.new({
 innerGradient.Parent = inner
 
 -- =========================================================
--- REFLEJO SUPERIOR
--- =========================================================
-local shine = Instance.new("Frame")
-shine.Name = "TopShine"
-shine.Size = UDim2.new(1, -4, 0, 4)
-shine.Position = UDim2.new(0, 2, 0, 2)
-shine.BackgroundColor3 = Color3.fromRGB(190, 240, 255)
-shine.BackgroundTransparency = 0.82
-shine.BorderSizePixel = 0
-shine.ZIndex = 12
-shine.Active = false
-shine.Parent = button
-
-local shineCorner = Instance.new("UICorner")
-shineCorner.CornerRadius = UDim.new(0, 5)
-shineCorner.Parent = shine
-
--- =========================================================
--- LÍNEA RGB INFERIOR
--- =========================================================
-local accent = Instance.new("Frame")
-accent.Name = "RGBAccent"
-accent.AnchorPoint = Vector2.new(0.5, 1)
-accent.Size = UDim2.new(0, 44, 0, 1)
-accent.Position = UDim2.new(0.5, 0, 1, -2)
-accent.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
-accent.BackgroundTransparency = 0.08
-accent.BorderSizePixel = 0
-accent.ZIndex = 12
-accent.Active = false
-accent.Parent = button
-
-local accentGradient = Instance.new("UIGradient")
-accentGradient.Name = "AccentGradient"
-accentGradient.Rotation = 0
-accentGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 220, 255)),
-    ColorSequenceKeypoint.new(0.40, Color3.fromRGB(66, 105, 255)),
-    ColorSequenceKeypoint.new(0.68, Color3.fromRGB(167, 69, 255)),
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 86, 212))
-})
-accentGradient.Parent = accent
-
--- =========================================================
 -- INDICADOR DE ESTADO
 -- Se mueve a la derecha para no invadir el texto.
 -- =========================================================
@@ -533,30 +489,6 @@ task.spawn(function()
         tween.Completed:Wait()
 
         innerGradient.Offset = Vector2.new(0.75, 0)
-    end
-end)
-
-task.spawn(function()
-    while button and button.Parent do
-        local tween = TweenService:Create(
-            accentGradient,
-            TweenInfo.new(
-                2.1,
-                Enum.EasingStyle.Sine,
-                Enum.EasingDirection.InOut,
-                0,
-                false,
-                0
-            ),
-            {
-                Offset = Vector2.new(1, 0)
-            }
-        )
-
-        tween:Play()
-        tween.Completed:Wait()
-
-        accentGradient.Offset = Vector2.new(-1, 0)
     end
 end)
 
