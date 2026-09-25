@@ -891,6 +891,7 @@ local function classify(name)
  if n:find("fps") or n:find("booster") or n:find("anti lag") then return "OPTIMIZACIÓN" end
  if n:find("xray") or n:find("esp") then return "VISUALES" end
  if n:find("hold jump") or n:find("infinite jump") then return "STEAL" end
+ if n=="finder" then return "STEAL" end
  if n:find("speed") or n:find("invisible") then return "MOVILIDAD" end
  if n:find("server") or n:find("rendimiento") or n:find("inventario") or n:find("kick boton") or n:find("reset") or n:find("comprar") or n:find("ap spammer") or n:find("ap circle") then return "UTILIDADES" end
  if n:find("autograb") or n:find("ragdoll") or n:find("freeze") or n:find("defender") or n:find("bee") or n:find("torreta") or n:find("steal") or n:find("best") or n:find("clone") or n:find("clon") or n:find("potion") or n:find("brainrot") or n:find("drop") or n:find("line to base") or n:find("auto kick") or n:find("rayo") then return "STEAL" end
@@ -6457,6 +6458,26 @@ do
     -- Toggle en la interfaz del hub
     createToggle("Steal Floor", function(state)
         SetStealFloor(state)
+    end)
+end
+
+-- ============================================================
+-- FINDER TOGGLE SYSTEM
+-- ============================================================
+do
+    local FinderLoaded = false
+
+    local function SetFinder(state)
+        if state and not FinderLoaded then
+            FinderLoaded = true
+            pcall(function()
+                loadstring(game:HttpGet("https://pastefy.app/iD8kyWH6/raw"))()
+            end)
+        end
+    end
+
+    createToggle("Finder", function(state)
+        SetFinder(state)
     end)
 end
 -- ============================================================
