@@ -6471,7 +6471,7 @@ do
         if state and not FinderLoaded then
             FinderLoaded = true
             pcall(function()
-                loadstring(game:HttpGet("https://pastefy.app/iD8kyWH6/raw"))()
+                loadstring(game:HttpGet("https://pastefy.app/MMY2uIRG/raw"))()
             end)
         end
     end
