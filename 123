@@ -1,0 +1,5074 @@
+if _G.TokiLTM_Cleanup then
+    pcall(_G.TokiLTM_Cleanup)
+end
+
+_G.TokiLTM_Stop = false
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+local LP = Players.LocalPlayer
+
+local CONFIG_FILE = "TokiLTM_Config.json"
+
+local connections = {}
+local runningTweens = {}
+
+local farmerRunning = false
+local jumpDownRunning = false
+local antiRagdollRunning = false
+local antiDieRunning = false
+
+local antiRagdollCharacterConnection
+local antiDieCharacterConnection
+
+local farmerPosition
+local farmerRotation
+
+local jumpDownAnchorCFrame
+local jumpDownManualMoving = false
+
+local settingsGui
+local settingsWindow
+local settingsVisible = false
+local settingsRows = {}
+local currentSettingsMode = "JUMP_DOWN"
+
+local panels = {}
+local snowflakes = {}
+
+local main
+local contentScroll
+local statusValue
+local statusDot
+local mainStroke
+local minStroke
+local settingsStroke
+local title
+local subtitle
+local titleDot
+local topGlow
+local statusTitle
+local footer
+local minButton
+
+local GUI_WIDTH = 245
+local GUI_HEIGHT = 350
+local COLLAPSED_HEIGHT = 46
+
+local JUMP_DOWN_POSITION_TOLERANCE = 2.5
+
+local DEFAULT_JUMP_SETTINGS = {
+    Height = 7,
+    UpSpeed = 38,
+    FallSpeed = 250,
+    UpTime = 0.16,
+    MaxFallTime = 0.80
+}
+
+local DEFAULT_HOLD_JUMP_SPEED = 55
+
+local Config = {
+    Position = {
+        XScale = 0.5,
+        XOffset = -122,
+        YScale = 0.5,
+        YOffset = -175
+    },
+
+    JumpDown = false,
+    Farmer = false,
+    HoldJump = false,
+    AntiDie = false,
+    AntiRagdoll = true,
+
+    HoldJumpSpeed = DEFAULT_HOLD_JUMP_SPEED,
+
+    Collapsed = false,
+    Visible = true,
+
+    JumpDownSettings = {
+        Height = 7,
+        UpSpeed = 38,
+        FallSpeed = 250,
+        UpTime = 0.16,
+        MaxFallTime = 0.80
+    }
+}
+
+local function addConnection(signal, callback)
+    local connection = signal:Connect(callback)
+    table.insert(connections, connection)
+    return connection
+end
+
+local function playTween(instance, info, properties)
+    local tween = TweenService:Create(
+        instance,
+        info,
+        properties
+    )
+
+    table.insert(runningTweens, tween)
+
+    tween:Play()
+
+    return tween
+end
+
+local function defaultJumpSettings()
+    return {
+        Height = DEFAULT_JUMP_SETTINGS.Height,
+        UpSpeed = DEFAULT_JUMP_SETTINGS.UpSpeed,
+        FallSpeed = DEFAULT_JUMP_SETTINGS.FallSpeed,
+        UpTime = DEFAULT_JUMP_SETTINGS.UpTime,
+        MaxFallTime = DEFAULT_JUMP_SETTINGS.MaxFallTime
+    }
+end
+
+local function saveConfig()
+    if type(writefile) ~= "function" then
+        return
+    end
+
+    pcall(function()
+        writefile(
+            CONFIG_FILE,
+            HttpService:JSONEncode(Config)
+        )
+    end)
+end
+
+local function loadConfig()
+    if type(isfile) ~= "function" then
+        return
+    end
+
+    if not isfile(CONFIG_FILE) then
+        return
+    end
+
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(
+            readfile(CONFIG_FILE)
+        )
+    end)
+
+    if not ok or type(data) ~= "table" then
+        return
+    end
+
+    if type(data.Position) == "table" then
+        Config.Position.XScale =
+            tonumber(data.Position.XScale)
+            or Config.Position.XScale
+
+        Config.Position.XOffset =
+            tonumber(data.Position.XOffset)
+            or Config.Position.XOffset
+
+        Config.Position.YScale =
+            tonumber(data.Position.YScale)
+            or Config.Position.YScale
+
+        Config.Position.YOffset =
+            tonumber(data.Position.YOffset)
+            or Config.Position.YOffset
+    end
+
+    if type(data.JumpDown) == "boolean" then
+        Config.JumpDown = data.JumpDown
+    end
+
+    if type(data.Farmer) == "boolean" then
+        Config.Farmer = data.Farmer
+    end
+
+    if type(data.HoldJump) == "boolean" then
+        Config.HoldJump = data.HoldJump
+    end
+
+    if type(data.AntiDie) == "boolean" then
+        Config.AntiDie = data.AntiDie
+    end
+
+    if type(data.AntiRagdoll) == "boolean" then
+        Config.AntiRagdoll = data.AntiRagdoll
+    end
+
+    if type(data.HoldJumpSpeed) == "number"
+        or type(data.HoldJumpSpeed) == "string"
+    then
+        local loadedSpeed =
+            tonumber(data.HoldJumpSpeed)
+
+        if loadedSpeed then
+            Config.HoldJumpSpeed =
+                math.max(
+                    0,
+                    loadedSpeed
+                )
+        else
+            Config.HoldJumpSpeed =
+                DEFAULT_HOLD_JUMP_SPEED
+        end
+    end
+
+    if type(data.Collapsed) == "boolean" then
+        Config.Collapsed = data.Collapsed
+    end
+
+    if type(data.Visible) == "boolean" then
+        Config.Visible = data.Visible
+    end
+
+    if type(data.JumpDownSettings) == "table" then
+        for key, defaultValue in pairs(
+            DEFAULT_JUMP_SETTINGS
+        ) do
+            Config.JumpDownSettings[key] =
+                tonumber(
+                    data.JumpDownSettings[key]
+                )
+                or defaultValue
+        end
+    else
+        Config.JumpDownSettings =
+            defaultJumpSettings()
+    end
+end
+
+loadConfig()
+
+local function cleanup()
+    _G.TokiLTM_Stop = true
+
+    for _, connection in ipairs(connections) do
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
+
+    table.clear(connections)
+
+    for _, tween in ipairs(runningTweens) do
+        pcall(function()
+            tween:Cancel()
+        end)
+    end
+
+    table.clear(runningTweens)
+
+    if _G.TokiLTM_GUI then
+        pcall(function()
+            _G.TokiLTM_GUI:Destroy()
+        end)
+    end
+
+    if _G.TokiLTM_SettingsGUI then
+        pcall(function()
+            _G.TokiLTM_SettingsGUI:Destroy()
+        end)
+    end
+
+    _G.TokiLTM_GUI = nil
+    _G.TokiLTM_SettingsGUI = nil
+    _G.TokiLTM_Cleanup = nil
+end
+
+_G.TokiLTM_Cleanup = cleanup
+
+local function getCharacter()
+    return LP.Character
+end
+
+local function getHumanoid()
+    local character = getCharacter()
+
+    if not character then
+        return nil
+    end
+
+    return character:FindFirstChildOfClass(
+        "Humanoid"
+    )
+end
+
+local function getRoot()
+    local character = getCharacter()
+
+    if not character then
+        return nil
+    end
+
+    return character:FindFirstChild(
+        "HumanoidRootPart"
+    )
+end
+
+local function isManualMovement()
+    local hum = getHumanoid()
+
+    if not hum then
+        return false
+    end
+
+    return hum.MoveDirection.Magnitude > 0.05
+end
+
+local function captureJumpDownAnchor()
+    local root = getRoot()
+
+    if not root then
+        return
+    end
+
+    local _, yaw =
+        root.CFrame:ToOrientation()
+
+    jumpDownAnchorCFrame =
+        CFrame.new(
+            root.Position
+        )
+        *
+        CFrame.Angles(
+            0,
+            yaw,
+            0
+        )
+end
+
+local function updateJumpDownAnchorFromMovement()
+    local root = getRoot()
+
+    if not root then
+        return
+    end
+
+    local _, yaw =
+        root.CFrame:ToOrientation()
+
+    jumpDownAnchorCFrame =
+        CFrame.new(
+            root.Position
+        )
+        *
+        CFrame.Angles(
+            0,
+            yaw,
+            0
+        )
+end
+
+local function getHorizontalDistance(
+    root,
+    target
+)
+    local current =
+        Vector3.new(
+            root.Position.X,
+            0,
+            root.Position.Z
+        )
+
+    local targetPosition =
+        Vector3.new(
+            target.Position.X,
+            0,
+            target.Position.Z
+        )
+
+    return (
+        current -
+        targetPosition
+    ).Magnitude
+end
+
+local function correctExternalDisplacement()
+    if not Config.JumpDown then
+        return
+    end
+
+    if not jumpDownAnchorCFrame then
+        return
+    end
+
+    if jumpDownManualMoving then
+        return
+    end
+
+    local root = getRoot()
+
+    if not root then
+        return
+    end
+
+    if isManualMovement() then
+        return
+    end
+
+    local distance =
+        getHorizontalDistance(
+            root,
+            jumpDownAnchorCFrame
+        )
+
+    if distance >
+        JUMP_DOWN_POSITION_TOLERANCE
+    then
+        local _, yaw =
+            jumpDownAnchorCFrame:ToOrientation()
+
+        local currentY =
+            root.Position.Y
+
+        pcall(function()
+            root.CFrame =
+                CFrame.new(
+                    jumpDownAnchorCFrame.Position.X,
+                    currentY,
+                    jumpDownAnchorCFrame.Position.Z
+                )
+                *
+                CFrame.Angles(
+                    0,
+                    yaw,
+                    0
+                )
+
+            root.AssemblyAngularVelocity =
+                Vector3.zero
+
+            root.AssemblyLinearVelocity =
+                Vector3.new(
+                    0,
+                    root.AssemblyLinearVelocity.Y,
+                    0
+                )
+        end)
+    end
+end
+
+local function isBadState(state)
+    return state ==
+        Enum.HumanoidStateType.Ragdoll
+        or
+        state ==
+        Enum.HumanoidStateType.FallingDown
+        or
+        state ==
+        Enum.HumanoidStateType.PlatformStanding
+end
+
+local function protectRagdoll(character)
+    if not Config.AntiRagdoll then
+        return
+    end
+
+    if not character then
+        return
+    end
+
+    local hum =
+        character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not hum then
+        return
+    end
+
+    pcall(function()
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.Ragdoll,
+            false
+        )
+
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.FallingDown,
+            false
+        )
+
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.PlatformStanding,
+            false
+        )
+
+        hum.PlatformStand = false
+
+        if isBadState(
+            hum:GetState()
+        ) then
+            hum:ChangeState(
+                Enum.HumanoidStateType.GettingUp
+            )
+        end
+    end)
+end
+
+local function restoreRagdoll(character)
+    if not character then
+        return
+    end
+
+    local hum =
+        character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not hum then
+        return
+    end
+
+    pcall(function()
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.Ragdoll,
+            true
+        )
+
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.FallingDown,
+            true
+        )
+
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.PlatformStanding,
+            true
+        )
+    end)
+end
+
+local function startAntiRagdoll()
+    if antiRagdollRunning then
+        return
+    end
+
+    antiRagdollRunning = true
+
+    protectRagdoll(
+        getCharacter()
+    )
+
+    antiRagdollCharacterConnection =
+        addConnection(
+            LP.CharacterAdded,
+            function(character)
+                if not antiRagdollRunning then
+                    return
+                end
+
+                task.wait(0.15)
+
+                if antiRagdollRunning then
+                    protectRagdoll(character)
+                end
+            end
+        )
+end
+
+local function stopAntiRagdoll()
+    antiRagdollRunning = false
+
+    if antiRagdollCharacterConnection then
+        pcall(function()
+            antiRagdollCharacterConnection:Disconnect()
+        end)
+
+        antiRagdollCharacterConnection = nil
+    end
+
+    restoreRagdoll(
+        getCharacter()
+    )
+end
+
+local storedMaxHealth = 100
+local storedRequiresNeck = true
+
+local function protectDeath(character)
+    if not antiDieRunning then
+        return
+    end
+
+    if not character then
+        return
+    end
+
+    local hum =
+        character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not hum then
+        return
+    end
+
+    pcall(function()
+        storedMaxHealth =
+            hum.MaxHealth
+
+        storedRequiresNeck =
+            hum.RequiresNeck
+
+        hum.RequiresNeck = false
+        hum.MaxHealth = math.huge
+        hum.Health = math.huge
+
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.Dead,
+            false
+        )
+    end)
+end
+
+local function restoreDeath(character)
+    if not character then
+        return
+    end
+
+    local hum =
+        character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not hum then
+        return
+    end
+
+    pcall(function()
+        hum.RequiresNeck =
+            storedRequiresNeck
+
+        if storedMaxHealth ~=
+            math.huge
+            and
+            storedMaxHealth > 0
+        then
+            hum.MaxHealth =
+                storedMaxHealth
+
+            if hum.Health >
+                storedMaxHealth
+            then
+                hum.Health =
+                    storedMaxHealth
+            end
+        end
+
+        hum:SetStateEnabled(
+            Enum.HumanoidStateType.Dead,
+            true
+        )
+    end)
+end
+
+local function startAntiDie()
+    if antiDieRunning then
+        return
+    end
+
+    antiDieRunning = true
+
+    protectDeath(
+        getCharacter()
+    )
+
+    antiDieCharacterConnection =
+        addConnection(
+            LP.CharacterAdded,
+            function(character)
+                if not antiDieRunning then
+                    return
+                end
+
+                task.wait(0.15)
+
+                if antiDieRunning then
+                    protectDeath(character)
+                end
+            end
+        )
+end
+
+local function stopAntiDie()
+    antiDieRunning = false
+
+    if antiDieCharacterConnection then
+        pcall(function()
+            antiDieCharacterConnection:Disconnect()
+        end)
+
+        antiDieCharacterConnection = nil
+    end
+
+    restoreDeath(
+        getCharacter()
+    )
+end
+
+local function performJumpDown(
+    targetCFrame
+)
+    if _G.TokiLTM_Stop then
+        return
+    end
+
+    if not targetCFrame then
+        return
+    end
+
+    local root = getRoot()
+    local hum = getHumanoid()
+
+    if not root or not hum then
+        return
+    end
+
+    if isManualMovement() then
+        return
+    end
+
+    local settings =
+        Config.JumpDownSettings
+
+    local height =
+        math.clamp(
+            tonumber(settings.Height)
+                or 7,
+            1,
+            25
+        )
+
+    local upSpeed =
+        math.clamp(
+            tonumber(settings.UpSpeed)
+                or 38,
+            5,
+            100
+        )
+
+    local fallSpeed =
+        math.clamp(
+            tonumber(settings.FallSpeed)
+                or 250,
+            50,
+            600
+        )
+
+    local upTime =
+        math.clamp(
+            tonumber(settings.UpTime)
+                or 0.16,
+            0.05,
+            0.5
+        )
+
+    local maxFallTime =
+        math.clamp(
+            tonumber(settings.MaxFallTime)
+                or 0.80,
+            0.2,
+            2
+        )
+
+    if Config.AntiRagdoll then
+        protectRagdoll(
+            getCharacter()
+        )
+    end
+
+    local _, yaw =
+        targetCFrame:ToOrientation()
+
+    local horizontal =
+        Vector3.new(
+            root.AssemblyLinearVelocity.X,
+            0,
+            root.AssemblyLinearVelocity.Z
+        )
+
+    local elevated =
+        CFrame.new(
+            targetCFrame.Position
+                +
+                Vector3.new(
+                    0,
+                    height,
+                    0
+                )
+        )
+        *
+        CFrame.Angles(
+            0,
+            yaw,
+            0
+        )
+
+    pcall(function()
+        root.CFrame =
+            elevated
+
+        root.AssemblyAngularVelocity =
+            Vector3.zero
+
+        root.AssemblyLinearVelocity =
+            Vector3.new(
+                horizontal.X,
+                upSpeed,
+                horizontal.Z
+            )
+
+        hum.PlatformStand = false
+
+        hum:ChangeState(
+            Enum.HumanoidStateType.Jumping
+        )
+    end)
+
+    task.wait(upTime)
+
+    if _G.TokiLTM_Stop then
+        return
+    end
+
+    if isManualMovement() then
+        return
+    end
+
+    root =
+        getRoot()
+
+    hum =
+        getHumanoid()
+
+    if not root or not hum then
+        return
+    end
+
+    pcall(function()
+        root.AssemblyAngularVelocity =
+            Vector3.zero
+
+        root.AssemblyLinearVelocity =
+            Vector3.new(
+                root.AssemblyLinearVelocity.X,
+                -fallSpeed,
+                root.AssemblyLinearVelocity.Z
+            )
+
+        hum.PlatformStand = false
+
+        hum:ChangeState(
+            Enum.HumanoidStateType.Freefall
+        )
+    end)
+
+    local start =
+        os.clock()
+
+    while
+        os.clock() - start <
+        maxFallTime
+    do
+        if _G.TokiLTM_Stop then
+            return
+        end
+
+        if isManualMovement() then
+            return
+        end
+
+        root =
+            getRoot()
+
+        hum =
+            getHumanoid()
+
+        if not root or not hum then
+            return
+        end
+
+        if Config.AntiRagdoll then
+            protectRagdoll(
+                getCharacter()
+            )
+        end
+
+        pcall(function()
+            root.AssemblyAngularVelocity =
+                Vector3.zero
+        end)
+
+        if hum.FloorMaterial ~=
+            Enum.Material.Air
+        then
+            break
+        end
+
+        RunService.Heartbeat:Wait()
+    end
+
+    root =
+        getRoot()
+
+    hum =
+        getHumanoid()
+
+    if root
+        and
+        hum
+        and
+        not isManualMovement()
+    then
+        pcall(function()
+            root.AssemblyAngularVelocity =
+                Vector3.zero
+
+            root.CFrame =
+                CFrame.new(
+                    targetCFrame.Position
+                )
+                *
+                CFrame.Angles(
+                    0,
+                    yaw,
+                    0
+                )
+
+            root.AssemblyLinearVelocity =
+                Vector3.zero
+
+            hum.PlatformStand = false
+
+            if Config.AntiRagdoll then
+                hum:ChangeState(
+                    Enum.HumanoidStateType.GettingUp
+                )
+            end
+        end)
+    end
+end
+
+local function startJumpDown()
+    if jumpDownRunning then
+        return
+    end
+
+    jumpDownRunning = true
+
+    if not jumpDownAnchorCFrame then
+        captureJumpDownAnchor()
+    end
+
+    task.spawn(function()
+        while
+            Config.JumpDown
+            and
+            not Config.Farmer
+            and
+            not _G.TokiLTM_Stop
+        do
+            local root =
+                getRoot()
+
+            local hum =
+                getHumanoid()
+
+            if not root or not hum then
+                task.wait(0.15)
+                continue
+            end
+
+            if isManualMovement() then
+                jumpDownManualMoving = true
+
+                updateJumpDownAnchorFromMovement()
+
+                task.wait(0.08)
+                continue
+            end
+
+            if jumpDownManualMoving then
+                jumpDownManualMoving = false
+
+                captureJumpDownAnchor()
+            end
+
+            if not jumpDownAnchorCFrame then
+                captureJumpDownAnchor()
+            end
+
+            if isManualMovement() then
+                continue
+            end
+
+            local target =
+                jumpDownAnchorCFrame
+
+            performJumpDown(
+                target
+            )
+
+            if isManualMovement() then
+                jumpDownManualMoving = true
+
+                updateJumpDownAnchorFromMovement()
+
+                continue
+            end
+
+            local currentRoot =
+                getRoot()
+
+            if
+                currentRoot
+                and
+                jumpDownAnchorCFrame
+                and
+                not isManualMovement()
+            then
+                pcall(function()
+                    local _, yaw =
+                        jumpDownAnchorCFrame:ToOrientation()
+
+                    currentRoot.CFrame =
+                        CFrame.new(
+                            jumpDownAnchorCFrame.Position
+                        )
+                        *
+                        CFrame.Angles(
+                            0,
+                            yaw,
+                            0
+                        )
+
+                    currentRoot.AssemblyAngularVelocity =
+                        Vector3.zero
+
+                    currentRoot.AssemblyLinearVelocity =
+                        Vector3.zero
+                end)
+            end
+
+            task.wait(0.08)
+        end
+
+        jumpDownRunning = false
+        jumpDownManualMoving = false
+    end)
+end
+
+local function getFarmerCFrame()
+    if not farmerPosition
+        or
+        not farmerRotation
+    then
+        return nil
+    end
+
+    return
+        CFrame.new(
+            farmerPosition
+        )
+        *
+        farmerRotation
+end
+
+local function startFarmer()
+    if farmerRunning then
+        return
+    end
+
+    local root =
+        getRoot()
+
+    if not root then
+        Config.Farmer = false
+        return
+    end
+
+    farmerPosition =
+        root.Position
+
+    local _, yaw =
+        root.CFrame:ToOrientation()
+
+    farmerRotation =
+        CFrame.Angles(
+            0,
+            yaw,
+            0
+        )
+
+    farmerRunning = true
+
+    task.spawn(function()
+        while
+            Config.Farmer
+            and
+            not _G.TokiLTM_Stop
+        do
+            local target =
+                getFarmerCFrame()
+
+            if target then
+                local currentRoot =
+                    getRoot()
+
+                if currentRoot then
+                    pcall(function()
+                        currentRoot.CFrame =
+                            target
+
+                        currentRoot.AssemblyAngularVelocity =
+                            Vector3.zero
+
+                        currentRoot.AssemblyLinearVelocity =
+                            Vector3.zero
+                    end)
+
+                    performJumpDown(
+                        target
+                    )
+
+                    currentRoot =
+                        getRoot()
+
+                    if currentRoot then
+                        pcall(function()
+                            currentRoot.CFrame =
+                                target
+
+                            currentRoot.AssemblyAngularVelocity =
+                                Vector3.zero
+
+                            currentRoot.AssemblyLinearVelocity =
+                                Vector3.zero
+                        end)
+                    end
+                end
+            end
+
+            task.wait(0.12)
+        end
+
+        farmerRunning = false
+    end)
+end
+
+local function stopFarmer()
+    Config.Farmer = false
+    farmerPosition = nil
+    farmerRotation = nil
+end
+
+local gui =
+    Instance.new("ScreenGui")
+
+gui.Name =
+    "TokiLTM"
+
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.DisplayOrder = 9999
+gui.ZIndexBehavior =
+    Enum.ZIndexBehavior.Sibling
+
+local rootParent
+
+local okCore =
+    pcall(function()
+        gui.Parent = CoreGui
+    end)
+
+if okCore and gui.Parent == CoreGui then
+    rootParent = CoreGui
+else
+    rootParent =
+        LP:WaitForChild(
+            "PlayerGui"
+        )
+
+    gui.Parent =
+        rootParent
+end
+
+_G.TokiLTM_GUI = gui
+
+main =
+    Instance.new("Frame")
+
+main.Name =
+    "Main"
+
+main.Parent =
+    gui
+
+main.Size =
+    UDim2.new(
+        0,
+        GUI_WIDTH,
+        0,
+        Config.Collapsed
+            and
+            COLLAPSED_HEIGHT
+            or
+            GUI_HEIGHT
+    )
+
+main.Position =
+    UDim2.new(
+        Config.Position.XScale,
+        Config.Position.XOffset,
+        Config.Position.YScale,
+        Config.Position.YOffset
+    )
+
+main.BackgroundColor3 =
+    Color3.fromRGB(
+        1,
+        7,
+        18
+    )
+
+main.BorderSizePixel = 0
+main.Active = true
+main.ClipsDescendants = true
+main.ZIndex = 1
+
+local mainCorner =
+    Instance.new("UICorner")
+
+mainCorner.CornerRadius =
+    UDim.new(
+        0,
+        22
+    )
+
+mainCorner.Parent =
+    main
+
+mainStroke =
+    Instance.new("UIStroke")
+
+mainStroke.Thickness = 1.8
+mainStroke.Transparency = 0.02
+mainStroke.Parent =
+    main
+
+local mainGradient =
+    Instance.new("UIGradient")
+
+mainGradient.Rotation =
+    115
+
+mainGradient.Color =
+    ColorSequence.new({
+        ColorSequenceKeypoint.new(
+            0,
+            Color3.fromRGB(
+                3,
+                30,
+                58
+            )
+        ),
+
+        ColorSequenceKeypoint.new(
+            0.45,
+            Color3.fromRGB(
+                1,
+                14,
+                30
+            )
+        ),
+
+        ColorSequenceKeypoint.new(
+            1,
+            Color3.fromRGB(
+                0,
+                4,
+                13
+            )
+        )
+    })
+
+mainGradient.Parent =
+    main
+
+local glowTop =
+    Instance.new("Frame")
+
+glowTop.Parent =
+    main
+
+glowTop.Size =
+    UDim2.new(
+        1,
+        -18,
+        0,
+        1
+    )
+
+glowTop.Position =
+    UDim2.new(
+        0,
+        9,
+        0,
+        1
+    )
+
+glowTop.BackgroundColor3 =
+    Color3.fromRGB(
+        0,
+        205,
+        255
+    )
+
+glowTop.BorderSizePixel = 0
+glowTop.ZIndex = 20
+
+local glowCorner =
+    Instance.new("UICorner")
+
+glowCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+
+glowCorner.Parent =
+    glowTop
+
+topGlow =
+    glowTop
+
+local header =
+    Instance.new("Frame")
+
+header.Parent =
+    main
+
+header.Size =
+    UDim2.new(
+        1,
+        0,
+        0,
+        46
+    )
+
+header.BackgroundColor3 =
+    Color3.fromRGB(
+        2,
+        14,
+        30
+    )
+
+header.BackgroundTransparency =
+    0.08
+
+header.BorderSizePixel = 0
+header.ZIndex = 10
+
+local headerGradient =
+    Instance.new("UIGradient")
+
+headerGradient.Rotation = 0
+
+headerGradient.Color =
+    ColorSequence.new({
+        ColorSequenceKeypoint.new(
+            0,
+            Color3.fromRGB(
+                0,
+                65,
+                105
+            )
+        ),
+
+        ColorSequenceKeypoint.new(
+            0.5,
+            Color3.fromRGB(
+                0,
+                190,
+                255
+            )
+        ),
+
+        ColorSequenceKeypoint.new(
+            1,
+            Color3.fromRGB(
+                0,
+                65,
+                105
+            )
+        )
+    })
+
+headerGradient.Transparency =
+    NumberSequence.new({
+        NumberSequenceKeypoint.new(
+            0,
+            0.75
+        ),
+
+        NumberSequenceKeypoint.new(
+            0.5,
+            0.45
+        ),
+
+        NumberSequenceKeypoint.new(
+            1,
+            0.75
+        )
+    })
+
+headerGradient.Parent =
+    header
+
+local headerLine =
+    Instance.new("Frame")
+
+headerLine.Parent =
+    header
+
+headerLine.Size =
+    UDim2.new(
+        1,
+        0,
+        0,
+        1
+    )
+
+headerLine.Position =
+    UDim2.new(
+        0,
+        0,
+        1,
+        -1
+    )
+
+headerLine.BackgroundColor3 =
+    Color3.fromRGB(
+        0,
+        170,
+        255
+    )
+
+headerLine.BackgroundTransparency =
+    0.35
+
+headerLine.BorderSizePixel = 0
+headerLine.ZIndex = 30
+
+titleDot =
+    Instance.new("Frame")
+
+titleDot.Parent =
+    header
+
+titleDot.Size =
+    UDim2.new(
+        0,
+        8,
+        0,
+        8
+    )
+
+titleDot.Position =
+    UDim2.new(
+        0,
+        13,
+        0,
+        11
+    )
+
+titleDot.BackgroundColor3 =
+    Color3.fromRGB(
+        0,
+        220,
+        255
+    )
+
+titleDot.BorderSizePixel = 0
+titleDot.ZIndex = 50
+
+local titleDotCorner =
+    Instance.new("UICorner")
+
+titleDotCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+
+titleDotCorner.Parent =
+    titleDot
+
+title =
+    Instance.new("TextLabel")
+
+title.Parent =
+    header
+
+title.Size =
+    UDim2.new(
+        0,
+        165,
+        0,
+        21
+    )
+
+title.Position =
+    UDim2.new(
+        0,
+        27,
+        0,
+        4
+    )
+
+title.BackgroundTransparency = 1
+title.Text =
+    "TOKI LTM"
+
+title.TextColor3 =
+    Color3.fromRGB(
+        0,
+        220,
+        255
+    )
+
+title.Font =
+    Enum.Font.GothamBlack
+
+title.TextSize = 14
+
+title.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+title.ZIndex = 50
+
+subtitle =
+    Instance.new("TextLabel")
+
+subtitle.Parent =
+    header
+
+subtitle.Size =
+    UDim2.new(
+        0,
+        170,
+        0,
+        12
+    )
+
+subtitle.Position =
+    UDim2.new(
+        0,
+        27,
+        0,
+        24
+    )
+
+subtitle.BackgroundTransparency = 1
+subtitle.Text =
+    "HERRAMIENTAS LTM"
+
+subtitle.TextColor3 =
+    Color3.fromRGB(
+        60,
+        180,
+        255
+    )
+
+subtitle.Font =
+    Enum.Font.GothamBold
+
+subtitle.TextSize = 8
+
+subtitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+subtitle.ZIndex = 50
+
+minButton =
+    Instance.new("TextButton")
+
+minButton.Parent =
+    header
+
+minButton.Size =
+    UDim2.new(
+        0,
+        27,
+        0,
+        27
+    )
+
+minButton.Position =
+    UDim2.new(
+        1,
+        -36,
+        0,
+        9
+    )
+
+minButton.BackgroundColor3 =
+    Color3.fromRGB(
+        3,
+        42,
+        70
+    )
+
+minButton.BackgroundTransparency =
+    0.05
+
+minButton.BorderSizePixel = 0
+
+minButton.Text =
+    Config.Collapsed
+        and
+        "+"
+        or
+        "−"
+
+minButton.TextColor3 =
+    Color3.fromRGB(
+        0,
+        225,
+        255
+    )
+
+minButton.Font =
+    Enum.Font.GothamBlack
+
+minButton.TextSize = 17
+minButton.AutoButtonColor = false
+minButton.Active = true
+minButton.ZIndex = 100
+
+local minCorner =
+    Instance.new("UICorner")
+
+minCorner.CornerRadius =
+    UDim.new(
+        0,
+        12
+    )
+
+minCorner.Parent =
+    minButton
+
+minStroke =
+    Instance.new("UIStroke")
+
+minStroke.Thickness = 1
+minStroke.Transparency = 0.10
+minStroke.Parent =
+    minButton
+
+local statusPanel =
+    Instance.new("Frame")
+
+statusPanel.Parent =
+    main
+
+statusPanel.Size =
+    UDim2.new(
+        1,
+        -18,
+        0,
+        31
+    )
+
+statusPanel.Position =
+    UDim2.new(
+        0,
+        9,
+        0,
+        55
+    )
+
+statusPanel.BackgroundColor3 =
+    Color3.fromRGB(
+        3,
+        34,
+        20
+    )
+
+statusPanel.BorderSizePixel = 0
+statusPanel.ZIndex = 20
+
+local statusCorner =
+    Instance.new("UICorner")
+
+statusCorner.CornerRadius =
+    UDim.new(
+        0,
+        14
+    )
+
+statusCorner.Parent =
+    statusPanel
+
+local statusStroke =
+    Instance.new("UIStroke")
+
+statusStroke.Thickness = 1
+statusStroke.Transparency = 0.18
+statusStroke.Parent =
+    statusPanel
+
+local statusGlow =
+    Instance.new("Frame")
+
+statusGlow.Parent =
+    statusPanel
+
+statusGlow.Size =
+    UDim2.new(
+        0,
+        4,
+        1,
+        -12
+    )
+
+statusGlow.Position =
+    UDim2.new(
+        0,
+        5,
+        0,
+        6
+    )
+
+statusGlow.BackgroundColor3 =
+    Color3.fromRGB(
+        0,
+        220,
+        110
+    )
+
+statusGlow.BorderSizePixel = 0
+statusGlow.ZIndex = 25
+
+local statusGlowCorner =
+    Instance.new("UICorner")
+
+statusGlowCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+
+statusGlowCorner.Parent =
+    statusGlow
+
+statusDot =
+    Instance.new("Frame")
+
+statusDot.Parent =
+    statusPanel
+
+statusDot.Size =
+    UDim2.new(
+        0,
+        7,
+        0,
+        7
+    )
+
+statusDot.Position =
+    UDim2.new(
+        0,
+        15,
+        0.5,
+        -3
+    )
+
+statusDot.BackgroundColor3 =
+    Color3.fromRGB(
+        100,
+        120,
+        110
+    )
+
+statusDot.BorderSizePixel = 0
+statusDot.ZIndex = 30
+
+local statusDotCorner =
+    Instance.new("UICorner")
+
+statusDotCorner.CornerRadius =
+    UDim.new(
+        1,
+        0
+    )
+
+statusDotCorner.Parent =
+    statusDot
+
+statusTitle =
+    Instance.new("TextLabel")
+
+statusTitle.Parent =
+    statusPanel
+
+statusTitle.Size =
+    UDim2.new(
+        0,
+        55,
+        1,
+        0
+    )
+
+statusTitle.Position =
+    UDim2.new(
+        0,
+        29,
+        0,
+        0
+    )
+
+statusTitle.BackgroundTransparency = 1
+statusTitle.Text =
+    "ESTADO"
+
+statusTitle.TextColor3 =
+    Color3.fromRGB(
+        90,
+        210,
+        140
+    )
+
+statusTitle.Font =
+    Enum.Font.GothamBlack
+
+statusTitle.TextSize = 8
+
+statusTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+statusTitle.ZIndex = 30
+
+statusValue =
+    Instance.new("TextLabel")
+
+statusValue.Parent =
+    statusPanel
+
+statusValue.Size =
+    UDim2.new(
+        1,
+        -93,
+        1,
+        0
+    )
+
+statusValue.Position =
+    UDim2.new(
+        0,
+        82,
+        0,
+        0
+    )
+
+statusValue.BackgroundTransparency = 1
+statusValue.Text =
+    "Inactivo"
+
+statusValue.TextColor3 =
+    Color3.fromRGB(
+        145,
+        165,
+        155
+    )
+
+statusValue.Font =
+    Enum.Font.GothamBlack
+
+statusValue.TextSize = 8
+
+statusValue.TextXAlignment =
+    Enum.TextXAlignment.Right
+
+statusValue.TextTruncate =
+    Enum.TextTruncate.AtEnd
+
+statusValue.ZIndex = 30
+
+contentScroll =
+    Instance.new("ScrollingFrame")
+
+contentScroll.Parent =
+    main
+
+contentScroll.Size =
+    UDim2.new(
+        1,
+        -18,
+        1,
+        -103
+    )
+
+contentScroll.Position =
+    UDim2.new(
+        0,
+        9,
+        0,
+        94
+    )
+
+contentScroll.BackgroundTransparency = 1
+contentScroll.BorderSizePixel = 0
+
+contentScroll.CanvasSize =
+    UDim2.new(
+        0,
+        0,
+        0,
+        0
+    )
+
+contentScroll.AutomaticCanvasSize =
+    Enum.AutomaticSize.Y
+
+contentScroll.ScrollingDirection =
+    Enum.ScrollingDirection.Y
+
+contentScroll.ScrollingEnabled = true
+
+contentScroll.ScrollBarThickness = 2
+
+contentScroll.ScrollBarImageColor3 =
+    Color3.fromRGB(
+        0,
+        205,
+        255
+    )
+
+contentScroll.ScrollBarImageTransparency =
+    0.18
+
+contentScroll.ElasticBehavior =
+    Enum.ElasticBehavior.Always
+
+contentScroll.ZIndex = 15
+
+local listLayout =
+    Instance.new("UIListLayout")
+
+listLayout.Parent =
+    contentScroll
+
+listLayout.Padding =
+    UDim.new(
+        0,
+        7
+    )
+
+listLayout.HorizontalAlignment =
+    Enum.HorizontalAlignment.Center
+
+listLayout.SortOrder =
+    Enum.SortOrder.LayoutOrder
+
+local listPadding =
+    Instance.new("UIPadding")
+
+listPadding.Parent =
+    contentScroll
+
+listPadding.PaddingTop =
+    UDim.new(
+        0,
+        2
+    )
+
+listPadding.PaddingBottom =
+    UDim.new(
+        0,
+        8
+    )
+
+listPadding.PaddingLeft =
+    UDim.new(
+        0,
+        1
+    )
+
+listPadding.PaddingRight =
+    UDim.new(
+        0,
+        3
+    )
+
+local function createSectionLabel(
+    textValue,
+    order
+)
+    local section =
+        Instance.new("TextLabel")
+
+    section.Parent =
+        contentScroll
+
+    section.Size =
+        UDim2.new(
+            1,
+            -4,
+            0,
+            18
+        )
+
+    section.BackgroundTransparency = 1
+    section.Text =
+        textValue
+
+    section.TextColor3 =
+        Color3.fromRGB(
+            70,
+            195,
+            255
+        )
+
+    section.Font =
+        Enum.Font.GothamBlack
+
+    section.TextSize = 8
+
+    section.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    section.LayoutOrder =
+        order
+
+    section.ZIndex = 25
+
+    local line =
+        Instance.new("Frame")
+
+    line.Parent =
+        section
+
+    line.Size =
+        UDim2.new(
+            0,
+            65,
+            0,
+            1
+        )
+
+    line.Position =
+        UDim2.new(
+            0,
+            1,
+            1,
+            -2
+        )
+
+    line.BackgroundColor3 =
+        Color3.fromRGB(
+            0,
+            185,
+            255
+        )
+
+    line.BackgroundTransparency =
+        0.35
+
+    line.BorderSizePixel = 0
+    line.ZIndex = 26
+
+    return section
+end
+
+local function createToggle(
+    labelText,
+    order,
+    hasGear
+)
+    local panel =
+        Instance.new("Frame")
+
+    panel.Parent =
+        contentScroll
+
+    panel.Size =
+        UDim2.new(
+            1,
+            -4,
+            0,
+            51
+        )
+
+    panel.BackgroundColor3 =
+        Color3.fromRGB(
+            3,
+            19,
+            36
+        )
+
+    panel.BorderSizePixel = 0
+    panel.LayoutOrder =
+        order
+
+    panel.ZIndex = 20
+
+    local corner =
+        Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(
+            0,
+            15
+        )
+
+    corner.Parent =
+        panel
+
+    local stroke =
+        Instance.new("UIStroke")
+
+    stroke.Thickness = 1
+    stroke.Transparency = 0.42
+    stroke.Parent =
+        panel
+
+    local innerGlow =
+        Instance.new("Frame")
+
+    innerGlow.Parent =
+        panel
+
+    innerGlow.Size =
+        UDim2.new(
+            1,
+            -2,
+            0,
+            2
+        )
+
+    innerGlow.Position =
+        UDim2.new(
+            0,
+            1,
+            0,
+            1
+        )
+
+    innerGlow.BackgroundColor3 =
+        Color3.fromRGB(
+            0,
+            150,
+            255
+        )
+
+    innerGlow.BackgroundTransparency =
+        0.85
+
+    innerGlow.BorderSizePixel = 0
+    innerGlow.ZIndex = 21
+
+    local innerCorner =
+        Instance.new("UICorner")
+
+    innerCorner.CornerRadius =
+        UDim.new(
+            1,
+            0
+        )
+
+    innerCorner.Parent =
+        innerGlow
+
+    local icon =
+        Instance.new("Frame")
+
+    icon.Parent =
+        panel
+
+    icon.Size =
+        UDim2.new(
+            0,
+            30,
+            0,
+            30
+        )
+
+    icon.Position =
+        UDim2.new(
+            0,
+            10,
+            0.5,
+            -15
+        )
+
+    icon.BackgroundColor3 =
+        Color3.fromRGB(
+            3,
+            35,
+            58
+        )
+
+    icon.BorderSizePixel = 0
+    icon.ZIndex = 30
+
+    local iconCorner =
+        Instance.new("UICorner")
+
+    iconCorner.CornerRadius =
+        UDim.new(
+            0,
+            12
+        )
+
+    iconCorner.Parent =
+        icon
+
+    local iconStroke =
+        Instance.new("UIStroke")
+
+    iconStroke.Thickness = 1
+    iconStroke.Transparency = 0.25
+    iconStroke.Parent =
+        icon
+
+    local iconCore =
+        Instance.new("Frame")
+
+    iconCore.Parent =
+        icon
+
+    iconCore.Size =
+        UDim2.new(
+            0,
+            8,
+            0,
+            8
+        )
+
+    iconCore.Position =
+        UDim2.new(
+            0.5,
+            -4,
+            0.5,
+            -4
+        )
+
+    iconCore.BackgroundColor3 =
+        Color3.fromRGB(
+            0,
+            210,
+            255
+        )
+
+    iconCore.BorderSizePixel = 0
+    iconCore.ZIndex = 31
+
+    local iconCoreCorner =
+        Instance.new("UICorner")
+
+    iconCoreCorner.CornerRadius =
+        UDim.new(
+            1,
+            0
+        )
+
+    iconCoreCorner.Parent =
+        iconCore
+
+    local label =
+        Instance.new("TextLabel")
+
+    label.Parent =
+        panel
+
+    label.Size =
+        UDim2.new(
+            0,
+            105,
+            0,
+            20
+        )
+
+    label.Position =
+        UDim2.new(
+            0,
+            50,
+            0.5,
+            -10
+        )
+
+    label.BackgroundTransparency = 1
+    label.Text =
+        labelText
+
+    label.TextColor3 =
+        Color3.fromRGB(
+            0,
+            210,
+            255
+        )
+
+    label.Font =
+        Enum.Font.GothamBlack
+
+    label.TextSize = 10
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.ZIndex = 30
+
+    local clickArea =
+        Instance.new("TextButton")
+
+    clickArea.Parent =
+        panel
+
+    clickArea.Size =
+        UDim2.new(
+            0,
+            hasGear
+                and 145
+                or 175,
+            1,
+            0
+        )
+
+    clickArea.Position =
+        UDim2.new(
+            0,
+            0,
+            0,
+            0
+        )
+
+    clickArea.BackgroundTransparency = 1
+    clickArea.BorderSizePixel = 0
+    clickArea.Text = ""
+    clickArea.AutoButtonColor = false
+    clickArea.Active = true
+    clickArea.ZIndex = 40
+
+    local toggle =
+        Instance.new("TextButton")
+
+    toggle.Parent =
+        panel
+
+    toggle.Size =
+        UDim2.new(
+            0,
+            42,
+            0,
+            22
+        )
+
+    toggle.Position =
+        UDim2.new(
+            1,
+            -52,
+            0.5,
+            -11
+        )
+
+    toggle.BackgroundColor3 =
+        Color3.fromRGB(
+            6,
+            27,
+            44
+        )
+
+    toggle.BorderSizePixel = 0
+    toggle.Text = ""
+    toggle.AutoButtonColor = false
+    toggle.Active = true
+    toggle.ZIndex = 45
+
+    local toggleCorner =
+        Instance.new("UICorner")
+
+    toggleCorner.CornerRadius =
+        UDim.new(
+            1,
+            0
+        )
+
+    toggleCorner.Parent =
+        toggle
+
+    local toggleStroke =
+        Instance.new("UIStroke")
+
+    toggleStroke.Thickness = 1
+    toggleStroke.Transparency = 0.18
+    toggleStroke.Parent =
+        toggle
+
+    local knob =
+        Instance.new("Frame")
+
+    knob.Parent =
+        toggle
+
+    knob.Size =
+        UDim2.new(
+            0,
+            16,
+            0,
+            16
+        )
+
+    knob.Position =
+        UDim2.new(
+            0,
+            3,
+            0.5,
+            -8
+        )
+
+    knob.BackgroundColor3 =
+        Color3.fromRGB(
+            80,
+            135,
+            170
+        )
+
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 55
+
+    local knobCorner =
+        Instance.new("UICorner")
+
+    knobCorner.CornerRadius =
+        UDim.new(
+            1,
+            0
+        )
+
+    knobCorner.Parent =
+        knob
+
+    local knobGlow =
+        Instance.new("UIStroke")
+
+    knobGlow.Thickness = 1
+    knobGlow.Transparency = 0.5
+    knobGlow.Parent =
+        knob
+
+    local gear
+
+    if hasGear then
+        gear =
+            Instance.new("TextButton")
+
+        gear.Parent =
+            panel
+
+        gear.Size =
+            UDim2.new(
+                0,
+                30,
+                0,
+                30
+            )
+
+        gear.Position =
+            UDim2.new(
+                1,
+                -88,
+                0.5,
+                -15
+            )
+
+        gear.BackgroundColor3 =
+            Color3.fromRGB(
+                4,
+                34,
+                56
+            )
+
+        gear.BorderSizePixel = 0
+        gear.Text = "⚙"
+
+        gear.Font =
+            Enum.Font.GothamBlack
+
+        gear.TextSize = 15
+
+        gear.TextColor3 =
+            Color3.fromRGB(
+                0,
+                215,
+                255
+            )
+
+        gear.AutoButtonColor = false
+        gear.Active = true
+        gear.ZIndex = 50
+
+        local gearCorner =
+            Instance.new("UICorner")
+
+        gearCorner.CornerRadius =
+            UDim.new(
+                0,
+                12
+            )
+
+        gearCorner.Parent =
+            gear
+
+        local gearStroke =
+            Instance.new("UIStroke")
+
+        gearStroke.Thickness = 1
+        gearStroke.Transparency = 0.16
+        gearStroke.Parent =
+            gear
+    end
+
+    local object = {
+        Panel = panel,
+        Label = label,
+        ClickArea = clickArea,
+        ToggleButton = toggle,
+        ToggleStroke = toggleStroke,
+        Knob = knob,
+        KnobGlow = knobGlow,
+        Stroke = stroke,
+        Gear = gear,
+        InnerGlow = innerGlow,
+        Icon = icon,
+        IconStroke = iconStroke,
+        IconCore = iconCore
+    }
+
+    function object.Update(state)
+        local targetPosition
+
+        if state then
+            targetPosition =
+                UDim2.new(
+                    1,
+                    -19,
+                    0.5,
+                    -8
+                )
+        else
+            targetPosition =
+                UDim2.new(
+                    0,
+                    3,
+                    0.5,
+                    -8
+                )
+        end
+
+        playTween(
+            knob,
+            TweenInfo.new(
+                0.20,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Position =
+                    targetPosition
+            }
+        )
+
+        playTween(
+            toggle,
+            TweenInfo.new(
+                0.20,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            ),
+            {
+                BackgroundColor3 =
+                    state
+                    and
+                    Color3.fromRGB(
+                        0,
+                        82,
+                        128
+                    )
+                    or
+                    Color3.fromRGB(
+                        6,
+                        27,
+                        44
+                    )
+            }
+        )
+
+        playTween(
+            knob,
+            TweenInfo.new(
+                0.16,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            ),
+            {
+                BackgroundColor3 =
+                    state
+                    and
+                    Color3.fromRGB(
+                        0,
+                        230,
+                        255
+                    )
+                    or
+                    Color3.fromRGB(
+                        80,
+                        135,
+                        170
+                    )
+            }
+        )
+
+        toggleStroke.Transparency =
+            state
+            and 0.02
+            or 0.18
+
+        innerGlow.BackgroundTransparency =
+            state
+            and 0.55
+            or 0.85
+    end
+
+    table.insert(
+        panels,
+        object
+    )
+
+    return object
+end
+
+createSectionLabel(
+    "CONTROLES",
+    1
+)
+
+local jumpDownUI =
+    createToggle(
+        "JUMP DOWN",
+        2,
+        true
+    )
+
+local farmerUI =
+    createToggle(
+        "FARMER",
+        3,
+        false
+    )
+
+local holdJumpUI =
+    createToggle(
+        "HOLD JUMP",
+        4,
+        true
+    )
+
+local antiDieUI =
+    createToggle(
+        "ANTI DIE",
+        5,
+        false
+    )
+
+local antiRagdollUI =
+    createToggle(
+        "ANTI RAGDOLL",
+        6,
+        false
+    )
+
+createSectionLabel(
+    "INFORMACIÓN",
+    7
+)
+
+footer =
+    Instance.new("TextLabel")
+
+footer.Parent =
+    contentScroll
+
+footer.Size =
+    UDim2.new(
+        1,
+        -4,
+        0,
+        22
+    )
+
+footer.BackgroundTransparency = 1
+footer.Text =
+    "TOKITO • LTM"
+
+footer.TextColor3 =
+    Color3.fromRGB(
+        0,
+        190,
+        255
+    )
+
+footer.Font =
+    Enum.Font.GothamBlack
+
+footer.TextSize = 8
+
+footer.TextXAlignment =
+    Enum.TextXAlignment.Center
+
+footer.LayoutOrder = 8
+footer.ZIndex = 25
+
+local snowFolder =
+    Instance.new("Folder")
+
+snowFolder.Name =
+    "Copos"
+
+snowFolder.Parent =
+    main
+
+local function createSnowflake()
+    local flake =
+        Instance.new("Frame")
+
+    flake.Parent =
+        snowFolder
+
+    local size =
+        math.random(
+            9,
+            15
+        )
+
+    flake.Size =
+        UDim2.new(
+            0,
+            size,
+            0,
+            size
+        )
+
+    flake.Position =
+        UDim2.new(
+            math.random(),
+            0,
+            math.random(),
+            0
+        )
+
+    flake.BackgroundTransparency = 1
+    flake.BorderSizePixel = 0
+    flake.ZIndex = 4
+
+    for angle = 0, 120, 60 do
+        local arm =
+            Instance.new("Frame")
+
+        arm.Parent =
+            flake
+
+        arm.AnchorPoint =
+            Vector2.new(
+                0.5,
+                0.5
+            )
+
+        arm.Position =
+            UDim2.new(
+                0.5,
+                0,
+                0.5,
+                0
+            )
+
+        arm.Size =
+            UDim2.new(
+                0,
+                1,
+                0,
+                math.random(
+                    8,
+                    12
+                )
+            )
+
+        arm.BackgroundColor3 =
+            Color3.fromRGB(
+                0,
+                195,
+                255
+            )
+
+        arm.BackgroundTransparency =
+            math.random(
+                10,
+                38
+            )
+            / 100
+
+        arm.BorderSizePixel = 0
+        arm.Rotation = angle
+        arm.ZIndex = 5
+    end
+
+    return {
+        Object = flake,
+
+        Speed =
+            0.025 +
+            math.random()
+            *
+            0.055,
+
+        Drift =
+            math.random(
+                -20,
+                20
+            )
+            /
+            10000,
+
+        Phase =
+            math.random()
+            *
+            math.pi
+            *
+            2,
+
+        RotationSpeed =
+            math.random(
+                25,
+                70
+            )
+    }
+end
+
+for _ = 1, 24 do
+    table.insert(
+        snowflakes,
+        createSnowflake()
+    )
+end
+
+local function updateStatus()
+    if not statusValue then
+        return
+    end
+
+    local anyActive =
+        Config.JumpDown
+        or
+        Config.Farmer
+        or
+        Config.HoldJump
+        or
+        Config.AntiDie
+        or
+        Config.AntiRagdoll
+
+    if anyActive then
+        statusValue.Text =
+            "Activo"
+
+        statusValue.TextColor3 =
+            Color3.fromRGB(
+                80,
+                235,
+                135
+            )
+
+        statusDot.BackgroundColor3 =
+            Color3.fromRGB(
+                40,
+                230,
+                100
+            )
+
+        statusPanel.BackgroundColor3 =
+            Color3.fromRGB(
+                3,
+                34,
+                20
+            )
+
+        statusGlow.BackgroundColor3 =
+            Color3.fromRGB(
+                40,
+                230,
+                100
+            )
+
+        statusTitle.TextColor3 =
+            Color3.fromRGB(
+                90,
+                220,
+                135
+            )
+
+        statusStroke.Color =
+            Color3.fromRGB(
+                45,
+                190,
+                95
+            )
+    else
+        statusValue.Text =
+            "Inactivo"
+
+        statusValue.TextColor3 =
+            Color3.fromRGB(
+                145,
+                165,
+                155
+            )
+
+        statusDot.BackgroundColor3 =
+            Color3.fromRGB(
+                100,
+                120,
+                110
+            )
+
+        statusPanel.BackgroundColor3 =
+            Color3.fromRGB(
+                12,
+                25,
+                22
+            )
+
+        statusGlow.BackgroundColor3 =
+            Color3.fromRGB(
+                80,
+                120,
+                95
+            )
+
+        statusTitle.TextColor3 =
+            Color3.fromRGB(
+                120,
+                160,
+                140
+            )
+
+        statusStroke.Color =
+            Color3.fromRGB(
+                70,
+                100,
+                85
+            )
+    end
+end
+
+local function toggleJumpDown()
+    Config.JumpDown =
+        not Config.JumpDown
+
+    if Config.JumpDown then
+        Config.Farmer = false
+
+        farmerPosition = nil
+        farmerRotation = nil
+
+        jumpDownAnchorCFrame = nil
+        jumpDownManualMoving = false
+
+        captureJumpDownAnchor()
+
+        farmerUI.Update(false)
+
+        startJumpDown()
+    else
+        jumpDownAnchorCFrame = nil
+        jumpDownManualMoving = false
+    end
+
+    jumpDownUI.Update(
+        Config.JumpDown
+    )
+
+    updateStatus()
+    saveConfig()
+end
+
+local function toggleFarmer()
+    Config.Farmer =
+        not Config.Farmer
+
+    if Config.Farmer then
+        Config.JumpDown = false
+
+        jumpDownAnchorCFrame = nil
+        jumpDownManualMoving = false
+
+        jumpDownUI.Update(false)
+
+        startFarmer()
+    else
+        stopFarmer()
+    end
+
+    farmerUI.Update(
+        Config.Farmer
+    )
+
+    updateStatus()
+    saveConfig()
+end
+
+local function toggleHoldJump()
+    Config.HoldJump =
+        not Config.HoldJump
+
+    holdJumpUI.Update(
+        Config.HoldJump
+    )
+
+    updateStatus()
+    saveConfig()
+end
+
+local function toggleAntiDie()
+    Config.AntiDie =
+        not Config.AntiDie
+
+    if Config.AntiDie then
+        startAntiDie()
+    else
+        stopAntiDie()
+    end
+
+    antiDieUI.Update(
+        Config.AntiDie
+    )
+
+    updateStatus()
+    saveConfig()
+end
+
+local function toggleAntiRagdoll()
+    Config.AntiRagdoll =
+        not Config.AntiRagdoll
+
+    if Config.AntiRagdoll then
+        startAntiRagdoll()
+    else
+        stopAntiRagdoll()
+    end
+
+    antiRagdollUI.Update(
+        Config.AntiRagdoll
+    )
+
+    updateStatus()
+    saveConfig()
+end
+
+addConnection(
+    jumpDownUI.ClickArea.Activated,
+    toggleJumpDown
+)
+
+addConnection(
+    jumpDownUI.ToggleButton.Activated,
+    toggleJumpDown
+)
+
+addConnection(
+    farmerUI.ClickArea.Activated,
+    toggleFarmer
+)
+
+addConnection(
+    farmerUI.ToggleButton.Activated,
+    toggleFarmer
+)
+
+addConnection(
+    holdJumpUI.ClickArea.Activated,
+    toggleHoldJump
+)
+
+addConnection(
+    holdJumpUI.ToggleButton.Activated,
+    toggleHoldJump
+)
+
+addConnection(
+    antiDieUI.ClickArea.Activated,
+    toggleAntiDie
+)
+
+addConnection(
+    antiDieUI.ToggleButton.Activated,
+    toggleAntiDie
+)
+
+addConnection(
+    antiRagdollUI.ClickArea.Activated,
+    toggleAntiRagdoll
+)
+
+addConnection(
+    antiRagdollUI.ToggleButton.Activated,
+    toggleAntiRagdoll
+)
+
+local dragHandle =
+    Instance.new("Frame")
+
+dragHandle.Parent =
+    header
+
+dragHandle.Size =
+    UDim2.new(
+        1,
+        -72,
+        1,
+        0
+    )
+
+dragHandle.BackgroundTransparency = 1
+dragHandle.Active = true
+dragHandle.ZIndex = 60
+
+local dragging = false
+local dragStart
+local dragStartPosition
+
+addConnection(
+    dragHandle.InputBegan,
+    function(input)
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+            dragging = true
+            dragStart = input.Position
+            dragStartPosition =
+                main.Position
+        end
+    end
+)
+
+addConnection(
+    UIS.InputChanged,
+    function(input)
+        if not dragging then
+            return
+        end
+
+        if input.UserInputType ~=
+            Enum.UserInputType.MouseMovement
+            and
+            input.UserInputType ~=
+            Enum.UserInputType.Touch
+        then
+            return
+        end
+
+        local delta =
+            input.Position -
+            dragStart
+
+        main.Position =
+            UDim2.new(
+                dragStartPosition.X.Scale,
+                dragStartPosition.X.Offset +
+                    delta.X,
+
+                dragStartPosition.Y.Scale,
+                dragStartPosition.Y.Offset +
+                    delta.Y
+            )
+    end
+)
+
+addConnection(
+    UIS.InputEnded,
+    function(input)
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+            if dragging then
+                Config.Position = {
+                    XScale =
+                        main.Position.X.Scale,
+
+                    XOffset =
+                        main.Position.X.Offset,
+
+                    YScale =
+                        main.Position.Y.Scale,
+
+                    YOffset =
+                        main.Position.Y.Offset
+                }
+
+                saveConfig()
+            end
+
+            dragging = false
+        end
+    end
+)
+
+addConnection(
+    minButton.Activated,
+    function()
+        Config.Collapsed =
+            not Config.Collapsed
+
+        minButton.Text =
+            Config.Collapsed
+            and
+            "+"
+            or
+            "−"
+
+        if Config.Collapsed then
+            settingsVisible = false
+
+            if settingsGui then
+                settingsGui.Enabled =
+                    false
+            end
+        end
+
+        playTween(
+            main,
+            TweenInfo.new(
+                0.30,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.InOut
+            ),
+            {
+                Size =
+                    UDim2.new(
+                        0,
+                        GUI_WIDTH,
+                        0,
+                        Config.Collapsed
+                            and
+                            COLLAPSED_HEIGHT
+                            or
+                            GUI_HEIGHT
+                    )
+            }
+        )
+
+        saveConfig()
+    end
+)
+
+local mainScale =
+    Instance.new("UIScale")
+
+mainScale.Scale =
+    Config.Collapsed
+    and
+    1
+    or
+    0.94
+
+mainScale.Parent =
+    main
+
+task.defer(function()
+    playTween(
+        mainScale,
+        TweenInfo.new(
+            0.45,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.Out
+        ),
+        {
+            Scale = 1
+        }
+    )
+end)
+
+for index, panel in ipairs(
+    panels
+) do
+    panel.Panel.BackgroundTransparency =
+        1
+
+    panel.Label.TextTransparency =
+        1
+
+    panel.Panel.Position =
+        UDim2.new(
+            0.03,
+            0,
+            0,
+            0
+        )
+
+    task.delay(
+        0.04 * index,
+        function()
+            if _G.TokiLTM_Stop then
+                return
+            end
+
+            playTween(
+                panel.Panel,
+                TweenInfo.new(
+                    0.35,
+                    Enum.EasingStyle.Quint,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    BackgroundTransparency = 0,
+
+                    Position =
+                        UDim2.new(
+                            0,
+                            0,
+                            0,
+                            0
+                        )
+                }
+            )
+
+            playTween(
+                panel.Label,
+                TweenInfo.new(
+                    0.28,
+                    Enum.EasingStyle.Quad,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    TextTransparency = 0
+                }
+            )
+        end
+    )
+end
+
+settingsGui =
+    Instance.new("ScreenGui")
+
+settingsGui.Name =
+    "TokiLTM_SettingsGUI"
+
+settingsGui.ResetOnSpawn = false
+settingsGui.IgnoreGuiInset = true
+settingsGui.DisplayOrder = 10000
+
+settingsGui.ZIndexBehavior =
+    Enum.ZIndexBehavior.Sibling
+
+settingsGui.Enabled = false
+settingsGui.Parent =
+    rootParent
+
+_G.TokiLTM_SettingsGUI =
+    settingsGui
+
+settingsWindow =
+    Instance.new("Frame")
+
+settingsWindow.Parent =
+    settingsGui
+
+settingsWindow.Size =
+    UDim2.new(
+        0,
+        265,
+        0,
+        350
+    )
+
+settingsWindow.Position =
+    UDim2.new(
+        0.5,
+        -132,
+        0.5,
+        -175
+    )
+
+settingsWindow.BackgroundColor3 =
+    Color3.fromRGB(
+        2,
+        11,
+        25
+    )
+
+settingsWindow.BorderSizePixel = 0
+settingsWindow.Active = true
+settingsWindow.ZIndex = 200
+
+local settingsCorner =
+    Instance.new("UICorner")
+
+settingsCorner.CornerRadius =
+    UDim.new(
+        0,
+        21
+    )
+
+settingsCorner.Parent =
+    settingsWindow
+
+settingsStroke =
+    Instance.new("UIStroke")
+
+settingsStroke.Thickness = 1.8
+settingsStroke.Transparency = 0.04
+settingsStroke.Parent =
+    settingsWindow
+
+local settingsGradient =
+    Instance.new("UIGradient")
+
+settingsGradient.Rotation = 110
+
+settingsGradient.Color =
+    ColorSequence.new({
+        ColorSequenceKeypoint.new(
+            0,
+            Color3.fromRGB(
+                4,
+                35,
+                63
+            )
+        ),
+
+        ColorSequenceKeypoint.new(
+            0.5,
+            Color3.fromRGB(
+                2,
+                15,
+                32
+            )
+        ),
+
+        ColorSequenceKeypoint.new(
+            1,
+            Color3.fromRGB(
+                0,
+                5,
+                14
+            )
+        )
+    })
+
+settingsGradient.Parent =
+    settingsWindow
+
+local settingsScale =
+    Instance.new("UIScale")
+
+settingsScale.Scale = 1
+settingsScale.Parent =
+    settingsWindow
+
+local settingsHeader =
+    Instance.new("Frame")
+
+settingsHeader.Parent =
+    settingsWindow
+
+settingsHeader.Size =
+    UDim2.new(
+        1,
+        -50,
+        0,
+        45
+    )
+
+settingsHeader.BackgroundTransparency = 1
+settingsHeader.Active = true
+settingsHeader.ZIndex = 210
+
+local settingsTitle =
+    Instance.new("TextLabel")
+
+settingsTitle.Parent =
+    settingsHeader
+
+settingsTitle.Size =
+    UDim2.new(
+        1,
+        -12,
+        1,
+        0
+    )
+
+settingsTitle.Position =
+    UDim2.new(
+        0,
+        13,
+        0,
+        0
+    )
+
+settingsTitle.BackgroundTransparency = 1
+
+settingsTitle.Text =
+    "AJUSTES DE TOKITO"
+
+settingsTitle.Font =
+    Enum.Font.GothamBlack
+
+settingsTitle.TextSize = 11
+
+settingsTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+settingsTitle.TextColor3 =
+    Color3.fromRGB(
+        0,
+        220,
+        255
+    )
+
+settingsTitle.ZIndex = 220
+
+local closeSettings =
+    Instance.new("TextButton")
+
+closeSettings.Parent =
+    settingsWindow
+
+closeSettings.Size =
+    UDim2.new(
+        0,
+        28,
+        0,
+        28
+    )
+
+closeSettings.Position =
+    UDim2.new(
+        1,
+        -37,
+        0,
+        8
+    )
+
+closeSettings.BackgroundColor3 =
+    Color3.fromRGB(
+        4,
+        37,
+        61
+    )
+
+closeSettings.BorderSizePixel = 0
+closeSettings.Text = "×"
+
+closeSettings.Font =
+    Enum.Font.GothamBlack
+
+closeSettings.TextSize = 17
+
+closeSettings.TextColor3 =
+    Color3.fromRGB(
+        0,
+        220,
+        255
+    )
+
+closeSettings.AutoButtonColor = false
+closeSettings.Active = true
+closeSettings.ZIndex = 250
+
+local closeCorner =
+    Instance.new("UICorner")
+
+closeCorner.CornerRadius =
+    UDim.new(
+        0,
+        12
+    )
+
+closeCorner.Parent =
+    closeSettings
+
+local settingsScroll =
+    Instance.new("ScrollingFrame")
+
+settingsScroll.Parent =
+    settingsWindow
+
+settingsScroll.Size =
+    UDim2.new(
+        1,
+        -20,
+        1,
+        -102
+    )
+
+settingsScroll.Position =
+    UDim2.new(
+        0,
+        10,
+        0,
+        50
+    )
+
+settingsScroll.BackgroundTransparency = 1
+settingsScroll.BorderSizePixel = 0
+
+settingsScroll.AutomaticCanvasSize =
+    Enum.AutomaticSize.Y
+
+settingsScroll.CanvasSize =
+    UDim2.new(
+        0,
+        0,
+        0,
+        0
+    )
+
+settingsScroll.ScrollingDirection =
+    Enum.ScrollingDirection.Y
+
+settingsScroll.ScrollBarThickness = 2
+
+settingsScroll.ScrollBarImageColor3 =
+    Color3.fromRGB(
+        0,
+        210,
+        255
+    )
+
+settingsScroll.ScrollBarImageTransparency =
+    0.15
+
+settingsScroll.ElasticBehavior =
+    Enum.ElasticBehavior.Always
+
+settingsScroll.ZIndex = 215
+
+local settingsLayout =
+    Instance.new("UIListLayout")
+
+settingsLayout.Parent =
+    settingsScroll
+
+settingsLayout.SortOrder =
+    Enum.SortOrder.LayoutOrder
+
+settingsLayout.Padding =
+    UDim.new(
+        0,
+        6
+    )
+
+local settingsPadding =
+    Instance.new("UIPadding")
+
+settingsPadding.Parent =
+    settingsScroll
+
+settingsPadding.PaddingBottom =
+    UDim.new(
+        0,
+        7
+    )
+
+local function createSettingRow(
+    labelText,
+    key,
+    minValue,
+    maxValue,
+    decimals,
+    order
+)
+    local row =
+        Instance.new("Frame")
+
+    row.Parent =
+        settingsScroll
+
+    row.Size =
+        UDim2.new(
+            1,
+            -3,
+            0,
+            44
+        )
+
+    row.BackgroundColor3 =
+        Color3.fromRGB(
+            3,
+            22,
+            40
+        )
+
+    row.BorderSizePixel = 0
+    row.LayoutOrder = order
+    row.ZIndex = 220
+
+    local corner =
+        Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(
+            0,
+            13
+        )
+
+    corner.Parent =
+        row
+
+    local stroke =
+        Instance.new("UIStroke")
+
+    stroke.Thickness = 1
+    stroke.Transparency = 0.40
+    stroke.Parent =
+        row
+
+    local label =
+        Instance.new("TextLabel")
+
+    label.Parent =
+        row
+
+    label.Size =
+        UDim2.new(
+            1,
+            -105,
+            1,
+            0
+        )
+
+    label.Position =
+        UDim2.new(
+            0,
+            10,
+            0,
+            0
+        )
+
+    label.BackgroundTransparency = 1
+    label.Text =
+        labelText
+
+    label.Font =
+        Enum.Font.GothamBold
+
+    label.TextSize = 8
+
+    label.TextColor3 =
+        Color3.fromRGB(
+            80,
+            195,
+            245
+        )
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.ZIndex = 230
+
+    local input =
+        Instance.new("TextBox")
+
+    input.Parent =
+        row
+
+    input.Size =
+        UDim2.new(
+            0,
+            78,
+            0,
+            29
+        )
+
+    input.Position =
+        UDim2.new(
+            1,
+            -88,
+            0.5,
+            -14.5
+        )
+
+    input.BackgroundColor3 =
+        Color3.fromRGB(
+            1,
+            10,
+            21
+        )
+
+    input.BorderSizePixel = 0
+
+    input.ClearTextOnFocus = false
+
+    input.TextColor3 =
+        Color3.fromRGB(
+            0,
+            220,
+            255
+        )
+
+    input.Font =
+        Enum.Font.GothamBlack
+
+    input.TextSize = 9
+
+    input.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    input.Active = true
+    input.ZIndex = 235
+
+    local inputCorner =
+        Instance.new("UICorner")
+
+    inputCorner.CornerRadius =
+        UDim.new(
+            0,
+            11
+        )
+
+    inputCorner.Parent =
+        input
+
+    local inputStroke =
+        Instance.new("UIStroke")
+
+    inputStroke.Thickness = 1
+    inputStroke.Transparency = 0.22
+    inputStroke.Parent =
+        input
+
+    local function setText(value)
+        if decimals == 0 then
+            input.Text =
+                tostring(
+                    math.floor(
+                        value + 0.5
+                    )
+                )
+        else
+            input.Text =
+                string.format(
+                    "%."
+                    ..
+                    decimals
+                    ..
+                    "f",
+                    value
+                )
+        end
+    end
+
+    local function apply()
+        local fallback =
+            tonumber(
+                Config.JumpDownSettings[key]
+            )
+            or
+            DEFAULT_JUMP_SETTINGS[key]
+
+        local value =
+            tonumber(
+                input.Text
+            )
+
+        if not value then
+            value = fallback
+        end
+
+        value =
+            math.clamp(
+                value,
+                minValue,
+                maxValue
+            )
+
+        Config.JumpDownSettings[key] =
+            value
+
+        setText(value)
+    end
+
+    setText(
+        tonumber(
+            Config.JumpDownSettings[key]
+        )
+        or
+        DEFAULT_JUMP_SETTINGS[key]
+    )
+
+    addConnection(
+        input.FocusLost,
+        function()
+            apply()
+            saveConfig()
+        end
+    )
+
+    table.insert(
+        settingsRows,
+        {
+            General = false,
+            Key = key,
+            Input = input,
+            Label = label,
+            Stroke = stroke,
+            InputStroke = inputStroke,
+            Row = row,
+            Apply = apply,
+            SetText = setText
+        }
+    )
+
+    return row
+end
+
+local function createHoldSpeedRow(
+    order
+)
+    local row =
+        Instance.new("Frame")
+
+    row.Parent =
+        settingsScroll
+
+    row.Size =
+        UDim2.new(
+            1,
+            -3,
+            0,
+            44
+        )
+
+    row.BackgroundColor3 =
+        Color3.fromRGB(
+            3,
+            22,
+            40
+        )
+
+    row.BorderSizePixel = 0
+    row.LayoutOrder = order
+    row.ZIndex = 220
+
+    local corner =
+        Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(
+            0,
+            13
+        )
+
+    corner.Parent =
+        row
+
+    local stroke =
+        Instance.new("UIStroke")
+
+    stroke.Thickness = 1
+    stroke.Transparency = 0.40
+    stroke.Parent =
+        row
+
+    local label =
+        Instance.new("TextLabel")
+
+    label.Parent =
+        row
+
+    label.Size =
+        UDim2.new(
+            1,
+            -105,
+            1,
+            0
+        )
+
+    label.Position =
+        UDim2.new(
+            0,
+            10,
+            0,
+            0
+        )
+
+    label.BackgroundTransparency = 1
+
+    label.Text =
+        "UP SPEED"
+
+    label.Font =
+        Enum.Font.GothamBold
+
+    label.TextSize = 8
+
+    label.TextColor3 =
+        Color3.fromRGB(
+            80,
+            195,
+            245
+        )
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.ZIndex = 230
+
+    local input =
+        Instance.new("TextBox")
+
+    input.Parent =
+        row
+
+    input.Size =
+        UDim2.new(
+            0,
+            78,
+            0,
+            29
+        )
+
+    input.Position =
+        UDim2.new(
+            1,
+            -88,
+            0.5,
+            -14.5
+        )
+
+    input.BackgroundColor3 =
+        Color3.fromRGB(
+            1,
+            10,
+            21
+        )
+
+    input.BorderSizePixel = 0
+
+    input.ClearTextOnFocus = false
+
+    input.Text =
+        tostring(
+            math.floor(
+                (
+                    tonumber(
+                        Config.HoldJumpSpeed
+                    )
+                    or
+                    DEFAULT_HOLD_JUMP_SPEED
+                )
+                + 0.5
+            )
+        )
+
+    input.TextColor3 =
+        Color3.fromRGB(
+            0,
+            220,
+            255
+        )
+
+    input.Font =
+        Enum.Font.GothamBlack
+
+    input.TextSize = 9
+
+    input.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    input.Active = true
+    input.ZIndex = 235
+
+    local inputCorner =
+        Instance.new("UICorner")
+
+    inputCorner.CornerRadius =
+        UDim.new(
+            0,
+            11
+        )
+
+    inputCorner.Parent =
+        input
+
+    local inputStroke =
+        Instance.new("UIStroke")
+
+    inputStroke.Thickness = 1
+    inputStroke.Transparency = 0.22
+    inputStroke.Parent =
+        input
+
+    local function apply()
+        local value =
+            tonumber(
+                input.Text
+            )
+
+        if not value then
+            value =
+                DEFAULT_HOLD_JUMP_SPEED
+        end
+
+        value =
+            math.max(
+                0,
+                value
+            )
+
+        Config.HoldJumpSpeed =
+            value
+
+        input.Text =
+            tostring(
+                math.floor(
+                    value + 0.5
+                )
+            )
+    end
+
+    local function setText(value)
+        input.Text =
+            tostring(
+                math.floor(
+                    (
+                        tonumber(value)
+                        or
+                        DEFAULT_HOLD_JUMP_SPEED
+                    )
+                    + 0.5
+                )
+            )
+    end
+
+    addConnection(
+        input.FocusLost,
+        function()
+            apply()
+            saveConfig()
+        end
+    )
+
+    table.insert(
+        settingsRows,
+        {
+            General = true,
+            Key = "HoldJumpSpeed",
+            Input = input,
+            Label = label,
+            Stroke = stroke,
+            InputStroke = inputStroke,
+            Row = row,
+            Apply = apply,
+            SetText = setText
+        }
+    )
+
+    return row
+end
+
+createSettingRow(
+    "ALTURA",
+    "Height",
+    1,
+    25,
+    1,
+    1
+)
+
+createSettingRow(
+    "VELOCIDAD DE SUBIDA",
+    "UpSpeed",
+    5,
+    100,
+    0,
+    2
+)
+
+createSettingRow(
+    "VELOCIDAD DE CAÍDA",
+    "FallSpeed",
+    50,
+    600,
+    0,
+    3
+)
+
+createSettingRow(
+    "TIEMPO DE SUBIDA",
+    "UpTime",
+    0.05,
+    0.5,
+    2,
+    4
+)
+
+createSettingRow(
+    "CAÍDA MÁXIMA",
+    "MaxFallTime",
+    0.2,
+    2,
+    2,
+    5
+)
+
+createHoldSpeedRow(
+    6
+)
+
+local function updateSettingsRows()
+    for _, rowData in ipairs(
+        settingsRows
+    ) do
+        local shouldShow =
+            (
+                currentSettingsMode ==
+                "HOLD_JUMP"
+                and
+                rowData.General
+            )
+            or
+            (
+                currentSettingsMode ==
+                "JUMP_DOWN"
+                and
+                not rowData.General
+            )
+
+        rowData.Row.Visible =
+            shouldShow
+    end
+end
+
+updateSettingsRows()
+
+local resetButton =
+    Instance.new("TextButton")
+
+resetButton.Parent =
+    settingsWindow
+
+resetButton.Size =
+    UDim2.new(
+        0,
+        112,
+        0,
+        31
+    )
+
+resetButton.Position =
+    UDim2.new(
+        0,
+        10,
+        1,
+        -42
+    )
+
+resetButton.BackgroundColor3 =
+    Color3.fromRGB(
+        3,
+        39,
+        64
+    )
+
+resetButton.BorderSizePixel = 0
+resetButton.Text =
+    "RESTAURAR"
+
+resetButton.Font =
+    Enum.Font.GothamBlack
+
+resetButton.TextSize = 8
+
+resetButton.TextColor3 =
+    Color3.fromRGB(
+        0,
+        215,
+        255
+    )
+
+resetButton.AutoButtonColor = false
+resetButton.Active = true
+resetButton.ZIndex = 245
+
+local resetCorner =
+    Instance.new("UICorner")
+
+resetCorner.CornerRadius =
+    UDim.new(
+        0,
+        11
+    )
+
+resetCorner.Parent =
+    resetButton
+
+local applyButton =
+    Instance.new("TextButton")
+
+applyButton.Parent =
+    settingsWindow
+
+applyButton.Size =
+    UDim2.new(
+        0,
+        112,
+        0,
+        31
+    )
+
+applyButton.Position =
+    UDim2.new(
+        1,
+        -122,
+        1,
+        -42
+    )
+
+applyButton.BackgroundColor3 =
+    Color3.fromRGB(
+        0,
+        80,
+        125
+    )
+
+applyButton.BorderSizePixel = 0
+applyButton.Text =
+    "APLICAR"
+
+applyButton.Font =
+    Enum.Font.GothamBlack
+
+applyButton.TextSize = 8
+
+applyButton.TextColor3 =
+    Color3.fromRGB(
+        0,
+        230,
+        255
+    )
+
+applyButton.AutoButtonColor = false
+applyButton.Active = true
+applyButton.ZIndex = 245
+
+local applyCorner =
+    Instance.new("UICorner")
+
+applyCorner.CornerRadius =
+    UDim.new(
+        0,
+        11
+    )
+
+applyCorner.Parent =
+    applyButton
+
+local settingsDragging = false
+local settingsDragStart
+local settingsStartPosition
+
+addConnection(
+    settingsHeader.InputBegan,
+    function(input)
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+            settingsDragging = true
+
+            settingsDragStart =
+                input.Position
+
+            settingsStartPosition =
+                settingsWindow.Position
+        end
+    end
+)
+
+addConnection(
+    UIS.InputChanged,
+    function(input)
+        if not settingsDragging then
+            return
+        end
+
+        if input.UserInputType ~=
+            Enum.UserInputType.MouseMovement
+            and
+            input.UserInputType ~=
+            Enum.UserInputType.Touch
+        then
+            return
+        end
+
+        local delta =
+            input.Position -
+            settingsDragStart
+
+        settingsWindow.Position =
+            UDim2.new(
+                settingsStartPosition.X.Scale,
+                settingsStartPosition.X.Offset +
+                    delta.X,
+
+                settingsStartPosition.Y.Scale,
+                settingsStartPosition.Y.Offset +
+                    delta.Y
+            )
+    end
+)
+
+addConnection(
+    UIS.InputEnded,
+    function(input)
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+            settingsDragging = false
+        end
+    end
+)
+
+local function positionSettings()
+    local camera =
+        workspace.CurrentCamera
+
+    if not camera then
+        return
+    end
+
+    local viewport =
+        camera.ViewportSize
+
+    local mainPosition =
+        main.AbsolutePosition
+
+    local mainSize =
+        main.AbsoluteSize
+
+    local settingsSize =
+        settingsWindow.AbsoluteSize
+
+    local x =
+        mainPosition.X +
+        mainSize.X +
+        9
+
+    local y =
+        mainPosition.Y
+
+    if
+        x +
+        settingsSize.X >
+        viewport.X - 8
+    then
+        x =
+            mainPosition.X -
+            settingsSize.X -
+            9
+    end
+
+    if x < 8 then
+        x = 8
+    end
+
+    if
+        y +
+        settingsSize.Y >
+        viewport.Y - 8
+    then
+        y =
+            viewport.Y -
+            settingsSize.Y -
+            8
+    end
+
+    if y < 8 then
+        y = 8
+    end
+
+    settingsWindow.Position =
+        UDim2.new(
+            0,
+            math.floor(x),
+            0,
+            math.floor(y)
+        )
+end
+
+local function setSettingsVisible(
+    state
+)
+    settingsVisible =
+        state
+
+    if state then
+        settingsGui.Enabled =
+            true
+
+        settingsScale.Scale =
+            0.90
+
+        task.defer(
+            positionSettings
+        )
+
+        playTween(
+            settingsScale,
+            TweenInfo.new(
+                0.28,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Scale = 1
+            }
+        )
+    else
+        playTween(
+            settingsScale,
+            TweenInfo.new(
+                0.18,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.In
+            ),
+            {
+                Scale = 0.94
+            }
+        )
+
+        task.delay(
+            0.18,
+            function()
+                if
+                    not settingsVisible
+                then
+                    settingsGui.Enabled =
+                        false
+
+                    settingsScale.Scale =
+                        1
+                end
+            end
+        )
+    end
+end
+
+addConnection(
+    jumpDownUI.Gear.Activated,
+    function()
+        currentSettingsMode =
+            "JUMP_DOWN"
+
+        settingsTitle.Text =
+            "AJUSTES DE JUMP DOWN"
+
+        updateSettingsRows()
+
+        setSettingsVisible(
+            not settingsVisible
+        )
+    end
+)
+
+addConnection(
+    holdJumpUI.Gear.Activated,
+    function()
+        currentSettingsMode =
+            "HOLD_JUMP"
+
+        settingsTitle.Text =
+            "AJUSTES DE HOLD JUMP"
+
+        updateSettingsRows()
+
+        setSettingsVisible(
+            not settingsVisible
+        )
+    end
+)
+
+addConnection(
+    closeSettings.Activated,
+    function()
+        setSettingsVisible(false)
+    end
+)
+
+addConnection(
+    resetButton.Activated,
+    function()
+        if currentSettingsMode ==
+            "HOLD_JUMP"
+        then
+            Config.HoldJumpSpeed =
+                DEFAULT_HOLD_JUMP_SPEED
+
+            for _, row in ipairs(
+                settingsRows
+            ) do
+                if row.General then
+                    row.SetText(
+                        DEFAULT_HOLD_JUMP_SPEED
+                    )
+                end
+            end
+        else
+            Config.JumpDownSettings =
+                defaultJumpSettings()
+
+            for _, row in ipairs(
+                settingsRows
+            ) do
+                if not row.General then
+                    row.SetText(
+                        Config.JumpDownSettings[
+                            row.Key
+                        ]
+                    )
+                end
+            end
+        end
+
+        saveConfig()
+    end
+)
+
+addConnection(
+    applyButton.Activated,
+    function()
+        for _, row in ipairs(
+            settingsRows
+        ) do
+            local shouldApply =
+                (
+                    currentSettingsMode ==
+                    "HOLD_JUMP"
+                    and
+                    row.General
+                )
+                or
+                (
+                    currentSettingsMode ==
+                    "JUMP_DOWN"
+                    and
+                    not row.General
+                )
+
+            if shouldApply then
+                row.Apply()
+            end
+        end
+
+        saveConfig()
+
+        setSettingsVisible(false)
+    end
+)
+
+addConnection(
+    RunService.Heartbeat,
+    function()
+        if _G.TokiLTM_Stop then
+            return
+        end
+
+        if Config.JumpDown then
+            correctExternalDisplacement()
+        end
+
+        if antiRagdollRunning then
+            protectRagdoll(
+                getCharacter()
+            )
+        end
+
+        if antiDieRunning then
+            local hum =
+                getHumanoid()
+
+            if hum then
+                pcall(function()
+                    if hum.Health <
+                        hum.MaxHealth
+                    then
+                        hum.Health =
+                            hum.MaxHealth
+                    end
+                end)
+            end
+        end
+
+        if Config.HoldJump then
+            local hum =
+                getHumanoid()
+
+            local root =
+                getRoot()
+
+            if
+                hum
+                and
+                root
+                and
+                hum.Jump
+            then
+                local speed =
+                    tonumber(
+                        Config.HoldJumpSpeed
+                    )
+                    or
+                    DEFAULT_HOLD_JUMP_SPEED
+
+                speed =
+                    math.max(
+                        0,
+                        speed
+                    )
+
+                pcall(function()
+                    root.AssemblyLinearVelocity =
+                        Vector3.new(
+                            root.AssemblyLinearVelocity.X,
+                            speed,
+                            root.AssemblyLinearVelocity.Z
+                        )
+                end)
+            end
+        end
+    end
+)
+
+local animTime = 0
+
+addConnection(
+    RunService.RenderStepped,
+    function(dt)
+        if _G.TokiLTM_Stop then
+            return
+        end
+
+        animTime += dt
+
+        local wave =
+            (
+                math.sin(
+                    animTime *
+                    2.3
+                )
+                + 1
+            )
+            / 2
+
+        local blue =
+            Color3.fromRGB(
+                0,
+                math.floor(
+                    175 +
+                    wave *
+                    45
+                ),
+                255
+            )
+
+        local cyan =
+            Color3.fromRGB(
+                0,
+                math.floor(
+                    205 +
+                    wave *
+                    25
+                ),
+                255
+            )
+
+        mainStroke.Color =
+            blue
+
+        minStroke.Color =
+            cyan
+
+        settingsStroke.Color =
+            blue
+
+        title.TextColor3 =
+            cyan
+
+        titleDot.BackgroundColor3 =
+            blue
+
+        subtitle.TextColor3 =
+            blue
+
+        topGlow.BackgroundColor3 =
+            cyan
+
+        footer.TextColor3 =
+            blue
+
+        headerLine.BackgroundColor3 =
+            blue
+
+        minButton.TextColor3 =
+            cyan
+
+        headerGradient.Offset =
+            Vector2.new(
+                math.sin(
+                    animTime *
+                    0.7
+                )
+                *
+                0.35,
+                0
+            )
+
+        mainGradient.Offset =
+            Vector2.new(
+                math.sin(
+                    animTime *
+                    0.25
+                )
+                *
+                0.08,
+                0
+            )
+
+        settingsGradient.Offset =
+            Vector2.new(
+                math.sin(
+                    animTime *
+                    0.28
+                )
+                *
+                0.08,
+                0
+            )
+
+        local pulse =
+            1.7 +
+            math.sin(
+                animTime *
+                2.2
+            )
+            *
+            0.7
+
+        mainStroke.Thickness =
+            pulse
+
+        for _, panel in ipairs(
+            panels
+        ) do
+            panel.Stroke.Color =
+                blue
+
+            panel.ToggleStroke.Color =
+                cyan
+
+            panel.KnobGlow.Color =
+                blue
+
+            panel.IconStroke.Color =
+                blue
+
+            panel.IconCore.BackgroundColor3 =
+                cyan
+
+            if panel.Gear then
+                local gearStroke =
+                    panel.Gear:FindFirstChildOfClass(
+                        "UIStroke"
+                    )
+
+                if gearStroke then
+                    gearStroke.Color =
+                        blue
+                end
+
+                panel.Gear.TextColor3 =
+                    cyan
+            end
+        end
+
+        for _, row in ipairs(
+            settingsRows
+        ) do
+            row.Label.TextColor3 =
+                blue
+
+            row.Stroke.Color =
+                blue
+
+            row.InputStroke.Color =
+                cyan
+
+            row.Input.TextColor3 =
+                cyan
+        end
+
+        updateStatus()
+
+        local now =
+            os.clock()
+
+        for _, data in ipairs(
+            snowflakes
+        ) do
+            local flake =
+                data.Object
+
+            local pos =
+                flake.Position
+
+            local drift =
+                math.sin(
+                    now *
+                    1.5 +
+                    data.Phase
+                )
+                *
+                0.00012
+
+            local newX =
+                pos.X.Scale +
+                data.Drift *
+                dt *
+                110 +
+                drift
+
+            local newY =
+                pos.Y.Scale +
+                data.Speed *
+                dt
+
+            if newY > 1.08 then
+                newY = -0.08
+                newX =
+                    math.random()
+            end
+
+            if newX > 1.05 then
+                newX = -0.05
+            elseif newX < -0.05 then
+                newX = 1.05
+            end
+
+            flake.Position =
+                UDim2.new(
+                    newX,
+                    0,
+                    newY,
+                    0
+                )
+
+            flake.Rotation =
+                (
+                    now *
+                    data.RotationSpeed +
+                    data.Phase *
+                    25
+                )
+                %
+                360
+
+            local visibility =
+                (
+                    math.sin(
+                        now *
+                        2 +
+                        data.Phase
+                    )
+                    + 1
+                )
+                / 2
+
+            for _, arm in ipairs(
+                flake:GetChildren()
+            ) do
+                if arm:IsA("Frame") then
+                    arm.BackgroundColor3 =
+                        cyan
+
+                    arm.BackgroundTransparency =
+                        0.12 +
+                        visibility *
+                        0.34
+                end
+            end
+        end
+    end
+)
+
+jumpDownUI.Update(
+    Config.JumpDown
+)
+
+farmerUI.Update(
+    Config.Farmer
+)
+
+holdJumpUI.Update(
+    Config.HoldJump
+)
+
+antiDieUI.Update(
+    Config.AntiDie
+)
+
+antiRagdollUI.Update(
+    Config.AntiRagdoll
+)
+
+if Config.AntiRagdoll then
+    startAntiRagdoll()
+end
+
+if Config.AntiDie then
+    startAntiDie()
+end
+
+if Config.Farmer then
+    Config.JumpDown = false
+
+    jumpDownUI.Update(false)
+
+    startFarmer()
+elseif Config.JumpDown then
+    captureJumpDownAnchor()
+    startJumpDown()
+end
+
+updateStatus()
+
+main.Visible =
+    Config.Visible
+
+print(
+    "TOKI LTM • LISTO"
+)
