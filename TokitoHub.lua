@@ -888,6 +888,7 @@ end
 local function classify(name)
  local n=string.lower(tostring(name))
  if n=="skip intro" then return "GENERAL" end
+ if n=="anti gummy" or n=="anti boogie" or n=="anti paintball" or n=="Aimbot" or n=="auto capa" or n=="auto paintball" then return "STEAL" end
  if n:find("fps") or n:find("booster") or n:find("anti lag") then return "OPTIMIZACIÓN" end
  if n:find("xray") or n:find("esp") then return "VISUALES" end
  if n:find("hold jump") or n:find("infinite jump") then return "STEAL" end
@@ -6471,15 +6472,550 @@ do
         if state and not FinderLoaded then
             FinderLoaded = true
             pcall(function()
-                loadstring(game:HttpGet("https://pastefy.app/MMY2uIRG/raw"))()
+                loadstring(game:HttpGet(""))()
             end)
         end
     end
 
-    createToggle("Finder", function(state)
+    createToggle("Finder (No funciona)", function(state)
         SetFinder(state)
     end)
 end
+
+
+-- ============================================================
+--  + ANTI GUMMY + ANTI BOOGIE + ANTI PAINTBALL
+-- ============================================================
+do
+    local StealCleanPlayers = game:GetService("Players")
+    local StealCleanRunService = game:GetService("RunService")
+    local StealCleanUserInputService = game:GetService("UserInputService")
+    local StealCleanLighting = game:GetService("Lighting")
+    local StealCleanReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local StealCleanLP = StealCleanPlayers.LocalPlayer
+
+    local StealCleanAntiGummy = false
+    local StealCleanAntiBoogie = false
+    local StealCleanAntiPaintball = false
+    local StealCleanAimEnabled = false
+    local StealCleanAutoCapeEnabled = false
+    local StealCleanAutoPaintballEnabled = false
+
+    local StealCleanAutoFireLast = {
+        ["Laser Cape"] = 0,
+        ["Paintball Gun"] = 0
+    }
+
+    local StealCleanAutoFireInterval = 0.16
+
+    local StealCleanAimTools = {
+        ["Web Slinger"] = true,
+        ["Paintball Gun"] = true,
+        ["Laser Cape"] = true
+    }
+
+    local StealCleanHookedTools = {}
+    local StealCleanPlayerMouse
+    local StealCleanLastAimCheck = 0
+    local StealCleanPaintballMain
+    local StealCleanPaintballAddedConnection
+    local StealCleanPaintballPlayerGuiConnection
+    local StealCleanCharacterConnection
+    local StealCleanHeartbeatConnection
+    local StealCleanPaintballScanTaskStarted = false
+
+    local function StealCleanResetTools()
+        local char = StealCleanLP.Character
+        if not char then
+            return
+        end
+
+        pcall(function()
+            StealCleanLP:SetAttribute("BlockTools", false)
+            StealCleanLP:SetAttribute("Web", false)
+            char:SetAttribute("BackpackReady", true)
+        end)
+    end
+
+    local function StealCleanClearBoogieEffect()
+        for _, obj in ipairs(StealCleanLighting:GetChildren()) do
+            if obj.Name == "DiscoEffect" then
+                pcall(function()
+                    obj:Destroy()
+                end)
+            end
+        end
+
+        local controllers = StealCleanReplicatedStorage:FindFirstChild("Controllers")
+        if not controllers then
+            return
+        end
+
+        local controller = controllers:FindFirstChild("BoogieBombController")
+        if not controller then
+            return
+        end
+
+        local boom = controller:FindFirstChild("BOOM")
+        if boom then
+            pcall(function()
+                boom:Stop()
+            end)
+        end
+    end
+
+    local function StealCleanGetMainHud()
+        local playerGui = StealCleanLP:FindFirstChild("PlayerGui")
+        return playerGui and playerGui:FindFirstChild("Main")
+    end
+
+    local function StealCleanIsPaintballSplat(obj)
+        local main = StealCleanGetMainHud()
+
+        if not StealCleanAntiPaintball or not main or obj.Parent ~= main then
+            return false
+        end
+
+        if not obj:IsA("ImageLabel") and not obj:IsA("ImageButton") then
+            return false
+        end
+
+        if obj:GetAttribute("__RYXPaintballIgnore") then
+            return false
+        end
+
+        if obj:GetAttribute("__TokitoPaintballShrunk") then
+            return false
+        end
+
+        return math.abs(obj.Rotation) > 0.01
+    end
+
+    local function StealCleanRemovePaintballSplat(obj)
+        if not StealCleanIsPaintballSplat(obj) then
+            return
+        end
+
+        obj:SetAttribute("__TokitoPaintballOriginalSize", obj.Size)
+        obj:SetAttribute("__TokitoPaintballShrunk", true)
+        obj.Size = UDim2.fromOffset(6, 6)
+    end
+
+    local function StealCleanRestorePaintballs()
+        local main = StealCleanGetMainHud()
+        if not main then
+            return
+        end
+
+        for _, obj in ipairs(main:GetChildren()) do
+            pcall(function()
+                local original = obj:GetAttribute("__TokitoPaintballOriginalSize")
+                if original then
+                    obj.Size = original
+                    obj:SetAttribute("__TokitoPaintballOriginalSize", nil)
+                    obj:SetAttribute("__TokitoPaintballShrunk", nil)
+                end
+            end)
+        end
+    end
+
+    local function StealCleanScanPaintball()
+        if not StealCleanAntiPaintball then
+            return
+        end
+
+        local main = StealCleanGetMainHud()
+        if not main then
+            return
+        end
+
+        for _, obj in ipairs(main:GetChildren()) do
+            pcall(StealCleanRemovePaintballSplat, obj)
+        end
+    end
+
+    local function StealCleanHookPaintballGui()
+        local playerGui = StealCleanLP:FindFirstChild("PlayerGui")
+        if not playerGui then
+            return
+        end
+
+        local function hookMain(main)
+            if not main then
+                return
+            end
+
+            if main:GetAttribute("__TokitoPaintballHooked") then
+                StealCleanPaintballMain = main
+                return
+            end
+
+            main:SetAttribute("__TokitoPaintballHooked", true)
+            StealCleanPaintballMain = main
+
+            StealCleanPaintballAddedConnection = main.ChildAdded:Connect(function(obj)
+                task.defer(function()
+                    if StealCleanAntiPaintball then
+                        pcall(StealCleanRemovePaintballSplat, obj)
+                    end
+                end)
+            end)
+        end
+
+        hookMain(playerGui:FindFirstChild("Main"))
+
+        if not StealCleanPaintballPlayerGuiConnection then
+            StealCleanPaintballPlayerGuiConnection = playerGui.ChildAdded:Connect(function(obj)
+                if obj.Name == "Main" then
+                    task.defer(function()
+                        hookMain(obj)
+                    end)
+                end
+            end)
+        end
+    end
+
+    local function StealCleanClearEffects()
+        if StealCleanAntiGummy then
+            StealCleanResetTools()
+        end
+
+        if StealCleanAntiBoogie then
+            StealCleanClearBoogieEffect()
+        end
+    end
+
+    local function StealCleanGetPlayerMouse()
+        if StealCleanPlayerMouse then
+            return StealCleanPlayerMouse
+        end
+
+        local packages = StealCleanReplicatedStorage:FindFirstChild("Packages")
+        if not packages then
+            return nil
+        end
+
+        pcall(function()
+            local module = packages:FindFirstChild("PlayerMouse")
+            if module then
+                StealCleanPlayerMouse = require(module)
+            end
+        end)
+
+        return StealCleanPlayerMouse
+    end
+
+    local function StealCleanGetBestEnemy()
+        local char = StealCleanLP.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local camera = workspace.CurrentCamera
+
+        if not root or not camera then
+            return nil
+        end
+
+        local bestTarget
+        local bestScore = math.huge
+        local cameraPosition = camera.CFrame.Position
+        local cameraDirection = camera.CFrame.LookVector
+
+        for _, player in ipairs(StealCleanPlayers:GetPlayers()) do
+            if player ~= StealCleanLP and player.Character then
+                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+
+                if targetRoot and humanoid and humanoid.Health > 0 then
+                    local distance = (targetRoot.Position - root.Position).Magnitude
+
+                    if distance <= 500 then
+                        local direction = targetRoot.Position - cameraPosition
+
+                        if direction.Magnitude > 0.01 then
+                            local dot = cameraDirection:Dot(direction.Unit)
+                            local angle = math.deg(math.acos(math.clamp(dot, -1, 1)))
+                            local score = distance
+
+                            if angle > 200 then
+                                score = score + 1000
+                            end
+
+                            if score < bestScore then
+                                bestScore = score
+                                bestTarget = targetRoot
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        return bestTarget
+    end
+
+    local function StealCleanAimAtBestEnemy()
+        if not StealCleanAimEnabled then
+            return
+        end
+
+        local mouse = StealCleanGetPlayerMouse()
+        if not mouse then
+            return
+        end
+
+        local target = StealCleanGetBestEnemy()
+        if not target or not target.Parent then
+            return
+        end
+
+        local velocity = target.AssemblyLinearVelocity or Vector3.zero
+        local predictedPosition = target.Position + velocity * 0.1
+
+        pcall(function()
+            mouse.Hit = CFrame.new(predictedPosition)
+            mouse.Target = target
+        end)
+    end
+
+    local function StealCleanHookTool(tool)
+        if not tool or StealCleanHookedTools[tool] or not StealCleanAimTools[tool.Name] then
+            return
+        end
+
+        StealCleanHookedTools[tool] = true
+
+        tool.Activated:Connect(function()
+            if StealCleanAimEnabled then
+                pcall(StealCleanAimAtBestEnemy)
+            end
+        end)
+
+        tool.Equipped:Connect(function()
+            task.wait(0.1)
+
+            if not StealCleanAimEnabled then
+                return
+            end
+
+            pcall(StealCleanAimAtBestEnemy)
+        end)
+    end
+
+    local function StealCleanWatchTools(parent)
+        if not parent then
+            return
+        end
+
+        for _, obj in ipairs(parent:GetChildren()) do
+            if obj:IsA("Tool") and StealCleanAimTools[obj.Name] then
+                StealCleanHookTool(obj)
+            end
+        end
+
+        parent.ChildAdded:Connect(function(obj)
+            task.wait(0.05)
+            if obj:IsA("Tool") and StealCleanAimTools[obj.Name] then
+                StealCleanHookTool(obj)
+            end
+        end)
+    end
+
+    local function StealCleanSetupAim()
+        local backpack = StealCleanLP:FindFirstChild("Backpack")
+        if backpack then
+            StealCleanWatchTools(backpack)
+        end
+
+        if StealCleanLP.Character then
+            StealCleanWatchTools(StealCleanLP.Character)
+        end
+    end
+
+    local function StealCleanAutoFireTool(toolName)
+        local now = tick()
+
+        if now - (StealCleanAutoFireLast[toolName] or 0) < StealCleanAutoFireInterval then
+            return
+        end
+
+        local character = StealCleanLP.Character
+        if not character then
+            return
+        end
+
+        local tool = character:FindFirstChild(toolName)
+        if not tool or not tool:IsA("Tool") then
+            return
+        end
+
+        local target = StealCleanGetBestEnemy()
+        if not target or not target.Parent then
+            return
+        end
+
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then
+            return
+        end
+
+        if (target.Position - root.Position).Magnitude > 100 then
+            return
+        end
+
+        local mouse = StealCleanGetPlayerMouse()
+        if not mouse then
+            return
+        end
+
+        local velocity = target.AssemblyLinearVelocity or Vector3.zero
+        local predictedPosition = target.Position + velocity * 0.1
+
+        pcall(function()
+            mouse.Hit = CFrame.new(predictedPosition)
+            mouse.Target = target
+            tool:Activate()
+        end)
+
+        StealCleanAutoFireLast[toolName] = now
+    end
+
+    local function StealCleanSetAutoCape(state)
+        StealCleanAutoCapeEnabled = state
+        if state then
+            StealCleanSetupAim()
+        end
+    end
+
+    local function StealCleanSetAutoPaintball(state)
+        StealCleanAutoPaintballEnabled = state
+        if state then
+            StealCleanSetupAim()
+        end
+    end
+
+    local function StealCleanSetAntiGummy(state)
+        StealCleanAntiGummy = state
+        if state then
+            StealCleanResetTools()
+        end
+    end
+
+    local function StealCleanSetAntiBoogie(state)
+        StealCleanAntiBoogie = state
+        if state then
+            StealCleanClearBoogieEffect()
+        end
+    end
+
+    local function StealCleanSetAntiPaintball(state)
+        StealCleanAntiPaintball = state
+        StealCleanHookPaintballGui()
+
+        if state then
+            StealCleanScanPaintball()
+        else
+            StealCleanRestorePaintballs()
+        end
+    end
+
+    local function StealCleanSetAim(state)
+        StealCleanAimEnabled = state
+        if state then
+            StealCleanSetupAim()
+        end
+    end
+
+    if not StealCleanHeartbeatConnection then
+        StealCleanHeartbeatConnection = StealCleanRunService.Heartbeat:Connect(function()
+            pcall(StealCleanClearEffects)
+        end)
+    end
+
+    if not StealCleanPaintballScanTaskStarted then
+        StealCleanPaintballScanTaskStarted = true
+        task.spawn(function()
+            while task.wait(0.25) do
+                if StealCleanAntiPaintball then
+                    pcall(StealCleanScanPaintball)
+                end
+            end
+        end)
+    end
+
+    StealCleanHookPaintballGui()
+    StealCleanSetupAim()
+
+    if not StealCleanCharacterConnection then
+        StealCleanCharacterConnection = StealCleanLP.CharacterAdded:Connect(function(character)
+            task.wait(0.2)
+
+            if StealCleanAntiGummy then
+                pcall(StealCleanResetTools)
+            end
+
+            if StealCleanAntiPaintball then
+                pcall(StealCleanHookPaintballGui)
+            end
+
+            if StealCleanAimEnabled then
+                pcall(StealCleanWatchTools, character)
+
+                local backpack = StealCleanLP:FindFirstChild("Backpack")
+                if backpack then
+                    pcall(StealCleanWatchTools, backpack)
+                end
+            end
+        end)
+    end
+
+    StealCleanRunService.RenderStepped:Connect(function()
+        local now = tick()
+
+        if StealCleanAimEnabled then
+            if now - StealCleanLastAimCheck > 0.1 then
+                StealCleanLastAimCheck = now
+                pcall(StealCleanGetBestEnemy)
+            end
+
+            if StealCleanUserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                pcall(StealCleanAimAtBestEnemy)
+            end
+        end
+
+        if StealCleanAutoCapeEnabled then
+            pcall(StealCleanAutoFireTool, "Laser Cape")
+        end
+
+        if StealCleanAutoPaintballEnabled then
+            pcall(StealCleanAutoFireTool, "Paintball Gun")
+        end
+    end)
+
+    createToggle("Anti Gummy", function(state)
+        StealCleanSetAntiGummy(state)
+    end)
+
+    createToggle("Anti Boogie", function(state)
+        StealCleanSetAntiBoogie(state)
+    end)
+
+    createToggle("Anti Paintball", function(state)
+        StealCleanSetAntiPaintball(state)
+    end)
+
+    createToggle("Aimbot", function(state)
+        StealCleanSetAim(state)
+    end)
+
+    createToggle("Auto Capa", function(state)
+        StealCleanSetAutoCape(state)
+    end)
+
+    createToggle("Auto Paintball", function(state)
+        StealCleanSetAutoPaintball(state)
+    end)
+end
+
 -- ============================================================
 -- AUTO KICK AL ROBAR TOGGLE SYSTEM
 -- ============================================================
