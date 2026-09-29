@@ -4,7 +4,7 @@
 -- ============================================================
 local __TOKITO_ENV = getgenv()
 local __TOKITO_COREGUI = game:GetService("CoreGui")
-local __TOKITO_VERSION = 13
+local __TOKITO_VERSION = 14
 local __TOKITO_EXISTING = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
 
 if __TOKITO_EXISTING then
@@ -12583,6 +12583,7 @@ do
     local defenderGui = nil
     local defenderConnections = {}
     local defenderBusy = false
+    local defenderQueued = false
 
     local ITEM_DELAY = 0.03
 
@@ -12695,6 +12696,28 @@ do
         end
     end
 
+    if defenderStyle == "Minimal" then
+        -- Al cargar una configuración antigua en Minimalista, se normaliza al
+        -- preset fijo solicitado por el usuario.
+        Config["DefenderShape"] = "Rounded"
+        Config["DefenderScale"] = 1
+        Config["DefenderBorderEnabled"] = true
+        Config["DefenderBorderThickness"] = 1.6
+        Config["DefenderAccentEnabled"] = false
+        Config["DefenderText"] = "DEFENDER"
+        Config["DefenderTextSize"] = 11
+        Config["DefenderTextColor"] = {255, 255, 255}
+        defenderShape = "Rounded"
+        defenderScale = 1
+        defenderBorderEnabled = true
+        defenderBorderThickness = 1.6
+        defenderAccentEnabled = false
+        defenderText = "DEFENDER"
+        defenderTextSize = 11
+        defenderTextColor = Color3.fromRGB(255, 255, 255)
+        if saveConfig then saveConfig() end
+    end
+
     local defenderPosition = UDim2.fromScale(0.5, 0.5)
     do
         local pos = Config["DefenderPos"]
@@ -12800,58 +12823,221 @@ do
         return true
     end
 
+    local DEFENDER_FIND_RETRIES = 18
+    local DEFENDER_FIND_DELAY = 0.055
+    local DEFENDER_EQUIP_RETRIES = 8
+    local DEFENDER_EQUIP_DELAY = 0.075
+    local DEFENDER_ACTIVATE_RETRIES = 3
+    local DEFENDER_ACTIVATE_DELAY = 0.055
+
     local function getDefenderItem(itemName)
+        if type(itemName) ~= "string" or itemName == "" then
+            return nil
+        end
+
         local character = LocalPlayer.Character
         local backpack = LocalPlayer:FindFirstChild("Backpack")
-        if not character or not backpack then return nil end
 
-        for _, obj in ipairs(character:GetChildren()) do
-            if obj:IsA("Tool") and obj.Name == itemName then
-                return obj
+        -- Primero Character: si ya está equipado no hacemos un EquipTool
+        -- innecesario que pueda interrumpir una activación en curso.
+        if character then
+            for _, obj in ipairs(character:GetChildren()) do
+                if obj:IsA("Tool") and obj.Name == itemName then
+                    return obj
+                end
             end
         end
-        for _, obj in ipairs(backpack:GetChildren()) do
-            if obj:IsA("Tool") and obj.Name == itemName then
-                return obj
+
+        if backpack then
+            for _, obj in ipairs(backpack:GetChildren()) do
+                if obj:IsA("Tool") and obj.Name == itemName then
+                    return obj
+                end
             end
         end
+
         return nil
     end
 
-    local function useDefenderItem(itemName)
-        local tool = getDefenderItem(itemName)
-        if not tool then return end
-
-        pcall(function()
-            local character = LocalPlayer.Character
-            if not character then return end
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if not humanoid then return end
-
-            if tool.Parent ~= character then
-                humanoid:EquipTool(tool)
-                task.wait()
+    local function waitForDefenderItem(itemName)
+        for attempt = 1, DEFENDER_FIND_RETRIES do
+            local tool = getDefenderItem(itemName)
+            if tool and tool.Parent then
+                return tool
             end
+
+            if attempt < DEFENDER_FIND_RETRIES then
+                task.wait(DEFENDER_FIND_DELAY)
+            end
+        end
+
+        return nil
+    end
+
+    local function equipDefenderItem(tool, humanoid, character)
+        if not tool or not humanoid or not character then
+            return false
+        end
+
+        -- Si ya está equipado, no lo tocamos.
+        if tool.Parent == character then
+            return true
+        end
+
+        for attempt = 1, DEFENDER_EQUIP_RETRIES do
+            if not tool.Parent then
+                return false
+            end
+
             if tool.Parent == character then
-                tool:Activate()
+                return true
             end
-        end)
+
+            local ok = pcall(function()
+                humanoid:EquipTool(tool)
+            end)
+
+            if tool.Parent == character then
+                return true
+            end
+
+            -- Si EquipTool no movió el Tool todavía, esperamos a que Roblox
+            -- complete el cambio Backpack -> Character antes de volver a intentar.
+            if ok then
+                task.wait(DEFENDER_EQUIP_DELAY)
+            else
+                task.wait(DEFENDER_EQUIP_DELAY * 1.5)
+            end
+        end
+
+        return tool.Parent == character
+    end
+
+    local function activateDefenderItem(tool, humanoid, character)
+        if not tool or not humanoid or not character then
+            return false
+        end
+
+        -- Activation debe hacerse con el Tool realmente equipado.
+        for attempt = 1, DEFENDER_ACTIVATE_RETRIES do
+            if tool.Parent ~= character then
+                return false
+            end
+
+            local enabled = true
+            pcall(function()
+                enabled = tool.Enabled ~= false
+            end)
+
+            if enabled then
+                local ok = pcall(function()
+                    tool:Activate()
+                end)
+
+                if ok then
+                    -- Dar un pequeño frame al juego para que el evento
+                    -- Tool.Activated/animación tenga oportunidad de ejecutarse.
+                    task.wait(DEFENDER_ACTIVATE_DELAY)
+                    return true
+                end
+            end
+
+            task.wait(DEFENDER_ACTIVATE_DELAY)
+        end
+
+        return false
+    end
+
+    local function useDefenderItem(itemName)
+        local character = LocalPlayer.Character
+        if not character then
+            return false
+        end
+
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then
+            return false
+        end
+
+        -- El Tool puede tardar en aparecer o cambiar de contenedor durante
+        -- respawn/re-equipo. Esperamos de forma tolerante en vez de fallar.
+        local tool = waitForDefenderItem(itemName)
+        if not tool then
+            return false
+        end
+
+        if not equipDefenderItem(tool, humanoid, character) then
+            -- Último refresh: Roblox pudo haber reemplazado la instancia.
+            tool = waitForDefenderItem(itemName)
+            if not tool or not equipDefenderItem(tool, humanoid, character) then
+                return false
+            end
+        end
+
+        -- Usamos la instancia actual después del equip para evitar activar
+        -- una referencia vieja si Roblox la reemplazó durante EquipTool().
+        local equippedTool = getDefenderItem(itemName)
+        if equippedTool and equippedTool.Parent == character then
+            tool = equippedTool
+        end
+
+        return activateDefenderItem(tool, humanoid, character)
     end
 
     local function useDefenderOnce()
-        if defenderBusy then return end
+        -- Consolidamos varios toques en una sola ejecución pendiente para
+        -- evitar workers simultáneos que se peleen por el Humanoid/Backpack.
+        if defenderBusy then
+            defenderQueued = true
+            return
+        end
+
         defenderBusy = true
-        local sequence = copyStringList(defenderItems)
+        defenderQueued = false
 
         task.spawn(function()
-            for index, itemName in ipairs(sequence) do
-                if not defenderBusy then break end
-                useDefenderItem(itemName)
-                if index < #sequence then
-                    task.wait(ITEM_DELAY)
+            local ok, err = pcall(function()
+                while defenderBusy do
+                    local sequence = copyStringList(defenderItems)
+
+                    -- Si no hay selección, no dejamos el estado "busy" colgado.
+                    if #sequence == 0 then
+                        break
+                    end
+
+                    for index, itemName in ipairs(sequence) do
+                        if not defenderBusy then
+                            break
+                        end
+
+                        -- Cada ítem recibe su propia rutina de búsqueda/equip/activate.
+                        -- Un fallo de un Tool NO cancela los siguientes.
+                        pcall(function()
+                            useDefenderItem(itemName)
+                        end)
+
+                        if index < #sequence then
+                            task.wait(ITEM_DELAY)
+                        end
+                    end
+
+                    if defenderBusy and defenderQueued then
+                        defenderQueued = false
+                        task.wait(0.06)
+                    else
+                        break
+                    end
                 end
-            end
+            end)
+
             defenderBusy = false
+            defenderQueued = false
+
+            if not ok then
+                -- Nunca dejar el Defender bloqueado aunque una API de Roblox
+                -- lance un error inesperado dentro del worker.
+                warn("[TokitoHub] Defender worker error:", err)
+            end
         end)
     end
 
@@ -12870,8 +13056,9 @@ do
         local corner = defenderVisual.Corner
         if not frame or not frame.Parent then return end
 
-        -- Base compacto. La UIScale modifica el tamaño visual; el botón no crece de más.
-        if defenderShape == "Circle" then
+        -- Minimalista usa un preset independiente: 60x30 y texto de 11 px.
+        -- Profesional conserva el tamaño configurable anterior.
+        if defenderShape == "Circle" and defenderStyle ~= "Minimal" then
             frame.Size = UDim2.fromOffset(50, 50)
             corner.CornerRadius = UDim.new(1, 0)
             if title then title.Visible = false end
@@ -12885,12 +13072,16 @@ do
                 toggle.Text = ""
             end
         else
-            frame.Size = UDim2.fromOffset(136, 44)
-            corner.CornerRadius = defenderShape == "Square" and UDim.new(0, 3) or UDim.new(0, 10)
+            frame.Size = defenderStyle == "Minimal"
+                and UDim2.fromOffset(60, 30)
+                or UDim2.fromOffset(136, 44)
+            corner.CornerRadius = defenderStyle == "Minimal"
+                and UDim.new(0, 7)
+                or (defenderShape == "Square" and UDim.new(0, 3) or UDim.new(0, 10))
 
             if mark then mark.Visible = false end
             if title then
-                title.Visible = true
+                title.Visible = defenderStyle ~= "Minimal"
                 title.Text = defenderText
             end
             if toggle then
@@ -12983,25 +13174,30 @@ do
         end
 
         if defenderStyle == "Minimal" then
-            -- Minimalista fijo: negro puro + blanco, sin RGB.
-            frame.BackgroundColor3 = Color3.fromRGB(6, 6, 8)
+            -- Preset fijo: 60x30, negro sólido y texto blanco de 11 px.
+            frame.Size = UDim2.fromOffset(60, 30)
+            frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             frame.BackgroundTransparency = 0
             if gradient then gradient.Enabled = false end
-            if stroke then stroke.Color = Color3.fromRGB(150, 155, 165) end
+            if accent then
+                accent.Visible = false
+            end
+            if stroke then stroke.Color = Color3.fromRGB(255, 255, 255) end
 
             if title then
                 title.TextColor3 = Color3.fromRGB(255, 255, 255)
                 title.Font = Enum.Font.GothamBold
-                title.TextSize = defenderTextSize
+                title.TextSize = defenderStyle == "Minimal" and 11 or defenderTextSize
+                title.Visible = false
             end
 
             if toggle then
-                toggle.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+                toggle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                 toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
                 toggle.Font = Enum.Font.GothamBold
                 toggle.TextScaled = false
-                toggle.TextSize = defenderTextSize
-                toggle.Text = defenderShape == "Circle" and "" or defenderText
+                toggle.TextSize = 11
+                toggle.Text = "DEFENDER"
             end
 
             if knob then knob.Visible = false end
@@ -13048,6 +13244,7 @@ do
 
     local function destroyDefender()
         defenderBusy = false
+        defenderQueued = false
         for _, connection in ipairs(defenderConnections) do
             pcall(function() connection:Disconnect() end)
         end
@@ -13078,7 +13275,7 @@ do
 
         local frame = Instance.new("Frame")
         frame.Name = "Defender"
-        frame.Size = UDim2.fromOffset(136, 44)
+        frame.Size = defenderStyle == "Minimal" and UDim2.fromOffset(60, 30) or UDim2.fromOffset(136, 44)
         frame.AnchorPoint = Vector2.new(0.5, 0.5)
         frame.Position = defenderPosition
         frame.BackgroundColor3 = darkenColor(defenderColor, 0.28)
@@ -13187,28 +13384,93 @@ do
 
         applyDefenderVisualStyle()
 
+        local defenderVisualToken = 0
+
         local function setUsingVisual(active)
             if not defenderGui or not defenderGui.Parent then return end
+
+            defenderVisualToken = defenderVisualToken + 1
+            local token = defenderVisualToken
+
+            local targetBg
             if defenderStyle == "Minimal" then
-                toggle.BackgroundColor3 = active and Color3.fromRGB(30, 30, 34) or Color3.fromRGB(8, 8, 10)
+                targetBg = active and Color3.fromRGB(30, 30, 34) or Color3.fromRGB(8, 8, 10)
             else
-                toggle.BackgroundColor3 = active and Color3.fromRGB(20, 205, 255) or darkenColor(defenderColor, 0.42)
+                targetBg = active and Color3.fromRGB(20, 205, 255) or darkenColor(defenderColor, 0.42)
             end
+
+            pcall(function()
+                TweenService:Create(
+                    toggle,
+                    TweenInfo.new(active and 0.10 or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {BackgroundColor3 = targetBg}
+                ):Play()
+            end)
+
             if knob and knob.Parent and defenderShape ~= "Circle" and defenderStyle ~= "Minimal" then
-                knob.BackgroundColor3 = active and Color3.fromRGB(255,255,255) or Color3.fromRGB(235,245,255)
-                knob.Position = active and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7)
+                local targetPos = active
+                    and UDim2.new(1, -17, 0.5, -7)
+                    or UDim2.new(0, 3, 0.5, -7)
+
+                knob.BackgroundColor3 = active
+                    and Color3.fromRGB(255,255,255)
+                    or Color3.fromRGB(235,245,255)
+
+                pcall(function()
+                    TweenService:Create(
+                        knob,
+                        TweenInfo.new(active and 0.12 or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                        {Position = targetPos}
+                    ):Play()
+                end)
+            end
+
+            -- El "ON" visual queda visible aunque la ejecución sea muy rápida.
+            -- El token evita que una ejecución vieja apague una nueva.
+            if active then
+                task.delay(0.35, function()
+                    if token ~= defenderVisualToken then
+                        return
+                    end
+                    if defenderGui and defenderGui.Parent and not defenderBusy then
+                        setUsingVisual(false)
+                    end
+                end)
             end
         end
 
         local function executeDefender()
-            if defenderBusy then return end
+            if not defenderGui or not defenderGui.Parent then
+                return
+            end
+
+            -- Siempre mostramos el feedback inmediatamente, incluso si ya
+            -- había una ejecución en curso. No se pierde el toque.
             setUsingVisual(true)
+
+            if defenderBusy then
+                defenderQueued = true
+                return
+            end
+
             useDefenderOnce()
+
             task.spawn(function()
-                while defenderBusy do task.wait() end
-                setUsingVisual(false)
+                while defenderBusy do
+                    task.wait(0.02)
+                end
+
+                if defenderGui and defenderGui.Parent then
+                    setUsingVisual(false)
+                end
             end)
         end
+
+        -- El switch sí tiene su propio evento. Esto evita depender del
+        -- InputEnded del Frame y hace que un toque directo al toggle ejecute.
+        table.insert(defenderConnections, toggle.Activated:Connect(function()
+            executeDefender()
+        end))
 
         -- ==================================================
         -- ARRASTRE ROBUSTO (PC + ANDROID)
@@ -13228,13 +13490,35 @@ do
                 or input.UserInputType == Enum.UserInputType.Touch
         end
 
+        local function beginDefenderDrag(input)
+            if not isPointer(input) then
+                return
+            end
+            dragging = true
+            moved = false
+            dragStart = input.Position
+            startPosition = frame.Position
+            activeInput = input
+            dragInput = nil
+        end
+
         local function updateDrag(input)
-            if not dragging or not dragStart or not startPosition then
+            if not dragging or not dragStart or not startPosition or not activeInput then
+                return
+            end
+
+            -- Nunca mover el Defender por un toque accidental o por una
+            -- segunda pulsación en otra parte de la pantalla.
+            -- Solo el mismo input que inició el gesto puede moverlo.
+            if input ~= activeInput and activeInput.UserInputType == Enum.UserInputType.Touch then
                 return
             end
 
             local delta = input.Position - dragStart
-            if math.abs(delta.X) >= MOVE_THRESHOLD or math.abs(delta.Y) >= MOVE_THRESHOLD then
+            if not moved then
+                if math.abs(delta.X) < MOVE_THRESHOLD and math.abs(delta.Y) < MOVE_THRESHOLD then
+                    return
+                end
                 moved = true
             end
 
@@ -13246,35 +13530,31 @@ do
             )
         end
 
-        table.insert(defenderConnections, frame.InputBegan:Connect(function(input)
-            if not isPointer(input) then
-                return
-            end
-
-            -- Cualquier estilo se puede mover. En el modo normal, tocar el switch
-            -- sigue siendo un click; en Minimalista el botón completo es arrastrable.
-            dragging = true
-            moved = false
-            dragStart = input.Position
-            startPosition = frame.Position
-            activeInput = input
-        end))
+        table.insert(defenderConnections, frame.InputBegan:Connect(beginDefenderDrag))
+        table.insert(defenderConnections, toggle.InputBegan:Connect(beginDefenderDrag))
+        if title then
+            table.insert(defenderConnections, title.InputBegan:Connect(beginDefenderDrag))
+        end
 
         table.insert(defenderConnections, frame.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement
-                or input.UserInputType == Enum.UserInputType.Touch then
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                dragInput = input
+            elseif input.UserInputType == Enum.UserInputType.Touch and activeInput == input then
                 dragInput = input
             end
         end))
 
         table.insert(defenderConnections, UserInputService.InputChanged:Connect(function(input)
-            if not dragging then
+            if not dragging or not activeInput then
                 return
             end
 
-            if input.UserInputType == Enum.UserInputType.MouseMovement
-                or input.UserInputType == Enum.UserInputType.Touch then
-                if dragInput == nil or input == dragInput then
+            if activeInput.UserInputType == Enum.UserInputType.MouseButton1 then
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    updateDrag(input)
+                end
+            elseif activeInput.UserInputType == Enum.UserInputType.Touch then
+                if input == activeInput and input.UserInputType == Enum.UserInputType.Touch then
                     updateDrag(input)
                 end
             end
@@ -13302,25 +13582,27 @@ do
 
             if moved then
                 saveDefenderPosition(frame.Position)
-            elseif defenderStyle == "Minimal" then
-                executeDefender()
-            elseif defenderStyle == "Professional" then
-                -- Un toque sobre el área no-switch activa Defender.
-                -- El switch mantiene su conexión Activated.
+            else
+                -- El switch se procesa mediante Activated. Aquí solo usamos
+                -- el resto del Frame como área de ejecución para no dispararlo
+                -- dos veces en el mismo toque.
                 local tp = toggle.AbsolutePosition
                 local ts = toggle.AbsoluteSize
                 local p = input.Position
-                local insideToggle = p.X >= tp.X and p.X <= tp.X + ts.X and p.Y >= tp.Y and p.Y <= tp.Y + ts.Y
+                local insideToggle = p.X >= tp.X and p.X <= tp.X + ts.X
+                    and p.Y >= tp.Y and p.Y <= tp.Y + ts.Y
+
                 if not insideToggle then
                     executeDefender()
                 end
             end
         end))
 
-        -- El botón flotante no desaparece ni cambia de tamaño cuando se arrastra.
+        -- El botón flotante conserva su tamaño durante el arrastre.
+        -- Minimalista también captura el gesto desde su TextButton completo.
         -- La posición se almacena usando el centro del Frame.
 
-        -- RGB solo se aplica al botón en su modo de color; Minimalista permanece completamente estático.
+        -- RGB solo se aplica al botón Profesional; Minimalista permanece negro con blanco.
         table.insert(defenderConnections, RunService.RenderStepped:Connect(function(dt)
             if not defenderGui or not defenderGui.Parent then return end
             if defenderStyle == "Professional" then
@@ -13950,7 +14232,27 @@ do
             updateStyleButtons()
         end)
         minimal.Activated:Connect(function()
+            -- Entrar a Minimalista siempre borra su personalización anterior
+            -- y restaura exactamente el preset: 60x30, negro, blanco, 11 px.
             defenderStyle = "Minimal"
+            defenderShape = "Rounded"
+            defenderScale = 1
+            defenderBorderEnabled = true
+            defenderBorderThickness = 1.6
+            defenderAccentEnabled = false
+            defenderText = "DEFENDER"
+            defenderTextSize = 11
+            defenderTextColor = Color3.fromRGB(255, 255, 255)
+
+            Config["DefenderStyle"] = "Minimal"
+            Config["DefenderShape"] = "Rounded"
+            Config["DefenderScale"] = 1
+            Config["DefenderBorderEnabled"] = true
+            Config["DefenderBorderThickness"] = 1.6
+            Config["DefenderAccentEnabled"] = false
+            Config["DefenderText"] = "DEFENDER"
+            Config["DefenderTextSize"] = 11
+            Config["DefenderTextColor"] = {255, 255, 255}
             persistDefenderSettings()
             applyDefenderVisualStyle()
             updateStyleButtons()
@@ -14661,6 +14963,7 @@ do
     __TOKITO_ENV.__TokitoHubCleanup = function()
         closeDefenderCustomizer()
         defenderBusy = false
+        defenderQueued = false
         destroyDefender()
         __TOKITO_ENV.__TokitoOpenDefenderCustomizer = nil
         pcall(function()
