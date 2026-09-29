@@ -4,7 +4,7 @@
 -- ============================================================
 local __TOKITO_ENV = getgenv()
 local __TOKITO_COREGUI = game:GetService("CoreGui")
-local __TOKITO_VERSION = 7
+local __TOKITO_VERSION = 13
 local __TOKITO_EXISTING = __TOKITO_COREGUI:FindFirstChild("TokitoHub")
 
 if __TOKITO_EXISTING then
@@ -385,7 +385,7 @@ contentTopShade.BorderSizePixel=0
 contentTopShade.ZIndex=2
 local sections={}
 local buttons={}
-local order={"STEAL","MUSICA","VISUALES","TEXTURAS","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
+local order={"STEAL","MUSICA","PERSONALIZACION","VISUALES","TEXTURAS","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
 local current="STEAL"
 
 local function makeSection(name)
@@ -498,6 +498,90 @@ end
 
 for _,n in ipairs(order) do
  makeSection(n)
+end
+
+-- ============================================================
+-- PERSONALIZACION / LANDING CARD
+-- ============================================================
+local openDefenderCustomizer
+
+do
+ local page=sections.PERSONALIZACION
+ if page then
+  local card=Instance.new("TextButton",page)
+  card.Name="DefenderCustomizationCard"
+  card.Size=UDim2.new(1,0,0,58)
+  card.BackgroundColor3=Color3.fromRGB(10,31,58)
+  card.BorderSizePixel=0
+  card.AutoButtonColor=false
+  card.Text=""
+  Instance.new("UICorner",card).CornerRadius=UDim.new(0,11)
+
+  local stroke=Instance.new("UIStroke",card)
+  stroke.Name="PersonalizationBlueStroke"
+  stroke.Thickness=1.5
+  stroke.Transparency=.18
+  stroke.Color=Color3.fromRGB(35,150,255)
+
+  local grad=Instance.new("UIGradient",card)
+  grad.Rotation=0
+  grad.Color=ColorSequence.new({
+   ColorSequenceKeypoint.new(0,Color3.fromRGB(10,38,73)),
+   ColorSequenceKeypoint.new(.5,Color3.fromRGB(8,28,54)),
+   ColorSequenceKeypoint.new(1,Color3.fromRGB(7,22,42))
+  })
+
+  local accent=Instance.new("Frame",card)
+  accent.Size=UDim2.new(0,3,1,-14)
+  accent.Position=UDim2.new(0,5,0,7)
+  accent.BackgroundColor3=Color3.fromRGB(0,155,255)
+  accent.BorderSizePixel=0
+  Instance.new("UICorner",accent).CornerRadius=UDim.new(1,0)
+
+  local title=Instance.new("TextLabel",card)
+  title.BackgroundTransparency=1
+  title.Size=UDim2.new(1,-82,0,20)
+  title.Position=UDim2.new(0,16,0,7)
+  title.Text="DEFENDER"
+  title.TextColor3=Color3.fromRGB(242,248,255)
+  title.Font=Enum.Font.GothamBold
+  title.TextSize=12
+  title.TextXAlignment=Enum.TextXAlignment.Left
+
+  local subtitle=Instance.new("TextLabel",card)
+  subtitle.BackgroundTransparency=1
+  subtitle.Size=UDim2.new(1,-82,0,18)
+  subtitle.Position=UDim2.new(0,16,0,29)
+  subtitle.Text="Items • estilo del botón • tamaño"
+  subtitle.TextColor3=Color3.fromRGB(135,190,235)
+  subtitle.Font=Enum.Font.Gotham
+  subtitle.TextSize=7
+  subtitle.TextXAlignment=Enum.TextXAlignment.Left
+
+  local arrow=Instance.new("TextLabel",card)
+  arrow.BackgroundTransparency=1
+  arrow.Size=UDim2.new(0,34,0,34)
+  arrow.Position=UDim2.new(1,-41,0.5,-17)
+  arrow.Text=">"
+  arrow.TextColor3=Color3.fromRGB(85,190,255)
+  arrow.Font=Enum.Font.GothamBold
+  arrow.TextSize=19
+
+  card.MouseEnter:Connect(function()
+   TweenService:Create(card,TweenInfo.new(.14,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{BackgroundColor3=Color3.fromRGB(12,43,79)}):Play()
+   TweenService:Create(stroke,TweenInfo.new(.14,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Transparency=.02,Thickness=2}):Play()
+  end)
+  card.MouseLeave:Connect(function()
+   TweenService:Create(card,TweenInfo.new(.16,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{BackgroundColor3=Color3.fromRGB(10,31,58)}):Play()
+   TweenService:Create(stroke,TweenInfo.new(.16,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Transparency=.18,Thickness=1.5}):Play()
+  end)
+  card.Activated:Connect(function()
+   local opener = __TOKITO_ENV.__TokitoOpenDefenderCustomizer
+   if type(opener) == "function" then
+    pcall(opener)
+   end
+  end)
+ end
 end
 
 local sectionRgbConnection=RunService.RenderStepped:Connect(function()
@@ -12483,686 +12567,2118 @@ end
 
 -- ========================================================
 -- DEFENDER
--- 1 CLIC = 1 USO DE LOS 4 ITEMS
--- MINI GUI + ARRASTRABLE + POSICIÓN PERSISTENTE
--- INTEGRADO AL createToggle DEL HUB
+-- Compact floating button + responsive customizer.
+-- Minimalista: negro + texto blanco, arrastre libre.
+-- Circular: muestra únicamente "D".
+-- Color configurable + RGB visual sutil.
 -- ========================================================
 
 do
-local LocalPlayer = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+    local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local TweenService = game:GetService("TweenService")
+    local Workspace = game:GetService("Workspace")
 
-local defenderGui = nil
-local defenderConnections = {}
+    local defenderGui = nil
+    local defenderConnections = {}
+    local defenderBusy = false
 
-local defenderBusy = false
+    local ITEM_DELAY = 0.03
 
-local ITEM_DELAY = 0.03
+    local DEFENDER_DEFAULT_ITEMS = {
+        "All Seeing Sentry",
+        "BeeHive",
+        "Attack Doge",
+        "Subspace Mine"
+    }
 
-local DEFAULT_POSITION = UDim2.new(
-0.5,
--55,
-0.5,
--18
-)
+    local function copyStringList(source)
+        local out = {}
+        local seen = {}
+        if type(source) ~= "table" then
+            return out
+        end
+        for _, value in ipairs(source) do
+            if type(value) == "string" and value ~= "" and not seen[value] then
+                seen[value] = true
+                table.insert(out, value)
+            end
+        end
+        return out
+    end
 
--- ====================================================
--- CARGAR POSICIÓN
--- ====================================================
+    local defenderItems = type(Config["DefenderItems"]) == "table"
+        and copyStringList(Config["DefenderItems"])
+        or copyStringList(DEFENDER_DEFAULT_ITEMS)
 
-local savedPosition = DEFAULT_POSITION
+    local defenderStyle = Config["DefenderStyle"] == "Minimal"
+        and "Minimal"
+        or "Professional"
 
-pcall(function()
-local pos = Config["DefenderPos"]
+    local defenderShape = "Rounded"
+    if Config["DefenderShape"] == "Square" or Config["DefenderShape"] == "Circle" or Config["DefenderShape"] == "Rounded" then
+        defenderShape = Config["DefenderShape"]
+    elseif Config["DefenderShape"] == "Round" then
+        defenderShape = "Rounded"
+    end
 
-if type(pos) == "table" and #pos >= 4 then    
-    savedPosition = UDim2.new(    
-        pos[1],    
-        pos[2],    
-        pos[3],    
-        pos[4]    
-    )    
+    local function isValidDefenderScale(value)
+        return type(value) == "number"
+            and value == value
+            and value > 0
+            and value < math.huge
+            and value > -math.huge
+    end
+
+    local DEFENDER_DEFAULTS_VERSION = 3
+    local defenderScale = tonumber(Config["DefenderScale"])
+    if Config["DefenderDefaultsVersion"] ~= DEFENDER_DEFAULTS_VERSION then
+        defenderScale = 1 -- 100% por defecto para esta versión
+        Config["DefenderScale"] = 1
+        Config["DefenderDefaultsVersion"] = DEFENDER_DEFAULTS_VERSION
+        if saveConfig then saveConfig() end
+    elseif not isValidDefenderScale(defenderScale) then
+        defenderScale = 1
+    end
+
+    local defenderBorderEnabled = Config["DefenderBorderEnabled"] ~= false
+    local defenderBorderThickness = tonumber(Config["DefenderBorderThickness"]) or 1.6
+    if not isValidDefenderScale(defenderBorderThickness) then
+        defenderBorderThickness = 1.6
+    end
+
+    local defenderAccentEnabled = Config["DefenderAccentEnabled"] ~= false
+
+    local defenderText = tostring(Config["DefenderText"] or "DEFENDER")
+    if defenderText == "" then
+        defenderText = "DEFENDER"
+    end
+    defenderText = string.sub(defenderText:gsub("[%c]", ""), 1, 18)
+    if defenderText == "" then
+        defenderText = "DEFENDER"
+    end
+
+    local defenderTextSize = tonumber(Config["DefenderTextSize"]) or 11
+    if defenderTextSize ~= defenderTextSize or defenderTextSize <= 0 or defenderTextSize == math.huge then
+        defenderTextSize = 11
+    end
+    defenderTextSize = math.clamp(defenderTextSize, 6, 30)
+
+    local defenderTextColor = Color3.fromRGB(255, 255, 255)
+    do
+        local c = Config["DefenderTextColor"]
+        if type(c) == "table" and #c >= 3 then
+            local r, g, b = tonumber(c[1]), tonumber(c[2]), tonumber(c[3])
+            if r and g and b then
+                defenderTextColor = Color3.fromRGB(
+                    math.clamp(math.floor(r + 0.5), 0, 255),
+                    math.clamp(math.floor(g + 0.5), 0, 255),
+                    math.clamp(math.floor(b + 0.5), 0, 255)
+                )
+            end
+        end
+    end
+
+    local defenderColor = Color3.fromRGB(0, 170, 255)
+    do
+        local c = Config["DefenderColor"]
+        if type(c) == "table" and #c >= 3 then
+            local r, g, b = tonumber(c[1]), tonumber(c[2]), tonumber(c[3])
+            if r and g and b then
+                defenderColor = Color3.fromRGB(
+                    math.clamp(math.floor(r + 0.5), 0, 255),
+                    math.clamp(math.floor(g + 0.5), 0, 255),
+                    math.clamp(math.floor(b + 0.5), 0, 255)
+                )
+            end
+        end
+    end
+
+    local defenderPosition = UDim2.fromScale(0.5, 0.5)
+    do
+        local pos = Config["DefenderPos"]
+        if type(pos) == "table" and #pos >= 4 then
+            if Config["DefenderPosAnchor"] == "Center" then
+                defenderPosition = UDim2.new(pos[1], pos[2], pos[3], pos[4])
+            else
+                -- Migración de versiones antiguas: guardaban esquina superior izquierda.
+                defenderPosition = UDim2.new(pos[1], pos[2] + 68, pos[3], pos[4] + 22)
+                Config["DefenderPosAnchor"] = "Center"
+                if saveConfig then saveConfig() end
+            end
+        end
+    end
+
+    local defenderVisual = {}
+    local defenderCustomizerGui = nil
+    local defenderCustomizerWindow = nil
+    local defenderCustomizerConnections = {}
+
+    local function persistDefenderSettings()
+        Config["DefenderItems"] = copyStringList(defenderItems)
+        Config["DefenderStyle"] = defenderStyle
+        Config["DefenderScale"] = defenderScale
+        Config["DefenderShape"] = defenderShape
+        Config["DefenderBorderEnabled"] = defenderBorderEnabled
+        Config["DefenderBorderThickness"] = defenderBorderThickness
+        Config["DefenderAccentEnabled"] = defenderAccentEnabled
+        Config["DefenderText"] = defenderText
+        Config["DefenderTextSize"] = defenderTextSize
+        Config["DefenderTextColor"] = {
+            math.floor(defenderTextColor.R * 255 + 0.5),
+            math.floor(defenderTextColor.G * 255 + 0.5),
+            math.floor(defenderTextColor.B * 255 + 0.5)
+        }
+        Config["DefenderColor"] = {
+            math.floor(defenderColor.R * 255 + 0.5),
+            math.floor(defenderColor.G * 255 + 0.5),
+            math.floor(defenderColor.B * 255 + 0.5)
+        }
+        if saveConfig then
+            saveConfig()
+        end
+    end
+
+    local function saveDefenderPosition(position)
+        Config["DefenderPos"] = {
+            position.X.Scale,
+            position.X.Offset,
+            position.Y.Scale,
+            position.Y.Offset
+        }
+        Config["DefenderPosAnchor"] = "Center"
+        if saveConfig then saveConfig() end
+    end
+
+    local function hasDefenderItemConfigured(itemName)
+        for _, configuredName in ipairs(defenderItems) do
+            if configuredName == itemName then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function getDetectedDefenderItems()
+        local found, seen = {}, {}
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        local character = LocalPlayer.Character
+
+        for _, container in ipairs({character, backpack}) do
+            if container then
+                for _, obj in ipairs(container:GetChildren()) do
+                    if obj:IsA("Tool") and obj.Name ~= "" and not seen[obj.Name] then
+                        seen[obj.Name] = true
+                        table.insert(found, obj.Name)
+                    end
+                end
+            end
+        end
+
+        table.sort(found, function(a, b)
+            return string.lower(a) < string.lower(b)
+        end)
+        return found
+    end
+
+    local function addDefenderConfiguredItem(itemName)
+        if type(itemName) ~= "string" or itemName == "" or hasDefenderItemConfigured(itemName) then
+            return false
+        end
+        table.insert(defenderItems, itemName)
+        persistDefenderSettings()
+        return true
+    end
+
+    local function removeDefenderConfiguredItem(index)
+        if type(index) ~= "number" or not defenderItems[index] then
+            return false
+        end
+        table.remove(defenderItems, index)
+        persistDefenderSettings()
+        return true
+    end
+
+    local function getDefenderItem(itemName)
+        local character = LocalPlayer.Character
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if not character or not backpack then return nil end
+
+        for _, obj in ipairs(character:GetChildren()) do
+            if obj:IsA("Tool") and obj.Name == itemName then
+                return obj
+            end
+        end
+        for _, obj in ipairs(backpack:GetChildren()) do
+            if obj:IsA("Tool") and obj.Name == itemName then
+                return obj
+            end
+        end
+        return nil
+    end
+
+    local function useDefenderItem(itemName)
+        local tool = getDefenderItem(itemName)
+        if not tool then return end
+
+        pcall(function()
+            local character = LocalPlayer.Character
+            if not character then return end
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then return end
+
+            if tool.Parent ~= character then
+                humanoid:EquipTool(tool)
+                task.wait()
+            end
+            if tool.Parent == character then
+                tool:Activate()
+            end
+        end)
+    end
+
+    local function useDefenderOnce()
+        if defenderBusy then return end
+        defenderBusy = true
+        local sequence = copyStringList(defenderItems)
+
+        task.spawn(function()
+            for index, itemName in ipairs(sequence) do
+                if not defenderBusy then break end
+                useDefenderItem(itemName)
+                if index < #sequence then
+                    task.wait(ITEM_DELAY)
+                end
+            end
+            defenderBusy = false
+        end)
+    end
+
+    local function tween(object, info, properties)
+        if not object or not object.Parent then return end
+        pcall(function()
+            TweenService:Create(object, info, properties):Play()
+        end)
+    end
+
+    local function applyDefenderShape()
+        local frame = defenderVisual.Frame
+        local title = defenderVisual.Title
+        local toggle = defenderVisual.Toggle
+        local mark = defenderVisual.MiniMark
+        local corner = defenderVisual.Corner
+        if not frame or not frame.Parent then return end
+
+        -- Base compacto. La UIScale modifica el tamaño visual; el botón no crece de más.
+        if defenderShape == "Circle" then
+            frame.Size = UDim2.fromOffset(50, 50)
+            corner.CornerRadius = UDim.new(1, 0)
+            if title then title.Visible = false end
+            if mark then
+                mark.Visible = true
+                mark.Text = "D"
+            end
+            if toggle then
+                toggle.Size = UDim2.fromScale(1, 1)
+                toggle.Position = UDim2.fromScale(0, 0)
+                toggle.Text = ""
+            end
+        else
+            frame.Size = UDim2.fromOffset(136, 44)
+            corner.CornerRadius = defenderShape == "Square" and UDim.new(0, 3) or UDim.new(0, 10)
+
+            if mark then mark.Visible = false end
+            if title then
+                title.Visible = true
+                title.Text = defenderText
+            end
+            if toggle then
+                if defenderStyle == "Minimal" then
+                    toggle.Size = UDim2.fromScale(1, 1)
+                    toggle.Position = UDim2.fromScale(0, 0)
+                    toggle.Text = defenderText
+                else
+                    toggle.Size = UDim2.fromOffset(34, 20)
+                    toggle.Position = UDim2.new(1, -45, 0.5, -10)
+                    toggle.Text = ""
+                end
+            end
+        end
+    end
+
+    local function makeColorSequence(base)
+        local h, s, v = Color3.toHSV(base)
+        return ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromHSV((h + 0.58) % 1, math.max(0.55, s), math.min(1, v * 0.72))),
+            ColorSequenceKeypoint.new(0.32, Color3.fromHSV(h, math.max(0.70, s), math.min(1, v * 1.05))),
+            ColorSequenceKeypoint.new(0.67, Color3.fromHSV((h + 0.08) % 1, math.max(0.65, s), math.min(1, v * 0.95))),
+            ColorSequenceKeypoint.new(1.00, Color3.fromHSV((h + 0.58) % 1, math.max(0.55, s), math.min(1, v * 0.72)))
+        })
+    end
+
+    local function darkenColor(c, amount)
+        local h, s, v = Color3.toHSV(c)
+        return Color3.fromHSV(h, s, math.clamp(v * amount, 0, 1))
+    end
+
+    local function applyDefenderVisualStyle()
+        local frame = defenderVisual.Frame
+        local title = defenderVisual.Title
+        local toggle = defenderVisual.Toggle
+        local knob = defenderVisual.Knob
+        local stroke = defenderVisual.Stroke
+        local gradient = defenderVisual.Gradient
+        local mark = defenderVisual.MiniMark
+        local accent = defenderVisual.Accent
+
+        if not frame or not frame.Parent or not toggle or not toggle.Parent then
+            return
+        end
+
+        local scale = frame:FindFirstChild("DefenderScale")
+        if not scale then
+            scale = Instance.new("UIScale")
+            scale.Name = "DefenderScale"
+            scale.Parent = frame
+        end
+        scale.Scale = defenderScale
+
+        if accent and accent.Parent then
+            accent.Visible = defenderAccentEnabled
+            accent.BackgroundColor3 = defenderStyle == "Minimal"
+                and defenderTextColor
+                or defenderColor
+        end
+
+        -- No compensación manual por UIScale: Roblox escala el UIStroke y UICorner
+        -- junto al árbol visual. Esto evita que el borde se descuadre al cambiar tamaño.
+        if stroke then
+            stroke.Thickness = defenderBorderThickness
+            stroke.Enabled = defenderBorderEnabled
+            stroke.Transparency = defenderBorderEnabled and 0.08 or 1
+            pcall(function()
+                stroke.StrokeSizingMode = Enum.StrokeSizingMode.FixedSize
+            end)
+            pcall(function()
+                stroke.LineJoinMode = defenderShape == "Square" and Enum.LineJoinMode.Miter or Enum.LineJoinMode.Round
+            end)
+        end
+
+        if defenderShape == "Circle" then
+            if title then title.Visible = false end
+            if mark then
+                mark.Visible = true
+                mark.Text = "D"
+                mark.TextColor3 = defenderStyle == "Minimal" and Color3.fromRGB(255,255,255) or defenderTextColor
+                mark.TextScaled = false
+                mark.TextSize = defenderTextSize
+            end
+        else
+            if mark then mark.Visible = false end
+            if title then
+                title.Visible = true
+                title.Text = defenderText
+            end
+        end
+
+        if defenderStyle == "Minimal" then
+            -- Minimalista fijo: negro puro + blanco, sin RGB.
+            frame.BackgroundColor3 = Color3.fromRGB(6, 6, 8)
+            frame.BackgroundTransparency = 0
+            if gradient then gradient.Enabled = false end
+            if stroke then stroke.Color = Color3.fromRGB(150, 155, 165) end
+
+            if title then
+                title.TextColor3 = Color3.fromRGB(255, 255, 255)
+                title.Font = Enum.Font.GothamBold
+                title.TextSize = defenderTextSize
+            end
+
+            if toggle then
+                toggle.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+                toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+                toggle.Font = Enum.Font.GothamBold
+                toggle.TextScaled = false
+                toggle.TextSize = defenderTextSize
+                toggle.Text = defenderShape == "Circle" and "" or defenderText
+            end
+
+            if knob then knob.Visible = false end
+        else
+            frame.BackgroundColor3 = darkenColor(defenderColor, 0.28)
+            frame.BackgroundTransparency = 0
+            if gradient then
+                gradient.Enabled = true
+                gradient.Color = makeColorSequence(defenderColor)
+            end
+            if stroke then
+                stroke.Color = defenderColor
+                stroke.Transparency = defenderBorderEnabled and 0.06 or 1
+            end
+
+            if title then
+                title.TextColor3 = defenderTextColor
+                title.Font = Enum.Font.GothamBold
+                title.TextSize = defenderTextSize
+            end
+
+            if toggle then
+                if defenderShape == "Circle" then
+                    toggle.BackgroundColor3 = darkenColor(defenderColor, 0.55)
+                else
+                    toggle.BackgroundColor3 = darkenColor(defenderColor, 0.42)
+                end
+                toggle.TextColor3 = defenderTextColor
+                toggle.TextScaled = false
+                toggle.TextSize = defenderTextSize
+                toggle.Text = ""
+            end
+
+            if knob then
+                knob.Visible = defenderShape ~= "Circle"
+                knob.BackgroundColor3 = Color3.fromRGB(235, 245, 255)
+                knob.Size = UDim2.fromOffset(14, 14)
+                knob.Position = UDim2.new(0, 3, 0.5, -7)
+            end
+        end
+
+        applyDefenderShape()
+    end
+
+    local function destroyDefender()
+        defenderBusy = false
+        for _, connection in ipairs(defenderConnections) do
+            pcall(function() connection:Disconnect() end)
+        end
+        table.clear(defenderConnections)
+
+        if defenderGui then
+            pcall(function() defenderGui:Destroy() end)
+            defenderGui = nil
+        end
+        table.clear(defenderVisual)
+    end
+
+    local function createDefender()
+        destroyDefender()
+
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "DefenderCompact"
+        screenGui.ResetOnSpawn = false
+        screenGui.IgnoreGuiInset = true
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        screenGui.DisplayOrder = 1000005
+
+        local parent
+        pcall(function() parent = gethui() end)
+        if not parent then parent = game:GetService("CoreGui") end
+        screenGui.Parent = parent
+        defenderGui = screenGui
+
+        local frame = Instance.new("Frame")
+        frame.Name = "Defender"
+        frame.Size = UDim2.fromOffset(136, 44)
+        frame.AnchorPoint = Vector2.new(0.5, 0.5)
+        frame.Position = defenderPosition
+        frame.BackgroundColor3 = darkenColor(defenderColor, 0.28)
+        frame.BorderSizePixel = 0
+        frame.Active = true
+        frame.ZIndex = 2
+        frame.Parent = screenGui
+
+        local corner = Instance.new("UICorner")
+        corner.Name = "DefenderCorner"
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = frame
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Name = "DefenderStroke"
+        stroke.Thickness = defenderBorderThickness
+        stroke.Transparency = defenderBorderEnabled and 0.06 or 1
+        stroke.Color = defenderColor
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        pcall(function() stroke.StrokeSizingMode = Enum.StrokeSizingMode.FixedSize end)
+        pcall(function() stroke.LineJoinMode = Enum.LineJoinMode.Round end)
+        stroke.Parent = frame
+
+        local gradient = Instance.new("UIGradient")
+        gradient.Name = "DefenderGradient"
+        gradient.Rotation = 32
+        gradient.Color = makeColorSequence(defenderColor)
+        gradient.Parent = frame
+
+        local accent = Instance.new("Frame")
+        accent.Name = "DefenderAccent"
+        accent.Size = UDim2.new(0, 3, 1, -12)
+        accent.Position = UDim2.new(0, 5, 0, 6)
+        accent.BackgroundColor3 = defenderColor
+        accent.BorderSizePixel = 0
+        accent.ZIndex = 3
+        accent.Parent = frame
+        local accentCorner = Instance.new("UICorner")
+        accentCorner.CornerRadius = UDim.new(1, 0)
+        accentCorner.Parent = accent
+
+        local title = Instance.new("TextLabel")
+        title.Name = "Title"
+        title.BackgroundTransparency = 1
+        title.Size = UDim2.new(1, -60, 0, 20)
+        title.Position = UDim2.new(0, 14, 0, 6)
+        title.Text = defenderText
+        title.TextColor3 = Color3.fromRGB(240, 249, 255)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 11
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.TextTruncate = Enum.TextTruncate.AtEnd
+        title.ZIndex = 4
+        title.Parent = frame
+
+        local miniMark = Instance.new("TextLabel")
+        miniMark.Name = "MiniMark"
+        miniMark.BackgroundTransparency = 1
+        miniMark.Size = UDim2.fromScale(1, 1)
+        miniMark.Position = UDim2.fromScale(0, 0)
+        miniMark.Text = "D"
+        miniMark.TextColor3 = defenderTextColor
+        miniMark.Font = Enum.Font.GothamBlack
+        miniMark.TextScaled = false
+        miniMark.TextSize = defenderTextSize
+        miniMark.Visible = false
+        miniMark.ZIndex = 7
+        miniMark.Parent = frame
+
+        local toggle = Instance.new("TextButton")
+        toggle.Name = "Use"
+        toggle.Size = UDim2.fromOffset(34, 20)
+        toggle.Position = UDim2.new(1, -45, 0.5, -10)
+        toggle.BackgroundColor3 = darkenColor(defenderColor, 0.42)
+        toggle.BorderSizePixel = 0
+        toggle.Text = ""
+        toggle.AutoButtonColor = false
+        toggle.Active = true
+        toggle.ZIndex = 6
+        toggle.Parent = frame
+        local toggleCorner = Instance.new("UICorner")
+        toggleCorner.CornerRadius = UDim.new(1, 0)
+        toggleCorner.Parent = toggle
+
+        local knob = Instance.new("Frame")
+        knob.Name = "Knob"
+        knob.Size = UDim2.fromOffset(14, 14)
+        knob.Position = UDim2.new(0, 3, 0.5, -7)
+        knob.BackgroundColor3 = Color3.fromRGB(235, 245, 255)
+        knob.BorderSizePixel = 0
+        knob.ZIndex = 7
+        knob.Parent = toggle
+        local knobCorner = Instance.new("UICorner")
+        knobCorner.CornerRadius = UDim.new(1, 0)
+        knobCorner.Parent = knob
+
+        defenderVisual.Frame = frame
+        defenderVisual.Corner = corner
+        defenderVisual.Stroke = stroke
+        defenderVisual.Gradient = gradient
+        defenderVisual.Accent = accent
+        defenderVisual.Title = title
+        defenderVisual.MiniMark = miniMark
+        defenderVisual.Toggle = toggle
+        defenderVisual.Knob = knob
+
+        applyDefenderVisualStyle()
+
+        local function setUsingVisual(active)
+            if not defenderGui or not defenderGui.Parent then return end
+            if defenderStyle == "Minimal" then
+                toggle.BackgroundColor3 = active and Color3.fromRGB(30, 30, 34) or Color3.fromRGB(8, 8, 10)
+            else
+                toggle.BackgroundColor3 = active and Color3.fromRGB(20, 205, 255) or darkenColor(defenderColor, 0.42)
+            end
+            if knob and knob.Parent and defenderShape ~= "Circle" and defenderStyle ~= "Minimal" then
+                knob.BackgroundColor3 = active and Color3.fromRGB(255,255,255) or Color3.fromRGB(235,245,255)
+                knob.Position = active and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7)
+            end
+        end
+
+        local function executeDefender()
+            if defenderBusy then return end
+            setUsingVisual(true)
+            useDefenderOnce()
+            task.spawn(function()
+                while defenderBusy do task.wait() end
+                setUsingVisual(false)
+            end)
+        end
+
+        -- ==================================================
+        -- ARRASTRE ROBUSTO (PC + ANDROID)
+        -- Un toque sin movimiento ejecuta Defender en Minimalista;
+        -- al superar el umbral, el mismo gesto se convierte en arrastre.
+        -- ==================================================
+        local dragging = false
+        local moved = false
+        local dragStart = nil
+        local startPosition = nil
+        local activeInput = nil
+        local dragInput = nil
+        local MOVE_THRESHOLD = 8
+
+        local function isPointer(input)
+            return input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch
+        end
+
+        local function updateDrag(input)
+            if not dragging or not dragStart or not startPosition then
+                return
+            end
+
+            local delta = input.Position - dragStart
+            if math.abs(delta.X) >= MOVE_THRESHOLD or math.abs(delta.Y) >= MOVE_THRESHOLD then
+                moved = true
+            end
+
+            frame.Position = UDim2.new(
+                startPosition.X.Scale,
+                startPosition.X.Offset + delta.X,
+                startPosition.Y.Scale,
+                startPosition.Y.Offset + delta.Y
+            )
+        end
+
+        table.insert(defenderConnections, frame.InputBegan:Connect(function(input)
+            if not isPointer(input) then
+                return
+            end
+
+            -- Cualquier estilo se puede mover. En el modo normal, tocar el switch
+            -- sigue siendo un click; en Minimalista el botón completo es arrastrable.
+            dragging = true
+            moved = false
+            dragStart = input.Position
+            startPosition = frame.Position
+            activeInput = input
+        end))
+
+        table.insert(defenderConnections, frame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end))
+
+        table.insert(defenderConnections, UserInputService.InputChanged:Connect(function(input)
+            if not dragging then
+                return
+            end
+
+            if input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch then
+                if dragInput == nil or input == dragInput then
+                    updateDrag(input)
+                end
+            end
+        end))
+
+        table.insert(defenderConnections, UserInputService.TouchMoved:Connect(function(touch)
+            if not dragging or activeInput ~= touch then
+                return
+            end
+            updateDrag(touch)
+        end))
+
+        table.insert(defenderConnections, UserInputService.InputEnded:Connect(function(input)
+            if not dragging then
+                return
+            end
+
+            if activeInput and input ~= activeInput then
+                return
+            end
+
+            dragging = false
+            activeInput = nil
+            dragInput = nil
+
+            if moved then
+                saveDefenderPosition(frame.Position)
+            elseif defenderStyle == "Minimal" then
+                executeDefender()
+            elseif defenderStyle == "Professional" then
+                -- Un toque sobre el área no-switch activa Defender.
+                -- El switch mantiene su conexión Activated.
+                local tp = toggle.AbsolutePosition
+                local ts = toggle.AbsoluteSize
+                local p = input.Position
+                local insideToggle = p.X >= tp.X and p.X <= tp.X + ts.X and p.Y >= tp.Y and p.Y <= tp.Y + ts.Y
+                if not insideToggle then
+                    executeDefender()
+                end
+            end
+        end))
+
+        -- El botón flotante no desaparece ni cambia de tamaño cuando se arrastra.
+        -- La posición se almacena usando el centro del Frame.
+
+        -- RGB solo se aplica al botón en su modo de color; Minimalista permanece completamente estático.
+        table.insert(defenderConnections, RunService.RenderStepped:Connect(function(dt)
+            if not defenderGui or not defenderGui.Parent then return end
+            if defenderStyle == "Professional" then
+                if defenderVisual.Gradient and defenderVisual.Gradient.Parent then
+                    defenderVisual.Gradient.Rotation = (defenderVisual.Gradient.Rotation + dt * 7) % 360
+                end
+                if defenderVisual.Stroke and defenderVisual.Stroke.Parent and defenderBorderEnabled then
+                    local h = (os.clock() * 0.035) % 1
+                    local baseH = select(1, Color3.toHSV(defenderColor))
+                    local animatedColor = Color3.fromHSV((baseH + h * 0.10) % 1, 0.82, 1)
+                    defenderVisual.Stroke.Color = animatedColor
+                    if defenderVisual.Accent and defenderVisual.Accent.Parent and defenderAccentEnabled then
+                        defenderVisual.Accent.BackgroundColor3 = animatedColor
+                    end
+                end
+            end
+        end))
+    end
+
+    -- ============================================================
+    -- PERSONALIZADOR DEL DEFENDER
+    -- ============================================================
+    local function closeDefenderCustomizer()
+        for _, connection in ipairs(defenderCustomizerConnections) do
+            pcall(function() connection:Disconnect() end)
+        end
+        table.clear(defenderCustomizerConnections)
+
+        if defenderCustomizerGui then
+            pcall(function() defenderCustomizerGui:Destroy() end)
+            defenderCustomizerGui = nil
+        end
+        defenderCustomizerWindow = nil
+    end
+
+    local function makeDefenderCustomizer()
+        if defenderCustomizerGui and defenderCustomizerGui.Parent then
+            return
+        end
+
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "DefenderCustomizer"
+        screenGui.ResetOnSpawn = false
+        screenGui.IgnoreGuiInset = true
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        screenGui.DisplayOrder = 1000006
+
+        local parent
+        pcall(function() parent = gethui() end)
+        if not parent then parent = game:GetService("CoreGui") end
+        screenGui.Parent = parent
+        defenderCustomizerGui = screenGui
+
+        -- Panel compacto para Android; los controles internos conservan su tamaño.
+        local window = Instance.new("Frame")
+        window.Name = "DefenderControlWindow"
+        window.Size = UDim2.fromOffset(280, 400)
+        window.AnchorPoint = Vector2.new(0.5, 0.5)
+        window.Position = UDim2.fromScale(0.5, 0.5)
+        window.BackgroundColor3 = Color3.fromRGB(4, 12, 26)
+        window.BorderSizePixel = 0
+        window.Active = true
+        window.Parent = screenGui
+        defenderCustomizerWindow = window
+
+        local windowCorner = Instance.new("UICorner")
+        windowCorner.CornerRadius = UDim.new(0, 17)
+        windowCorner.Parent = window
+
+        -- Borde neon azul con gradiente RGB. Afecta únicamente al panel.
+        local outerStroke = Instance.new("UIStroke")
+        outerStroke.Name = "NeonRGBStroke"
+        outerStroke.Thickness = 2.2
+        outerStroke.Transparency = 0.03
+        outerStroke.Color = Color3.fromRGB(0, 170, 255)
+        outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        outerStroke.Parent = window
+
+        local outerGradient = Instance.new("UIGradient")
+        outerGradient.Name = "NeonRGBGradient"
+        outerGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 105, 255)),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(0, 225, 255)),
+            ColorSequenceKeypoint.new(0.48, Color3.fromRGB(90, 130, 255)),
+            ColorSequenceKeypoint.new(0.72, Color3.fromRGB(0, 170, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 105, 255))
+        })
+        outerGradient.Rotation = 20
+        outerGradient.Parent = outerStroke
+
+        local innerStroke = Instance.new("UIStroke")
+        innerStroke.Name = "InnerNeonStroke"
+        innerStroke.Thickness = 0.75
+        innerStroke.Transparency = 0.43
+        innerStroke.Color = Color3.fromRGB(80, 190, 255)
+        innerStroke.Parent = window
+
+        local panelGradient = Instance.new("UIGradient")
+        panelGradient.Name = "PanelBlueGradient"
+        panelGradient.Rotation = 90
+        panelGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(7, 31, 63)),
+            ColorSequenceKeypoint.new(0.45, Color3.fromRGB(4, 17, 37)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(3, 10, 23))
+        })
+        panelGradient.Parent = window
+
+        local header = Instance.new("Frame")
+        header.Name = "Header"
+        header.Size = UDim2.new(1, 0, 0, 50)
+        header.BackgroundColor3 = Color3.fromRGB(6, 29, 58)
+        header.BorderSizePixel = 0
+        header.ZIndex = 50
+        header.Active = true
+        header.Parent = window
+
+        local headerCorner = Instance.new("UICorner")
+        headerCorner.CornerRadius = UDim.new(0, 15)
+        headerCorner.Parent = header
+
+        local headerGradient = Instance.new("UIGradient")
+        headerGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(6, 53, 97)),
+            ColorSequenceKeypoint.new(0.45, Color3.fromRGB(0, 116, 185)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 37, 78))
+        })
+        headerGradient.Parent = header
+
+        local title = Instance.new("TextLabel")
+        title.BackgroundTransparency = 1
+        title.Size = UDim2.new(1, -116, 0, 21)
+        title.Position = UDim2.new(0, 12, 0, 9)
+        title.Text = "DEFENDER • CONTROL"
+        title.TextColor3 = Color3.fromRGB(246, 252, 255)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 12
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = header
+
+        local subtitle = Instance.new("TextLabel")
+        subtitle.BackgroundTransparency = 1
+        subtitle.Size = UDim2.new(1, -116, 0, 13)
+        subtitle.Position = UDim2.new(0, 12, 0, 32)
+        subtitle.Text = "Items, apariencia, escala y forma"
+        subtitle.TextColor3 = Color3.fromRGB(142, 210, 250)
+        subtitle.Font = Enum.Font.Gotham
+        subtitle.TextSize = 7
+        subtitle.TextXAlignment = Enum.TextXAlignment.Left
+        subtitle.Parent = header
+
+        header.ZIndex = 20
+        header.ClipsDescendants = false
+
+        local minimize = Instance.new("TextButton")
+        minimize.Name = "Minimize"
+        minimize.Size = UDim2.fromOffset(34, 34)
+        minimize.Position = UDim2.new(1, -72, 0.5, -17)
+        minimize.BackgroundColor3 = Color3.fromRGB(10, 55, 92)
+        minimize.BorderSizePixel = 0
+        minimize.AutoButtonColor = false
+        minimize.Active = true
+        minimize.Selectable = false
+        minimize.Text = "−"
+        minimize.TextColor3 = Color3.fromRGB(235, 248, 255)
+        minimize.Font = Enum.Font.GothamBold
+        minimize.TextSize = 16
+        minimize.ZIndex = 200
+        minimize.Parent = header
+        local minimizeCorner = Instance.new("UICorner")
+        minimizeCorner.CornerRadius = UDim.new(0, 12)
+        minimizeCorner.Parent = minimize
+        local minimizeStroke = Instance.new("UIStroke")
+        minimizeStroke.Thickness = 1.2
+        minimizeStroke.Transparency = 0.28
+        minimizeStroke.Color = Color3.fromRGB(70, 200, 255)
+        minimizeStroke.Parent = minimize
+
+        local close = Instance.new("TextButton")
+        close.Name = "Close"
+        close.Size = UDim2.fromOffset(38, 38)
+        close.Position = UDim2.new(1, -44, 0.5, -19)
+        close.BackgroundColor3 = Color3.fromRGB(14, 58, 96)
+        close.BorderSizePixel = 0
+        close.AutoButtonColor = false
+        close.Active = true
+        close.Selectable = false
+        close.Text = "×"
+        close.TextColor3 = Color3.fromRGB(235, 247, 255)
+        close.Font = Enum.Font.GothamBold
+        close.TextSize = 18
+        close.ZIndex = 100
+        close.Parent = header
+        local closeCorner = Instance.new("UICorner")
+        closeCorner.CornerRadius = UDim.new(0, 12)
+        closeCorner.Parent = close
+        local closeStroke = Instance.new("UIStroke")
+        closeStroke.Thickness = 1.1
+        closeStroke.Transparency = 0.38
+        closeStroke.Color = Color3.fromRGB(70, 190, 255)
+        closeStroke.Parent = close
+
+        local body = Instance.new("ScrollingFrame")
+        body.Name = "Body"
+        body.Size = UDim2.new(1, -14, 1, -58)
+        body.Position = UDim2.new(0, 7, 0, 56)
+        body.BackgroundTransparency = 1
+        body.BorderSizePixel = 0
+        body.ScrollBarThickness = 3
+        body.ScrollBarImageColor3 = Color3.fromRGB(30, 180, 255)
+        body.ScrollBarImageTransparency = 0.20
+        body.ScrollingDirection = Enum.ScrollingDirection.XY
+        body.HorizontalScrollBarInset = Enum.ScrollBarInset.Always
+        body.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+        body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        body.CanvasSize = UDim2.new(0, 320, 0, 0)
+        body.ZIndex = 10
+        body.Parent = window
+
+        local bodyPad = Instance.new("UIPadding")
+        bodyPad.PaddingLeft = UDim.new(0, 2)
+        bodyPad.PaddingRight = UDim.new(0, 2)
+        bodyPad.PaddingTop = UDim.new(0, 1)
+        bodyPad.PaddingBottom = UDim.new(0, 9)
+        bodyPad.Parent = body
+
+        local bodyLayout = Instance.new("UIListLayout")
+        bodyLayout.Padding = UDim.new(0, 5)
+        bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        bodyLayout.Parent = body
+
+        local function makeCard(height)
+            local card = Instance.new("Frame")
+            card.Size = UDim2.fromOffset(300, height)
+            card.BackgroundColor3 = Color3.fromRGB(6, 27, 54)
+            card.BorderSizePixel = 0
+            card.Parent = body
+
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, 11)
+            c.Parent = card
+
+            local s = Instance.new("UIStroke")
+            s.Thickness = 1.15
+            s.Transparency = 0.18
+            s.Color = Color3.fromRGB(24, 128, 215)
+            s.Parent = card
+
+            return card
+        end
+
+        local function makeCardTitle(parentFrame, textValue, subValue)
+            local t = Instance.new("TextLabel")
+            t.BackgroundTransparency = 1
+            t.Size = UDim2.new(1, -18, 0, 16)
+            t.Position = UDim2.new(0, 9, 0, 5)
+            t.Text = textValue
+            t.TextColor3 = Color3.fromRGB(235, 247, 255)
+            t.Font = Enum.Font.GothamBold
+            t.TextSize = 10
+            t.TextXAlignment = Enum.TextXAlignment.Left
+            t.Parent = parentFrame
+
+            local st = Instance.new("TextLabel")
+            st.BackgroundTransparency = 1
+            st.Size = UDim2.new(1, -18, 0, 13)
+            st.Position = UDim2.new(0, 9, 0, 21)
+            st.Text = subValue
+            st.TextColor3 = Color3.fromRGB(121, 183, 230)
+            st.Font = Enum.Font.Gotham
+            st.TextSize = 7
+            st.TextXAlignment = Enum.TextXAlignment.Left
+            st.Parent = parentFrame
+        end
+
+        -- ==================================================
+        -- ITEMS
+        -- ==================================================
+        local itemsCard = makeCard(164)
+        makeCardTitle(itemsCard, "ÍTEMS QUE USA DEFENDER", "Se ejecutan en este orden al pulsar el botón")
+
+        local itemList = Instance.new("ScrollingFrame")
+        itemList.Name = "CurrentItems"
+        itemList.Size = UDim2.new(1, -18, 0, 78)
+        itemList.Position = UDim2.new(0, 9, 0, 39)
+        itemList.BackgroundColor3 = Color3.fromRGB(3, 15, 30)
+        itemList.BorderSizePixel = 0
+        itemList.ScrollBarThickness = 2
+        itemList.ScrollBarImageColor3 = Color3.fromRGB(0, 175, 255)
+        itemList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        itemList.CanvasSize = UDim2.new()
+        itemList.Parent = itemsCard
+
+        local itemCorner = Instance.new("UICorner")
+        itemCorner.CornerRadius = UDim.new(0, 8)
+        itemCorner.Parent = itemList
+
+        local itemPad = Instance.new("UIPadding")
+        itemPad.PaddingTop = UDim.new(0, 3)
+        itemPad.PaddingBottom = UDim.new(0, 3)
+        itemPad.PaddingLeft = UDim.new(0, 3)
+        itemPad.PaddingRight = UDim.new(0, 3)
+        itemPad.Parent = itemList
+
+        local itemLayout = Instance.new("UIListLayout")
+        itemLayout.Padding = UDim.new(0, 2)
+        itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        itemLayout.Parent = itemList
+
+        local detectedCount = Instance.new("TextLabel")
+        detectedCount.BackgroundTransparency = 1
+        detectedCount.Size = UDim2.new(1, -145, 0, 13)
+        detectedCount.Position = UDim2.new(0, 9, 1, -33)
+        detectedCount.TextColor3 = Color3.fromRGB(89, 193, 255)
+        detectedCount.Font = Enum.Font.GothamMedium
+        detectedCount.TextSize = 7
+        detectedCount.TextXAlignment = Enum.TextXAlignment.Left
+        detectedCount.Parent = itemsCard
+
+        local addButton = Instance.new("TextButton")
+        addButton.Size = UDim2.fromOffset(120, 25)
+        addButton.Position = UDim2.new(1, -129, 1, -31)
+        addButton.BackgroundColor3 = Color3.fromRGB(8, 94, 155)
+        addButton.BorderSizePixel = 0
+        addButton.AutoButtonColor = false
+        addButton.Text = "+  AGREGAR ITEM"
+        addButton.TextColor3 = Color3.fromRGB(237, 250, 255)
+        addButton.Font = Enum.Font.GothamBold
+        addButton.TextSize = 8
+        addButton.Parent = itemsCard
+        local addButtonCorner = Instance.new("UICorner")
+        addButtonCorner.CornerRadius = UDim.new(0, 8)
+        addButtonCorner.Parent = addButton
+
+        local addCard = makeCard(48)
+        addCard.Name = "AddItemCard"
+        addCard.Visible = false
+
+        local addTitle = Instance.new("TextLabel")
+        addTitle.BackgroundTransparency = 1
+        addTitle.Size = UDim2.new(1, -18, 0, 16)
+        addTitle.Position = UDim2.new(0, 9, 0, 5)
+        addTitle.Text = "ÍTEMS DETECTADOS"
+        addTitle.TextColor3 = Color3.fromRGB(234, 246, 255)
+        addTitle.Font = Enum.Font.GothamBold
+        addTitle.TextSize = 9
+        addTitle.TextXAlignment = Enum.TextXAlignment.Left
+        addTitle.Parent = addCard
+
+        local availableList = Instance.new("ScrollingFrame")
+        availableList.Name = "AvailableItems"
+        availableList.Size = UDim2.new(1, -18, 0, 24)
+        availableList.Position = UDim2.new(0, 9, 0, 26)
+        availableList.BackgroundTransparency = 1
+        availableList.BorderSizePixel = 0
+        availableList.ScrollBarThickness = 2
+        availableList.ScrollBarImageColor3 = Color3.fromRGB(35, 170, 255)
+        availableList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        availableList.CanvasSize = UDim2.new()
+        availableList.Parent = addCard
+
+        local availableLayout = Instance.new("UIListLayout")
+        availableLayout.Padding = UDim.new(0, 3)
+        availableLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        availableLayout.Parent = availableList
+
+        local function getDefenderItemTexture(itemName)
+            local tool = nil
+            pcall(function() tool = getDefenderItem(itemName) end)
+            if tool and tool:IsA("Tool") then
+                local texture = ""
+                pcall(function() texture = tool.TextureId end)
+                if type(texture) == "string" and texture ~= "" then return texture end
+            end
+            return ""
+        end
+
+        local function addItemIcon(parentFrame, itemName, size)
+            local holder = Instance.new("Frame")
+            holder.Size = UDim2.fromOffset(size, size)
+            holder.Position = UDim2.new(0, 4, 0.5, -size / 2)
+            holder.BackgroundColor3 = Color3.fromRGB(4, 22, 40)
+            holder.BorderSizePixel = 0
+            holder.Parent = parentFrame
+            local holderCorner = Instance.new("UICorner")
+            holderCorner.CornerRadius = UDim.new(0, 6)
+            holderCorner.Parent = holder
+            local iconStroke = Instance.new("UIStroke")
+            iconStroke.Thickness = 1
+            iconStroke.Transparency = 0.25
+            iconStroke.Color = Color3.fromRGB(35, 145, 230)
+            iconStroke.Parent = holder
+
+            local image = Instance.new("ImageLabel")
+            image.Size = UDim2.new(1, -4, 1, -4)
+            image.Position = UDim2.fromOffset(2, 2)
+            image.BackgroundTransparency = 1
+            image.ScaleType = Enum.ScaleType.Fit
+            image.Image = getDefenderItemTexture(itemName)
+            image.Visible = image.Image ~= ""
+            image.Parent = holder
+
+            local fallback = Instance.new("TextLabel")
+            fallback.Size = UDim2.fromScale(1, 1)
+            fallback.BackgroundTransparency = 1
+            fallback.Text = string.upper(string.sub(itemName, 1, 1))
+            fallback.TextColor3 = Color3.fromRGB(90, 195, 255)
+            fallback.Font = Enum.Font.GothamBold
+            fallback.TextSize = 9
+            fallback.TextXAlignment = Enum.TextXAlignment.Center
+            fallback.TextYAlignment = Enum.TextYAlignment.Center
+            fallback.Visible = image.Image == ""
+            fallback.Parent = holder
+        end
+
+        local function refreshLists()
+            for _, child in ipairs(itemList:GetChildren()) do
+                if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+                    child:Destroy()
+                end
+            end
+
+            for index, itemName in ipairs(defenderItems) do
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, 0, 0, 30)
+                row.BackgroundColor3 = Color3.fromRGB(7, 31, 56)
+                row.BorderSizePixel = 0
+                row.Parent = itemList
+                local rowCorner = Instance.new("UICorner")
+                rowCorner.CornerRadius = UDim.new(0, 7)
+                rowCorner.Parent = row
+                local rowStroke = Instance.new("UIStroke")
+                rowStroke.Thickness = 1
+                rowStroke.Transparency = 0.28
+                rowStroke.Color = Color3.fromRGB(23, 107, 183)
+                rowStroke.Parent = row
+
+                local orderLabel = Instance.new("TextLabel")
+                orderLabel.BackgroundTransparency = 1
+                orderLabel.Size = UDim2.fromOffset(24, 24)
+                orderLabel.Position = UDim2.new(0, 4, 0, 0)
+                orderLabel.Text = string.format("%02d", index)
+                orderLabel.TextColor3 = Color3.fromRGB(66, 176, 240)
+                orderLabel.Font = Enum.Font.GothamBold
+                orderLabel.TextSize = 8
+                orderLabel.Parent = row
+
+                addItemIcon(row, itemName, 21)
+
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Size = UDim2.new(1, -67, 1, 0)
+                nameLabel.Position = UDim2.new(0, 28, 0, 0)
+                nameLabel.Text = itemName
+                nameLabel.TextColor3 = Color3.fromRGB(232, 244, 255)
+                nameLabel.Font = Enum.Font.GothamMedium
+                nameLabel.TextSize = 9
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                nameLabel.Parent = row
+
+                local remove = Instance.new("TextButton")
+                remove.Size = UDim2.fromOffset(26, 22)
+                remove.Position = UDim2.new(1, -30, 0.5, -11)
+                remove.BackgroundColor3 = Color3.fromRGB(30, 42, 60)
+                remove.BorderSizePixel = 0
+                remove.AutoButtonColor = false
+                remove.Text = "×"
+                remove.TextColor3 = Color3.fromRGB(180, 225, 250)
+                remove.Font = Enum.Font.GothamBold
+                remove.TextSize = 14
+                remove.Parent = row
+                local removeCorner = Instance.new("UICorner")
+                removeCorner.CornerRadius = UDim.new(0, 6)
+                removeCorner.Parent = remove
+
+                remove.Activated:Connect(function()
+                    if removeDefenderConfiguredItem(index) then
+                        refreshLists()
+                    end
+                end)
+            end
+
+            if #defenderItems == 0 then
+                local empty = Instance.new("TextLabel")
+                empty.Size = UDim2.new(1, 0, 0, 24)
+                empty.BackgroundTransparency = 1
+                empty.Text = "No hay items configurados."
+                empty.TextColor3 = Color3.fromRGB(115, 170, 215)
+                empty.Font = Enum.Font.Gotham
+                empty.TextSize = 8
+                empty.Parent = itemList
+            end
+
+            local detected = getDetectedDefenderItems()
+            detectedCount.Text = "Detectados: " .. tostring(#detected) .. "   •   Configurados: " .. tostring(#defenderItems)
+
+            for _, child in ipairs(availableList:GetChildren()) do
+                if not child:IsA("UIListLayout") then
+                    child:Destroy()
+                end
+            end
+
+            local missing = {}
+            for _, name in ipairs(detected) do
+                if not hasDefenderItemConfigured(name) then
+                    table.insert(missing, name)
+                end
+            end
+
+            if #missing == 0 then
+                local empty = Instance.new("TextLabel")
+                empty.Size = UDim2.new(1, 0, 0, 24)
+                empty.BackgroundTransparency = 1
+                empty.Text = "No hay nuevos Tools para agregar."
+                empty.TextColor3 = Color3.fromRGB(110, 165, 210)
+                empty.Font = Enum.Font.Gotham
+                empty.TextSize = 8
+                empty.Parent = availableList
+            else
+                for _, itemName in ipairs(missing) do
+                    local add = Instance.new("TextButton")
+                    add.Size = UDim2.new(1, 0, 0, 30)
+                    add.BackgroundColor3 = Color3.fromRGB(7, 36, 62)
+                    add.BorderSizePixel = 0
+                    add.AutoButtonColor = false
+                    add.Text = ""
+                    add.Parent = availableList
+                    local addCorner = Instance.new("UICorner")
+                    addCorner.CornerRadius = UDim.new(0, 7)
+                    addCorner.Parent = add
+
+                    local addStroke = Instance.new("UIStroke")
+                    addStroke.Thickness = 1
+                    addStroke.Transparency = 0.28
+                    addStroke.Color = Color3.fromRGB(24, 111, 190)
+                    addStroke.Parent = add
+
+                    addItemIcon(add, itemName, 22)
+                    local addName = Instance.new("TextLabel")
+                    addName.BackgroundTransparency = 1
+                    addName.Size = UDim2.new(1, -66, 1, 0)
+                    addName.Position = UDim2.new(0, 28, 0, 0)
+                    addName.Text = itemName
+                    addName.TextColor3 = Color3.fromRGB(225, 243, 255)
+                    addName.Font = Enum.Font.GothamMedium
+                    addName.TextSize = 9
+                    addName.TextXAlignment = Enum.TextXAlignment.Left
+                    addName.TextTruncate = Enum.TextTruncate.AtEnd
+                    addName.Parent = add
+
+                    local glyph = Instance.new("TextLabel")
+                    glyph.BackgroundTransparency = 1
+                    glyph.Size = UDim2.fromOffset(24, 25)
+                    glyph.Position = UDim2.new(1, -29, 0, 0)
+                    glyph.Text = "+"
+                    glyph.TextColor3 = Color3.fromRGB(85, 195, 255)
+                    glyph.Font = Enum.Font.GothamBold
+                    glyph.TextSize = 15
+                    glyph.Parent = add
+
+                    add.Activated:Connect(function()
+                        if addDefenderConfiguredItem(itemName) then refreshLists() end
+                    end)
+                end
+            end
+
+            local count = #missing
+            addCard.Size = UDim2.new(1, 0, 0, math.max(48, 50 + count * 28))
+            availableList.Size = UDim2.new(1, -18, 0, math.max(24, 24 + count * 28))
+        end
+
+        local addOpen = false
+        addButton.Activated:Connect(function()
+            addOpen = not addOpen
+            addCard.Visible = addOpen
+            addButton.Text = addOpen and "−  CERRAR LISTA" or "+  AGREGAR ITEM"
+            refreshLists()
+        end)
+
+        -- ==================================================
+        -- ESTILO
+        -- ==================================================
+        local styleCard = makeCard(88)
+        makeCardTitle(styleCard, "ESTILO", "Color configurable o Minimalista negro")
+
+        local professional = Instance.new("TextButton")
+        professional.Size = UDim2.new(0.5, -12, 0, 38)
+        professional.Position = UDim2.new(0, 9, 0, 45)
+        professional.BackgroundColor3 = Color3.fromRGB(11, 92, 154)
+        professional.BorderSizePixel = 0
+        professional.AutoButtonColor = false
+        professional.Text = "PROFESIONAL"
+        professional.TextColor3 = Color3.fromRGB(245, 252, 255)
+        professional.Font = Enum.Font.GothamBold
+        professional.TextSize = 10
+        professional.Parent = styleCard
+        local professionalCorner = Instance.new("UICorner")
+        professionalCorner.CornerRadius = UDim.new(0, 8)
+        professionalCorner.Parent = professional
+
+        local minimal = Instance.new("TextButton")
+        minimal.Size = UDim2.new(0.5, -12, 0, 38)
+        minimal.Position = UDim2.new(0.5, 3, 0, 45)
+        minimal.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+        minimal.BorderSizePixel = 0
+        minimal.AutoButtonColor = false
+        minimal.Text = "MINIMALISTA"
+        minimal.TextColor3 = Color3.fromRGB(255, 255, 255)
+        minimal.Font = Enum.Font.GothamBold
+        minimal.TextSize = 10
+        minimal.Parent = styleCard
+        local minimalCorner = Instance.new("UICorner")
+        minimalCorner.CornerRadius = UDim.new(0, 8)
+        minimalCorner.Parent = minimal
+
+        local function updateStyleButtons()
+            professional.BackgroundColor3 = defenderStyle == "Professional" and Color3.fromRGB(12, 101, 170) or Color3.fromRGB(8, 38, 62)
+            minimal.BackgroundColor3 = defenderStyle == "Minimal" and Color3.fromRGB(34, 34, 38) or Color3.fromRGB(10, 10, 12)
+            professional.TextColor3 = defenderStyle == "Professional" and Color3.fromRGB(245,252,255) or Color3.fromRGB(175,205,230)
+            minimal.TextColor3 = Color3.fromRGB(255,255,255)
+        end
+
+        professional.Activated:Connect(function()
+            defenderStyle = "Professional"
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            updateStyleButtons()
+        end)
+        minimal.Activated:Connect(function()
+            defenderStyle = "Minimal"
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            updateStyleButtons()
+        end)
+
+        -- ==================================================
+        -- FORMA
+        -- ==================================================
+        local shapeCard = makeCard(104)
+        makeCardTitle(shapeCard, "FORMA", "Redondeada, cuadrada o circular")
+
+        local function shapeButton(textValue, xScale, widthScale)
+            local button = Instance.new("TextButton")
+            button.Size = UDim2.new(widthScale, -8, 0, 38)
+            button.Position = UDim2.new(xScale, xScale == 0 and 9 or 3, 0, 49)
+            button.BackgroundColor3 = Color3.fromRGB(8, 37, 62)
+            button.BorderSizePixel = 0
+            button.AutoButtonColor = false
+            button.Text = textValue
+            button.TextColor3 = Color3.fromRGB(180, 210, 235)
+            button.Font = Enum.Font.GothamBold
+            button.TextSize = 9
+            button.Parent = shapeCard
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, 8)
+            c.Parent = button
+            return button
+        end
+
+        local roundedButton = shapeButton("REDONDEADA", 0, 0.34)
+        local squareButton = shapeButton("CUADRADA", 0.333, 0.34)
+        local circleButton = shapeButton("CIRCULAR", 0.666, 0.334)
+
+        local function updateShapeButtons()
+            local function paint(button, active)
+                button.BackgroundColor3 = active and Color3.fromRGB(10, 100, 168) or Color3.fromRGB(8, 37, 62)
+                button.TextColor3 = active and Color3.fromRGB(245,252,255) or Color3.fromRGB(180,210,235)
+            end
+            paint(roundedButton, defenderShape == "Rounded")
+            paint(squareButton, defenderShape == "Square")
+            paint(circleButton, defenderShape == "Circle")
+        end
+
+        roundedButton.Activated:Connect(function()
+            defenderShape = "Rounded"
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            updateShapeButtons()
+        end)
+        squareButton.Activated:Connect(function()
+            defenderShape = "Square"
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            updateShapeButtons()
+        end)
+        circleButton.Activated:Connect(function()
+            defenderShape = "Circle"
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            updateShapeButtons()
+        end)
+
+        -- ==================================================
+        -- ESCALA
+        -- ==================================================
+        local sizeCard = makeCard(132)
+        makeCardTitle(sizeCard, "ESCALA LIBRE", "100% por defecto; admite cualquier valor positivo")
+
+        local sizeValue = Instance.new("TextLabel")
+        sizeValue.BackgroundTransparency = 1
+        sizeValue.Size = UDim2.fromOffset(105, 22)
+        sizeValue.Position = UDim2.new(0, 10, 0, 43)
+        sizeValue.TextColor3 = Color3.fromRGB(95, 212, 255)
+        sizeValue.Font = Enum.Font.GothamBlack
+        sizeValue.TextSize = 10
+        sizeValue.TextXAlignment = Enum.TextXAlignment.Left
+        sizeValue.Parent = sizeCard
+
+        local sizeBox = Instance.new("TextBox")
+        sizeBox.Name = "FreeScaleInput"
+        sizeBox.Size = UDim2.new(0, 132, 0, 38)
+        sizeBox.Position = UDim2.new(0.5, -66, 0, 40)
+        sizeBox.BackgroundColor3 = Color3.fromRGB(3, 17, 33)
+        sizeBox.BorderSizePixel = 0
+        sizeBox.ClearTextOnFocus = false
+        sizeBox.PlaceholderText = "100%"
+        sizeBox.TextColor3 = Color3.fromRGB(242, 252, 255)
+        sizeBox.PlaceholderColor3 = Color3.fromRGB(105, 150, 180)
+        sizeBox.Font = Enum.Font.GothamBold
+        sizeBox.TextSize = 12
+        sizeBox.TextXAlignment = Enum.TextXAlignment.Center
+        sizeBox.Parent = sizeCard
+        local sizeBoxCorner = Instance.new("UICorner")
+        sizeBoxCorner.CornerRadius = UDim.new(0, 8)
+        sizeBoxCorner.Parent = sizeBox
+        local sizeBoxStroke = Instance.new("UIStroke")
+        sizeBoxStroke.Thickness = 1
+        sizeBoxStroke.Transparency = 0.20
+        sizeBoxStroke.Color = Color3.fromRGB(35, 145, 220)
+        sizeBoxStroke.Parent = sizeBox
+
+        local minus = Instance.new("TextButton")
+        minus.Size = UDim2.fromOffset(36, 36)
+        minus.Position = UDim2.new(0, 8, 0, 41)
+        minus.BackgroundColor3 = Color3.fromRGB(10, 57, 94)
+        minus.BorderSizePixel = 0
+        minus.AutoButtonColor = false
+        minus.Text = "−"
+        minus.TextColor3 = Color3.fromRGB(224, 244, 255)
+        minus.Font = Enum.Font.GothamBold
+        minus.TextSize = 16
+        minus.Parent = sizeCard
+        local minusCorner = Instance.new("UICorner")
+        minusCorner.CornerRadius = UDim.new(0, 8)
+        minusCorner.Parent = minus
+
+        local plus = Instance.new("TextButton")
+        plus.Size = UDim2.fromOffset(36, 36)
+        plus.Position = UDim2.new(1, -44, 0, 41)
+        plus.BackgroundColor3 = Color3.fromRGB(10, 57, 94)
+        plus.BorderSizePixel = 0
+        plus.AutoButtonColor = false
+        plus.Text = "+"
+        plus.TextColor3 = Color3.fromRGB(224, 244, 255)
+        plus.Font = Enum.Font.GothamBold
+        plus.TextSize = 16
+        plus.Parent = sizeCard
+        local plusCorner = Instance.new("UICorner")
+        plusCorner.CornerRadius = UDim.new(0, 8)
+        plusCorner.Parent = plus
+
+        local preset100 = Instance.new("TextButton")
+        preset100.Size = UDim2.fromOffset(82, 30)
+        preset100.Position = UDim2.new(0, 8, 1, -34)
+        preset100.BackgroundColor3 = Color3.fromRGB(8, 69, 118)
+        preset100.BorderSizePixel = 0
+        preset100.AutoButtonColor = false
+        preset100.Text = "100%"
+        preset100.TextColor3 = Color3.fromRGB(230,247,255)
+        preset100.Font = Enum.Font.GothamBold
+        preset100.TextSize = 10
+        preset100.Parent = sizeCard
+        local preset100Corner = Instance.new("UICorner")
+        preset100Corner.CornerRadius = UDim.new(0, 7)
+        preset100Corner.Parent = preset100
+
+        local preset200 = Instance.new("TextButton")
+        preset200.Size = UDim2.fromOffset(82, 30)
+        preset200.Position = UDim2.new(0, 92, 1, -34)
+        preset200.BackgroundColor3 = Color3.fromRGB(8, 69, 118)
+        preset200.BorderSizePixel = 0
+        preset200.AutoButtonColor = false
+        preset200.Text = "200%"
+        preset200.TextColor3 = Color3.fromRGB(230,247,255)
+        preset200.Font = Enum.Font.GothamBold
+        preset200.TextSize = 10
+        preset200.Parent = sizeCard
+        local preset200Corner = Instance.new("UICorner")
+        preset200Corner.CornerRadius = UDim.new(0, 7)
+        preset200Corner.Parent = preset200
+
+        local function refreshScaleLabels()
+            local textValue = string.format("%.2f%%", defenderScale * 100)
+            if defenderScale >= 10 then
+                textValue = string.format("%.0f%%", defenderScale * 100)
+            end
+            sizeValue.Text = "ACTUAL  " .. textValue
+            sizeBox.Text = textValue
+        end
+
+        local function applyScale(value)
+            if not isValidDefenderScale(value) then return false end
+            defenderScale = value
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            refreshScaleLabels()
+            return true
+        end
+
+        local function parseScaleText(raw)
+            if type(raw) ~= "string" then return nil end
+            local cleaned = raw:gsub("%s+", ""):gsub("%%", ""):gsub(",", ".")
+            local numberValue = tonumber(cleaned)
+            if not numberValue then return nil end
+            return numberValue / 100
+        end
+
+        sizeBox.FocusLost:Connect(function()
+            local parsed = parseScaleText(sizeBox.Text)
+            if not parsed or not isValidDefenderScale(parsed) then
+                refreshScaleLabels()
+                return
+            end
+            applyScale(parsed)
+        end)
+
+        minus.Activated:Connect(function() applyScale(defenderScale * 0.90) end)
+        plus.Activated:Connect(function() applyScale(defenderScale * 1.10) end)
+        preset100.Activated:Connect(function() applyScale(1) end)
+        preset200.Activated:Connect(function() applyScale(2) end)
+
+        -- ==================================================
+        -- BORDE
+        -- ==================================================
+        local borderCard = makeCard(110)
+        makeCardTitle(borderCard, "BORDE", "El contorno se escala junto al botón y conserva la forma")
+
+        local borderToggle = Instance.new("TextButton")
+        borderToggle.Size = UDim2.fromOffset(104, 36)
+        borderToggle.Position = UDim2.new(0, 8, 0, 44)
+        borderToggle.BackgroundColor3 = defenderBorderEnabled and Color3.fromRGB(10, 96, 160) or Color3.fromRGB(8, 38, 62)
+        borderToggle.BorderSizePixel = 0
+        borderToggle.AutoButtonColor = false
+        borderToggle.Text = defenderBorderEnabled and "BORDE: ON" or "BORDE: OFF"
+        borderToggle.TextColor3 = Color3.fromRGB(240,250,255)
+        borderToggle.Font = Enum.Font.GothamBold
+        borderToggle.TextSize = 9
+        borderToggle.Parent = borderCard
+        local borderToggleCorner = Instance.new("UICorner")
+        borderToggleCorner.CornerRadius = UDim.new(0, 8)
+        borderToggleCorner.Parent = borderToggle
+
+        local borderValue = Instance.new("TextLabel")
+        borderValue.BackgroundTransparency = 1
+        borderValue.Size = UDim2.fromOffset(104, 20)
+        borderValue.Position = UDim2.new(0.5, -10, 0, 46)
+        borderValue.TextColor3 = Color3.fromRGB(91, 201, 255)
+        borderValue.Font = Enum.Font.GothamBold
+        borderValue.TextSize = 8
+        borderValue.Parent = borderCard
+
+        local borderMinus = Instance.new("TextButton")
+        borderMinus.Size = UDim2.fromOffset(36, 36)
+        borderMinus.Position = UDim2.new(1, -100, 0, 43)
+        borderMinus.BackgroundColor3 = Color3.fromRGB(10, 57, 94)
+        borderMinus.BorderSizePixel = 0
+        borderMinus.AutoButtonColor = false
+        borderMinus.Text = "−"
+        borderMinus.TextColor3 = Color3.fromRGB(224,244,255)
+        borderMinus.Font = Enum.Font.GothamBold
+        borderMinus.TextSize = 16
+        borderMinus.Parent = borderCard
+        local borderMinusCorner = Instance.new("UICorner")
+        borderMinusCorner.CornerRadius = UDim.new(0, 7)
+        borderMinusCorner.Parent = borderMinus
+
+        local borderPlus = Instance.new("TextButton")
+        borderPlus.Size = UDim2.fromOffset(36, 36)
+        borderPlus.Position = UDim2.new(1, -40, 0, 43)
+        borderPlus.BackgroundColor3 = Color3.fromRGB(10, 57, 94)
+        borderPlus.BorderSizePixel = 0
+        borderPlus.AutoButtonColor = false
+        borderPlus.Text = "+"
+        borderPlus.TextColor3 = Color3.fromRGB(224,244,255)
+        borderPlus.Font = Enum.Font.GothamBold
+        borderPlus.TextSize = 16
+        borderPlus.Parent = borderCard
+        local borderPlusCorner = Instance.new("UICorner")
+        borderPlusCorner.CornerRadius = UDim.new(0, 7)
+        borderPlusCorner.Parent = borderPlus
+
+        local function refreshBorderUI()
+            borderToggle.Text = defenderBorderEnabled and "BORDE: ON" or "BORDE: OFF"
+            borderToggle.BackgroundColor3 = defenderBorderEnabled and Color3.fromRGB(10, 96, 160) or Color3.fromRGB(8, 38, 62)
+            borderValue.Text = string.format("GROSOR %.1f", defenderBorderThickness)
+        end
+
+        borderToggle.Activated:Connect(function()
+            defenderBorderEnabled = not defenderBorderEnabled
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            refreshBorderUI()
+        end)
+        borderMinus.Activated:Connect(function()
+            defenderBorderThickness = math.max(0, defenderBorderThickness - 0.5)
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            refreshBorderUI()
+        end)
+        borderPlus.Activated:Connect(function()
+            defenderBorderThickness = defenderBorderThickness + 0.5
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            refreshBorderUI()
+        end)
+
+        -- ==================================================
+        -- APARIENCIA
+        -- ==================================================
+        local appearanceCard = makeCard(206)
+        makeCardTitle(appearanceCard, "APARIENCIA", "Cambia los colores y el texto del Defender")
+
+        local colorLabel = Instance.new("TextLabel")
+        colorLabel.BackgroundTransparency = 1
+        colorLabel.Size = UDim2.fromOffset(62, 22)
+        colorLabel.Position = UDim2.new(0, 10, 0, 42)
+        colorLabel.Text = "COLOR"
+        colorLabel.TextColor3 = Color3.fromRGB(175, 220, 248)
+        colorLabel.Font = Enum.Font.GothamBold
+        colorLabel.TextSize = 8
+        colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+        colorLabel.Parent = appearanceCard
+
+        local colorBox = Instance.new("TextBox")
+        colorBox.Size = UDim2.fromOffset(116, 32)
+        colorBox.Position = UDim2.new(0, 62, 0, 38)
+        colorBox.BackgroundColor3 = Color3.fromRGB(3, 17, 33)
+        colorBox.BorderSizePixel = 0
+        colorBox.ClearTextOnFocus = false
+        colorBox.PlaceholderText = "#00AAFF"
+        colorBox.TextColor3 = Color3.fromRGB(243, 250, 255)
+        colorBox.Font = Enum.Font.GothamBold
+        colorBox.TextSize = 10
+        colorBox.TextXAlignment = Enum.TextXAlignment.Center
+        colorBox.Parent = appearanceCard
+        local colorBoxCorner = Instance.new("UICorner")
+        colorBoxCorner.CornerRadius = UDim.new(0, 8)
+        colorBoxCorner.Parent = colorBox
+        local colorBoxStroke = Instance.new("UIStroke")
+        colorBoxStroke.Thickness = 1
+        colorBoxStroke.Transparency = 0.18
+        colorBoxStroke.Color = Color3.fromRGB(30, 145, 225)
+        colorBoxStroke.Parent = colorBox
+
+        local swatches = {
+            {"AZUL", Color3.fromRGB(0, 170, 255)},
+            {"CYAN", Color3.fromRGB(0, 235, 255)},
+            {"VIOLETA", Color3.fromRGB(120, 90, 255)},
+            {"MAGENTA", Color3.fromRGB(235, 80, 235)},
+            {"VERDE", Color3.fromRGB(60, 230, 165)},
+            {"ROJO", Color3.fromRGB(255, 76, 105)}
+        }
+
+        local function colorToHex(c)
+            return string.format("#%02X%02X%02X", math.floor(c.R*255+0.5), math.floor(c.G*255+0.5), math.floor(c.B*255+0.5))
+        end
+
+        local function hexToColor3(raw)
+            if type(raw) ~= "string" then return nil end
+            local hex = raw:gsub("#", ""):gsub("%s+", "")
+            if #hex ~= 6 or not hex:match("^[%da-fA-F]+$") then return nil end
+            local r = tonumber(hex:sub(1,2), 16)
+            local g = tonumber(hex:sub(3,4), 16)
+            local b = tonumber(hex:sub(5,6), 16)
+            if not r or not g or not b then return nil end
+            return Color3.fromRGB(r, g, b)
+        end
+
+        local colorRow = Instance.new("Frame")
+        colorRow.BackgroundTransparency = 1
+        colorRow.Size = UDim2.new(1, -18, 0, 28)
+        colorRow.Position = UDim2.new(0, 9, 0, 76)
+        colorRow.Parent = appearanceCard
+
+        for index, entry in ipairs(swatches) do
+            local sw = Instance.new("TextButton")
+            sw.Size = UDim2.fromOffset(44, 24)
+            sw.Position = UDim2.new(0, (index-1)*49, 0, 0)
+            sw.BackgroundColor3 = entry[2]
+            sw.BorderSizePixel = 0
+            sw.AutoButtonColor = false
+            sw.Text = ""
+            sw.Parent = colorRow
+            local swCorner = Instance.new("UICorner")
+            swCorner.CornerRadius = UDim.new(0, 8)
+            swCorner.Parent = sw
+            local swStroke = Instance.new("UIStroke")
+            swStroke.Thickness = 1.2
+            swStroke.Transparency = 0.12
+            swStroke.Color = Color3.fromRGB(245, 252, 255)
+            swStroke.Parent = sw
+            sw.Activated:Connect(function()
+                defenderColor = entry[2]
+                colorBox.Text = colorToHex(defenderColor)
+                persistDefenderSettings()
+                applyDefenderVisualStyle()
+            end)
+        end
+
+        local colorHint = Instance.new("TextLabel")
+        colorHint.BackgroundTransparency = 1
+        colorHint.Size = UDim2.new(1, -18, 0, 14)
+        colorHint.Position = UDim2.new(0, 9, 0, 103)
+        colorHint.Text = "El color se usa en el botón; Minimalista mantiene negro/blanco."
+        colorHint.TextColor3 = Color3.fromRGB(110, 170, 215)
+        colorHint.Font = Enum.Font.Gotham
+        colorHint.TextSize = 6
+        colorHint.TextXAlignment = Enum.TextXAlignment.Left
+        colorHint.Parent = appearanceCard
+
+        local letterColorLabel = Instance.new("TextLabel")
+        letterColorLabel.BackgroundTransparency = 1
+        letterColorLabel.Size = UDim2.fromOffset(62, 22)
+        letterColorLabel.Position = UDim2.new(0, 10, 0, 120)
+        letterColorLabel.Text = "COLOR TEXTO"
+        letterColorLabel.TextColor3 = Color3.fromRGB(175, 220, 248)
+        letterColorLabel.Font = Enum.Font.GothamBold
+        letterColorLabel.TextSize = 8
+        letterColorLabel.TextXAlignment = Enum.TextXAlignment.Left
+        letterColorLabel.Parent = appearanceCard
+
+        local letterColorBox = Instance.new("TextBox")
+        letterColorBox.Size = UDim2.fromOffset(116, 30)
+        letterColorBox.Position = UDim2.new(0, 62, 0, 116)
+        letterColorBox.BackgroundColor3 = Color3.fromRGB(3, 17, 33)
+        letterColorBox.BorderSizePixel = 0
+        letterColorBox.ClearTextOnFocus = false
+        letterColorBox.PlaceholderText = "#FFFFFF"
+        letterColorBox.TextColor3 = Color3.fromRGB(245, 252, 255)
+        letterColorBox.Font = Enum.Font.GothamBold
+        letterColorBox.TextSize = 9
+        letterColorBox.TextXAlignment = Enum.TextXAlignment.Center
+        letterColorBox.Parent = appearanceCard
+        local letterColorCorner = Instance.new("UICorner")
+        letterColorCorner.CornerRadius = UDim.new(0, 8)
+        letterColorCorner.Parent = letterColorBox
+        local letterColorStroke = Instance.new("UIStroke")
+        letterColorStroke.Thickness = 1
+        letterColorStroke.Transparency = 0.18
+        letterColorStroke.Color = Color3.fromRGB(30, 145, 225)
+        letterColorStroke.Parent = letterColorBox
+
+        local letterSwatches = {
+            {"BLANCO", Color3.fromRGB(255, 255, 255)},
+            {"CYAN", Color3.fromRGB(0, 235, 255)},
+            {"AZUL", Color3.fromRGB(70, 145, 255)},
+            {"VIOLETA", Color3.fromRGB(150, 105, 255)},
+            {"MAGENTA", Color3.fromRGB(245, 95, 235)},
+            {"VERDE", Color3.fromRGB(80, 235, 175)},
+            {"AMARILLO", Color3.fromRGB(255, 220, 90)},
+            {"ROJO", Color3.fromRGB(255, 90, 110)}
+        }
+
+        local letterColorRow = Instance.new("Frame")
+        letterColorRow.BackgroundTransparency = 1
+        letterColorRow.Size = UDim2.fromOffset(286, 28)
+        letterColorRow.Position = UDim2.new(0, 9, 0, 154)
+        letterColorRow.Parent = appearanceCard
+
+        for index, entry in ipairs(letterSwatches) do
+            local sw = Instance.new("TextButton")
+            sw.Size = UDim2.fromOffset(30, 24)
+            sw.Position = UDim2.new(0, (index - 1) * 35, 0, 0)
+            sw.BackgroundColor3 = entry[2]
+            sw.BorderSizePixel = 0
+            sw.AutoButtonColor = false
+            sw.Text = ""
+            sw.Parent = letterColorRow
+            local swCorner = Instance.new("UICorner")
+            swCorner.CornerRadius = UDim.new(0, 8)
+            swCorner.Parent = sw
+            local swStroke = Instance.new("UIStroke")
+            swStroke.Thickness = 1.2
+            swStroke.Transparency = 0.12
+            swStroke.Color = Color3.fromRGB(245, 252, 255)
+            swStroke.Parent = sw
+            sw.Activated:Connect(function()
+                defenderTextColor = entry[2]
+                letterColorBox.Text = colorToHex(defenderTextColor)
+                persistDefenderSettings()
+                applyDefenderVisualStyle()
+            end)
+        end
+
+        local textSizeLabel = Instance.new("TextLabel")
+        textSizeLabel.BackgroundTransparency = 1
+        textSizeLabel.Size = UDim2.fromOffset(62, 22)
+        textSizeLabel.Position = UDim2.new(0, 184, 0, 122)
+        textSizeLabel.Text = "TAMAÑO"
+        textSizeLabel.TextColor3 = Color3.fromRGB(175, 220, 248)
+        textSizeLabel.Font = Enum.Font.GothamBold
+        textSizeLabel.TextSize = 8
+        textSizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+        textSizeLabel.Parent = appearanceCard
+
+        local textSizeBox = Instance.new("TextBox")
+        textSizeBox.Size = UDim2.fromOffset(52, 30)
+        textSizeBox.Position = UDim2.new(1, -62, 0, 118)
+        textSizeBox.BackgroundColor3 = Color3.fromRGB(3, 17, 33)
+        textSizeBox.BorderSizePixel = 0
+        textSizeBox.ClearTextOnFocus = false
+        textSizeBox.PlaceholderText = "11"
+        textSizeBox.TextColor3 = Color3.fromRGB(245, 252, 255)
+        textSizeBox.Font = Enum.Font.GothamBold
+        textSizeBox.TextSize = 10
+        textSizeBox.TextXAlignment = Enum.TextXAlignment.Center
+        textSizeBox.Parent = appearanceCard
+        local textSizeCorner = Instance.new("UICorner")
+        textSizeCorner.CornerRadius = UDim.new(0, 8)
+        textSizeCorner.Parent = textSizeBox
+        local textSizeStroke = Instance.new("UIStroke")
+        textSizeStroke.Thickness = 1
+        textSizeStroke.Transparency = 0.18
+        textSizeStroke.Color = Color3.fromRGB(30, 145, 225)
+        textSizeStroke.Parent = textSizeBox
+
+        local textLabel = Instance.new("TextLabel")
+        textLabel.BackgroundTransparency = 1
+        textLabel.Size = UDim2.fromOffset(62, 22)
+        textLabel.Position = UDim2.new(0, 10, 0, 188)
+        textLabel.Text = "LETRAS"
+        textLabel.TextColor3 = Color3.fromRGB(175, 220, 248)
+        textLabel.Font = Enum.Font.GothamBold
+        textLabel.TextSize = 8
+        textLabel.TextXAlignment = Enum.TextXAlignment.Left
+        textLabel.Parent = appearanceCard
+
+        local textBox = Instance.new("TextBox")
+        textBox.Size = UDim2.new(1, -81, 0, 28)
+        textBox.Position = UDim2.new(0, 62, 0, 184)
+        textBox.BackgroundColor3 = Color3.fromRGB(3, 17, 33)
+        textBox.BorderSizePixel = 0
+        textBox.ClearTextOnFocus = false
+        textBox.PlaceholderText = "DEFENDER"
+        textBox.TextColor3 = Color3.fromRGB(245, 252, 255)
+        textBox.Font = Enum.Font.GothamBold
+        textBox.TextSize = 9
+        textBox.TextXAlignment = Enum.TextXAlignment.Left
+        textBox.Parent = appearanceCard
+        local textBoxCorner = Instance.new("UICorner")
+        textBoxCorner.CornerRadius = UDim.new(0, 8)
+        textBoxCorner.Parent = textBox
+
+        local function refreshAppearanceUI()
+            colorBox.Text = colorToHex(defenderColor)
+            letterColorBox.Text = colorToHex(defenderTextColor)
+            textBox.Text = defenderText
+            textSizeBox.Text = tostring(math.floor(defenderTextSize + 0.5))
+        end
+
+        local function parseTextSize(raw)
+            local n = tonumber(tostring(raw or ""):gsub("%s+", ""))
+            if not n or n ~= n or n <= 0 or n == math.huge then
+                return nil
+            end
+            return math.clamp(n, 6, 30)
+        end
+
+        colorBox.FocusLost:Connect(function()
+            local parsed = hexToColor3(colorBox.Text)
+            if parsed then
+                defenderColor = parsed
+                persistDefenderSettings()
+                applyDefenderVisualStyle()
+                refreshAppearanceUI()
+            else
+                refreshAppearanceUI()
+            end
+        end)
+
+        letterColorBox.FocusLost:Connect(function()
+            local parsed = hexToColor3(letterColorBox.Text)
+            if parsed then
+                defenderTextColor = parsed
+                persistDefenderSettings()
+                applyDefenderVisualStyle()
+                refreshAppearanceUI()
+            else
+                refreshAppearanceUI()
+            end
+        end)
+
+        textSizeBox.FocusLost:Connect(function()
+            local parsed = parseTextSize(textSizeBox.Text)
+            if parsed then
+                defenderTextSize = parsed
+                persistDefenderSettings()
+                applyDefenderVisualStyle()
+                refreshAppearanceUI()
+            else
+                refreshAppearanceUI()
+            end
+        end)
+
+        textBox.FocusLost:Connect(function()
+            local cleaned = tostring(textBox.Text or ""):gsub("[%c]", "")
+            cleaned = string.sub(cleaned, 1, 18)
+            if cleaned == "" then cleaned = "DEFENDER" end
+            defenderText = cleaned
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            refreshAppearanceUI()
+        end)
+
+        local accentToggle = Instance.new("TextButton")
+        accentToggle.Size = UDim2.fromOffset(126, 28)
+        accentToggle.Position = UDim2.new(0, 62, 0, 216)
+        accentToggle.BackgroundColor3 = defenderAccentEnabled and Color3.fromRGB(10, 95, 160) or Color3.fromRGB(8, 36, 60)
+        accentToggle.BorderSizePixel = 0
+        accentToggle.AutoButtonColor = false
+        accentToggle.Text = defenderAccentEnabled and "LINEA: ON" or "LINEA: OFF"
+        accentToggle.TextColor3 = Color3.fromRGB(240, 250, 255)
+        accentToggle.Font = Enum.Font.GothamBold
+        accentToggle.TextSize = 8
+        accentToggle.Parent = appearanceCard
+        local accentToggleCorner = Instance.new("UICorner")
+        accentToggleCorner.CornerRadius = UDim.new(0, 8)
+        accentToggleCorner.Parent = accentToggle
+
+        local accentHint = Instance.new("TextLabel")
+        accentHint.BackgroundTransparency = 1
+        accentHint.Size = UDim2.fromOffset(108, 28)
+        accentHint.Position = UDim2.new(0, 192, 0, 216)
+        accentHint.Text = "La línea usa el color del botón"
+        accentHint.TextColor3 = Color3.fromRGB(110, 170, 215)
+        accentHint.Font = Enum.Font.Gotham
+        accentHint.TextSize = 6
+        accentHint.TextWrapped = true
+        accentHint.TextXAlignment = Enum.TextXAlignment.Left
+        accentHint.Parent = appearanceCard
+
+        accentToggle.Activated:Connect(function()
+            defenderAccentEnabled = not defenderAccentEnabled
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            accentToggle.Text = defenderAccentEnabled and "LINEA: ON" or "LINEA: OFF"
+            accentToggle.BackgroundColor3 = defenderAccentEnabled and Color3.fromRGB(10, 95, 160) or Color3.fromRGB(8, 36, 60)
+        end)
+
+        -- ==================================================
+        -- RESTABLECER
+        -- ==================================================
+        local resetCard = makeCard(56)
+        local reset = Instance.new("TextButton")
+        reset.Size = UDim2.new(1, -18, 0, 30)
+        reset.Position = UDim2.new(0, 9, 0.5, -15)
+        reset.BackgroundColor3 = Color3.fromRGB(10, 57, 93)
+        reset.BorderSizePixel = 0
+        reset.AutoButtonColor = false
+        reset.Text = "RESTABLECER APARIENCIA"
+        reset.TextColor3 = Color3.fromRGB(235, 249, 255)
+        reset.Font = Enum.Font.GothamBold
+        reset.TextSize = 8
+        reset.Parent = resetCard
+        local resetCorner = Instance.new("UICorner")
+        resetCorner.CornerRadius = UDim.new(0, 9)
+        resetCorner.Parent = reset
+
+        reset.Activated:Connect(function()
+            defenderStyle = "Professional"
+            defenderShape = "Rounded"
+            defenderScale = 1
+            defenderBorderEnabled = true
+            defenderBorderThickness = 1.6
+            defenderAccentEnabled = true
+            defenderText = "DEFENDER"
+            defenderTextSize = 11
+            defenderTextColor = Color3.fromRGB(255, 255, 255)
+            defenderColor = Color3.fromRGB(0, 170, 255)
+            persistDefenderSettings()
+            applyDefenderVisualStyle()
+            updateStyleButtons()
+            updateShapeButtons()
+            refreshScaleLabels()
+            refreshBorderUI()
+            refreshAppearanceUI()
+        end)
+
+        local footer = Instance.new("TextLabel")
+        footer.Size = UDim2.new(1, 0, 0, 18)
+        footer.BackgroundTransparency = 1
+        footer.Text = "Desliza ↔ para ver los controles completos   •   Guardado automático"
+        footer.TextColor3 = Color3.fromRGB(88, 148, 195)
+        footer.Font = Enum.Font.Gotham
+        footer.TextSize = 6
+        footer.Parent = body
+
+        -- Tanto X como minimizar eliminan por completo este panel.
+        -- Para volver a abrirlo se usa Personalización > Defender.
+        minimize.Text = "−"
+        minimize.Activated:Connect(closeDefenderCustomizer)
+        close.Activated:Connect(closeDefenderCustomizer)
+
+        -- El panel queda centrado en todo momento, también tras cambios de viewport.
+        local cameraChangedConnection = nil
+        local function keepCentered()
+            if window and window.Parent then
+                window.AnchorPoint = Vector2.new(0.5, 0.5)
+                window.Position = UDim2.fromScale(0.5, 0.5)
+            end
+        end
+        keepCentered()
+
+        if Workspace.CurrentCamera then
+            cameraChangedConnection = Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(keepCentered)
+            table.insert(defenderCustomizerConnections, cameraChangedConnection)
+        end
+
+        -- RGB del panel (no del botón flotante): gradiente vivo azul/cyan/violeta.
+        table.insert(defenderCustomizerConnections, RunService.RenderStepped:Connect(function(dt)
+            if not window or not window.Parent then return end
+            outerGradient.Rotation = (outerGradient.Rotation + dt * 18) % 360
+            outerGradient.Offset = Vector2.new(math.sin(os.clock() * 0.55) * 0.10, math.cos(os.clock() * 0.40) * 0.06)
+            headerGradient.Rotation = (headerGradient.Rotation + dt * 9) % 360
+        end))
+
+        refreshLists()
+        updateStyleButtons()
+        updateShapeButtons()
+        refreshScaleLabels()
+        refreshBorderUI()
+        refreshAppearanceUI()
+    end
+
+    __TOKITO_ENV.__TokitoOpenDefenderCustomizer = makeDefenderCustomizer
+
+    local __TokitoBaseCleanup = __TOKITO_ENV.__TokitoHubCleanup
+    __TOKITO_ENV.__TokitoHubCleanup = function()
+        closeDefenderCustomizer()
+        defenderBusy = false
+        destroyDefender()
+        __TOKITO_ENV.__TokitoOpenDefenderCustomizer = nil
+        pcall(function()
+            if type(__TokitoBaseCleanup) == "function" then
+                __TokitoBaseCleanup()
+            end
+        end)
+    end
+
+    createToggle("Defender", function(state)
+        if state then
+            createDefender()
+        else
+            destroyDefender()
+        end
+    end)
 end
 
-end)
-
--- ====================================================
--- GUARDAR POSICIÓN
--- ====================================================
-
-local function saveDefenderPosition(position)
-Config["DefenderPos"] = {
-position.X.Scale,
-position.X.Offset,
-position.Y.Scale,
-position.Y.Offset
-}
-
-if saveConfig then    
-    saveConfig()    
-end
-
-end
-
--- ====================================================
--- BUSCAR TOOL
--- ====================================================
-
-local function getDefenderItem(itemName)
-local character = LocalPlayer.Character
-local backpack = LocalPlayer:FindFirstChild("Backpack")
-
-if not character or not backpack then    
-    return nil    
-end    
-
-for _, obj in ipairs(character:GetChildren()) do    
-    if obj:IsA("Tool") and obj.Name == itemName then    
-        return obj    
-    end    
-end    
-
-for _, obj in ipairs(backpack:GetChildren()) do    
-    if obj:IsA("Tool") and obj.Name == itemName then    
-        return obj    
-    end    
-end    
-
-return nil
-
-end
-
--- ====================================================
--- USAR TOOL
--- ====================================================
-
-local function useDefenderItem(itemName)
-local tool = getDefenderItem(itemName)
-
-if not tool then    
-    return    
-end    
-
-pcall(function()    
-    local character = LocalPlayer.Character    
-
-    if not character then    
-        return    
-    end    
-
-    local humanoid =    
-        character:FindFirstChildOfClass("Humanoid")    
-
-    if not humanoid then    
-        return    
-    end    
-
-    if tool.Parent ~= character then    
-        humanoid:EquipTool(tool)    
-        task.wait()    
-    end    
-
-    if tool.Parent == character then    
-        tool:Activate()    
-    end    
-end)
-
-end
-
--- ====================================================
--- SECUENCIA
--- ====================================================
-
-local function useDefenderOnce()
-
-if defenderBusy then    
-    return    
-end    
-
-defenderBusy = true    
-
-task.spawn(function()    
-
-    useDefenderItem(    
-        "All Seeing Sentry"    
-    )    
-
-    task.wait(ITEM_DELAY)    
-
-    if not defenderBusy then    
-        return    
-    end    
-
-    useDefenderItem(    
-        "BeeHive"    
-    )    
-
-    task.wait(ITEM_DELAY)    
-
-    if not defenderBusy then    
-        return    
-    end    
-
-    useDefenderItem(    
-        "Attack Doge"    
-    )    
-
-    task.wait(ITEM_DELAY)    
-
-    if not defenderBusy then    
-        return    
-    end    
-
-    useDefenderItem(    
-        "Subspace Mine"    
-    )    
-
-    defenderBusy = false    
-end)
-
-end
-
--- ====================================================
--- DESTRUIR GUI
--- ====================================================
-
-local function destroyDefender()
-
-defenderBusy = false    
-
-for _, connection in ipairs(defenderConnections) do    
-    if connection then    
-        pcall(function()    
-            connection:Disconnect()    
-        end)    
-    end    
-end    
-
-table.clear(defenderConnections)    
-
-if defenderGui then    
-    pcall(function()    
-        defenderGui:Destroy()    
-    end)    
-
-    defenderGui = nil    
-end
-
-end
-
--- ====================================================
--- CREAR GUI
--- ====================================================
-
-local function createDefender()
-
-destroyDefender()    
-
-local ScreenGui = Instance.new("ScreenGui")    
-
-ScreenGui.Name = "DefenderCompact"    
-ScreenGui.ResetOnSpawn = false    
-ScreenGui.IgnoreGuiInset = true    
-ScreenGui.ZIndexBehavior =    
-    Enum.ZIndexBehavior.Sibling    
-
-local parent    
-
-pcall(function()    
-    parent = gethui()    
-end)    
-
-if not parent then    
-    parent = game:GetService("CoreGui")    
-end    
-
-ScreenGui.Parent = parent    
-defenderGui = ScreenGui    
-
--- ==================================================    
--- FRAME    
--- ==================================================    
-
-local Frame = Instance.new("Frame")    
-
-Frame.Name = "Defender"    
-
-Frame.Size = UDim2.new(    
-    0,    
-    110,    
-    0,    
-    36    
-)    
-
-Frame.Position = savedPosition    
-
-Frame.BackgroundColor3 = Color3.fromRGB(    
-    9,    
-    15,    
-    22    
-)    
-
-Frame.BorderSizePixel = 0    
-Frame.Active = true    
-Frame.Parent = ScreenGui    
-
-local Corner = Instance.new("UICorner")    
-Corner.CornerRadius = UDim.new(0, 9)    
-Corner.Parent = Frame    
-
-local Stroke = Instance.new("UIStroke")    
-Stroke.Thickness = 1    
-Stroke.Transparency = 0.15    
-Stroke.Color = Color3.fromRGB(    
-    0,    
-    150,    
-    220    
-)    
-Stroke.Parent = Frame    
-
--- ==================================================    
--- TITULO    
--- ==================================================    
-
-local Title = Instance.new("TextLabel")    
-
-Title.Size = UDim2.new(    
-    0,    
-    65,    
-    1,    
-    0    
-)    
-
-Title.Position = UDim2.new(    
-    0,    
-    9,    
-    0,    
-    0    
-)    
-
-Title.BackgroundTransparency = 1    
-Title.Text = "DEFENDER"    
-
-Title.TextColor3 = Color3.fromRGB(    
-    220,    
-    235,    
-    245    
-)    
-
-Title.Font = Enum.Font.GothamBold    
-Title.TextSize = 9    
-Title.TextXAlignment =    
-    Enum.TextXAlignment.Left    
-
-Title.Parent = Frame    
-
--- ==================================================    
--- BOTÓN    
--- ==================================================    
-
-local Toggle = Instance.new("TextButton")    
-
-Toggle.Name = "Use"    
-
-Toggle.Size = UDim2.new(    
-    0,    
-    32,    
-    0,    
-    18    
-)    
-
-Toggle.Position = UDim2.new(    
-    1,    
-    -40,    
-    0.5,    
-    -9    
-)    
-
-Toggle.BackgroundColor3 =    
-    Color3.fromRGB(    
-        35,    
-        45,    
-        55    
-    )    
-
-Toggle.BorderSizePixel = 0    
-Toggle.Text = ""    
-Toggle.AutoButtonColor = false    
-Toggle.ZIndex = 5    
-Toggle.Parent = Frame    
-
-local ToggleCorner = Instance.new("UICorner")    
-ToggleCorner.CornerRadius =    
-    UDim.new(1, 0)    
-ToggleCorner.Parent = Toggle    
-
-local Knob = Instance.new("Frame")    
-
-Knob.Size = UDim2.new(    
-    0,    
-    14,    
-    0,    
-    14    
-)    
-
-Knob.Position = UDim2.new(    
-    0,    
-    2,    
-    0.5,    
-    -7    
-)    
-
-Knob.BackgroundColor3 =    
-    Color3.fromRGB(    
-        170,    
-        185,    
-        195    
-    )    
-
-Knob.BorderSizePixel = 0    
-Knob.ZIndex = 6    
-Knob.Parent = Toggle    
-
-local KnobCorner = Instance.new("UICorner")    
-KnobCorner.CornerRadius =    
-    UDim.new(1, 0)    
-KnobCorner.Parent = Knob    
-
--- ==================================================    
--- CLICK DEL DEFENDER    
--- ==================================================    
-
-table.insert(    
-    defenderConnections,    
-
-    Toggle.MouseButton1Click:Connect(    
-        function()    
-
-            if defenderBusy then    
-                return    
-            end    
-
-            -- Visual ON    
-            Toggle.BackgroundColor3 =    
-                Color3.fromRGB(    
-                    0,    
-                    155,    
-                    225    
-                )    
-
-            Knob.BackgroundColor3 =    
-                Color3.fromRGB(    
-                    255,    
-                    255,    
-                    255    
-                )    
-
-            Knob.Position =    
-                UDim2.new(    
-                    1,    
-                    -16,    
-                    0.5,    
-                    -7    
-                )    
-
-            Title.TextColor3 =    
-                Color3.fromRGB(    
-                    0,    
-                    210,    
-                    255    
-                )    
-
-            useDefenderOnce()    
-
-            task.spawn(function()    
-
-                while defenderBusy do    
-                    task.wait()    
-                end    
-
-                if not defenderGui    
-                    or not defenderGui.Parent then    
-                    return    
-                end    
-
-                -- Visual OFF    
-                Toggle.BackgroundColor3 =    
-                    Color3.fromRGB(    
-                        35,    
-                        45,    
-                        55    
-                    )    
-
-                Knob.BackgroundColor3 =    
-                    Color3.fromRGB(    
-                        170,    
-                        185,    
-                        195    
-                    )    
-
-                Knob.Position =    
-                    UDim2.new(    
-                        0,    
-                        2,    
-                        0.5,    
-                        -7    
-                    )    
-
-                Title.TextColor3 =    
-                    Color3.fromRGB(    
-                        220,    
-                        235,    
-                        245    
-                    )    
-            end)    
-        end    
-    )    
-)    
-
--- ==================================================    
--- ARRASTRE    
--- ==================================================    
-
-local dragging = false    
-local dragStart = nil    
-local startPosition = nil    
-local activeTouch = nil    
-
-table.insert(    
-    defenderConnections,    
-
-    Frame.InputBegan:Connect(    
-        function(input)    
-
-            if input.UserInputType    
-                ~= Enum.UserInputType.MouseButton1    
-                and input.UserInputType    
-                ~= Enum.UserInputType.Touch then    
-
-                return    
-            end    
-
-            -- No iniciar drag si tocó el botón    
-            if input.UserInputType    
-                == Enum.UserInputType.MouseButton1 then    
-
-                local mouse =    
-                    UserInputService:GetMouseLocation()    
-
-                local pos =    
-                    Toggle.AbsolutePosition    
-
-                local size =    
-                    Toggle.AbsoluteSize    
-
-                if mouse.X >= pos.X    
-                    and mouse.X <= pos.X + size.X    
-                    and mouse.Y >= pos.Y    
-                    and mouse.Y <= pos.Y + size.Y then    
-
-                    return    
-                end    
-            end    
-
-            dragging = true    
-            dragStart = input.Position    
-            startPosition = Frame.Position    
-            activeTouch = input    
-        end    
-    )    
-)    
-
-table.insert(    
-    defenderConnections,    
-
-    UserInputService.InputChanged:Connect(    
-        function(input)    
-
-            if not dragging then    
-                return    
-            end    
-
-            if input.UserInputType    
-                == Enum.UserInputType.MouseMovement then    
-
-                local delta =    
-                    input.Position -    
-                    dragStart    
-
-                Frame.Position =    
-                    UDim2.new(    
-                        startPosition.X.Scale,    
-                        startPosition.X.Offset    
-                            + delta.X,    
-
-                        startPosition.Y.Scale,    
-                        startPosition.Y.Offset    
-                            + delta.Y    
-                    )    
-            end    
-        end    
-    )    
-)    
-
-table.insert(    
-    defenderConnections,    
-
-    UserInputService.TouchMoved:Connect(    
-        function(touch)    
-
-            if not dragging then    
-                return    
-            end    
-
-            if touch ~= activeTouch then    
-                return    
-            end    
-
-            local delta =    
-                touch.Position -    
-                dragStart    
-
-            Frame.Position =    
-                UDim2.new(    
-                    startPosition.X.Scale,    
-                    startPosition.X.Offset    
-                        + delta.X,    
-
-                    startPosition.Y.Scale,    
-                    startPosition.Y.Offset    
-                        + delta.Y    
-                )    
-        end    
-    )    
-)    
-
-table.insert(    
-    defenderConnections,    
-
-    UserInputService.InputEnded:Connect(    
-        function(input)    
-
-            if input.UserInputType    
-                ~= Enum.UserInputType.MouseButton1    
-                and input.UserInputType    
-                ~= Enum.UserInputType.Touch then    
-
-                return    
-            end    
-
-            if input.UserInputType    
-                == Enum.UserInputType.Touch    
-                and activeTouch    
-                and input ~= activeTouch then    
-
-                return    
-            end    
-
-            if dragging then    
-
-                dragging = false    
-                activeTouch = nil    
-
-                saveDefenderPosition(    
-                    Frame.Position    
-                )    
-            end    
-        end    
-    )    
-)    
-
--- ==================================================    
--- RGB    
--- ==================================================    
-
-table.insert(    
-    defenderConnections,    
-
-    RunService.RenderStepped:Connect(    
-        function()    
-
-            if not defenderGui    
-                or not defenderGui.Parent then    
-
-                return    
-            end    
-
-            Stroke.Color =    
-                Color3.fromHSV(    
-                    0.55    
-                        + math.sin(    
-                            tick() * 2    
-                        ) * 0.04,    
-
-                    1,    
-                    1    
-                )    
-        end    
-    )    
-)
-
-end
-
--- ====================================================
--- HUB TOGGLE
--- ====================================================
-
-createToggle(
-"Defender",
-function(state)
-
-if state then    
-        createDefender()    
-    else    
-        destroyDefender()    
-    end    
-
-end
-
-)
-
-end
 -- HOLD JUMP
 local holdJumpEnabled = false
 
