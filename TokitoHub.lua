@@ -385,7 +385,9 @@ contentTopShade.BorderSizePixel=0
 contentTopShade.ZIndex=2
 local sections={}
 local buttons={}
-local order={"STEAL","VISUALES","TEXTURAS","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
+local order={"STEAL","MUSICA","VISUALES","TEXTURAS","OPTIMIZACIÓN","MOVILIDAD","UTILIDADES","GENERAL"}
+local current="STEAL"
+
 local function makeSection(name)
  local page=Instance.new("ScrollingFrame",content)
  page.Name=name
@@ -406,49 +408,147 @@ local function makeSection(name)
  local lay=Instance.new("UIListLayout",page)
  lay.Padding=UDim.new(0,7)
  lay.SortOrder=Enum.SortOrder.LayoutOrder
+
  local tab=Instance.new("TextButton",tabs)
+ tab.Name="Section_"..name
  tab.Size=UDim2.new(1,0,0,38)
  tab.Text=name
- tab.Font=Enum.Font.GothamBold
- tab.TextSize=11
- tab.TextColor3=Color3.fromRGB(220,235,255)
- tab.BackgroundColor3=Color3.fromRGB(24,35,58)
+ tab.Font=Enum.Font.GothamBlack
+ tab.TextSize=12
+ tab.TextColor3=Color3.fromRGB(232,242,255)
+ tab.TextStrokeColor3=Color3.fromRGB(0,18,42)
+ tab.TextStrokeTransparency=.42
+ tab.BackgroundColor3=Color3.fromRGB(17,27,46)
  tab.BorderSizePixel=0
+ tab.AutoButtonColor=false
  Instance.new("UICorner",tab).CornerRadius=UDim.new(0,9)
+
  local tabStroke=Instance.new("UIStroke",tab)
- tabStroke.Thickness=1
- tabStroke.Transparency=.72
- tabStroke.Color=Color3.fromRGB(55,125,205)
+ tabStroke.Name="RGBStroke"
+ tabStroke.Thickness=1.35
+ tabStroke.Transparency=.46
+ tabStroke.Color=Color3.fromRGB(20,85,155)
+
  local tabGrad=Instance.new("UIGradient",tab)
  tabGrad.Rotation=0
  tabGrad.Color=ColorSequence.new({
-  ColorSequenceKeypoint.new(0,Color3.fromRGB(27,43,69)),
-  ColorSequenceKeypoint.new(1,Color3.fromRGB(18,29,49))
+  ColorSequenceKeypoint.new(0,Color3.fromRGB(24,43,68)),
+  ColorSequenceKeypoint.new(.5,Color3.fromRGB(16,31,53)),
+  ColorSequenceKeypoint.new(1,Color3.fromRGB(11,23,40))
  })
+
+ local tabAccent=Instance.new("Frame",tab)
+ tabAccent.Name="RGBAccent"
+ tabAccent.Size=UDim2.new(0,3,1,-10)
+ tabAccent.Position=UDim2.new(0,4,0,5)
+ tabAccent.BackgroundColor3=Color3.fromRGB(15,70,135)
+ tabAccent.BorderSizePixel=0
+ tabAccent.BackgroundTransparency=.58
+ tabAccent.ZIndex=2
+ Instance.new("UICorner",tabAccent).CornerRadius=UDim.new(1,0)
+
+ local accentGrad=Instance.new("UIGradient",tabAccent)
+ accentGrad.Rotation=90
+ accentGrad.Color=ColorSequence.new({
+  ColorSequenceKeypoint.new(0,Color3.fromRGB(5,30,85)),
+  ColorSequenceKeypoint.new(.5,Color3.fromRGB(20,85,155)),
+  ColorSequenceKeypoint.new(1,Color3.fromRGB(5,45,115))
+ })
+
+ local accentGlow=Instance.new("UIStroke",tabAccent)
+ accentGlow.Name="RGBGlow"
+ accentGlow.Thickness=2
+ accentGlow.Transparency=.78
+ accentGlow.Color=Color3.fromRGB(25,95,175)
+
  sections[name]=page
  buttons[name]=tab
+
  tab.MouseButton1Click:Connect(function()
-  for n,p in pairs(sections) do p.Visible=(n==name) end
+  current=name
+
+  for n,p in pairs(sections) do
+   p.Visible=(n==name)
+  end
+
   for n,b in pairs(buttons) do
-   b.BackgroundColor3=(n==name) and Color3.fromRGB(27,60,101) or Color3.fromRGB(19,29,48)
-   b.TextColor3=(n==name) and Color3.fromRGB(235,248,255) or Color3.fromRGB(175,205,235)
-   local bs=b:FindFirstChildOfClass("UIStroke")
+   local active=(n==name)
+
+   b.BackgroundColor3=active and Color3.fromRGB(18,42,72) or Color3.fromRGB(12,22,38)
+   b.TextColor3=active and Color3.fromRGB(255,255,255) or Color3.fromRGB(220,235,252)
+
+   local bs=b:FindFirstChild("RGBStroke")
    if bs then
-    bs.Color=(n==name) and Color3.fromRGB(70,205,255) or Color3.fromRGB(55,125,205)
-    bs.Transparency=(n==name) and .30 or .72
+    bs.Transparency=active and .08 or .34
+    bs.Thickness=active and 2 or 1.35
+   end
+
+   local ac=b:FindFirstChild("RGBAccent")
+   if ac then
+    ac.BackgroundTransparency=active and .02 or .38
+
+    local glow=ac:FindFirstChild("RGBGlow")
+    if glow then
+     glow.Transparency=active and .14 or .55
+    end
    end
   end
  end)
 end
-for _,n in ipairs(order) do makeSection(n) end
-local current="STEAL"
+
+for _,n in ipairs(order) do
+ makeSection(n)
+end
+
+local sectionRgbConnection=RunService.RenderStepped:Connect(function()
+ local pulse=(math.sin(tick()*2.2)+1)/2
+ local darkA=Color3.fromRGB(4,24,58)
+ local darkB=Color3.fromRGB(10,48,92)
+ local darkC=Color3.fromRGB(22,78,130)
+ local borderColor=darkA:Lerp(darkC,pulse)
+ local accentColor=darkB:Lerp(darkC,pulse*.72)
+
+ for _,n in ipairs(order) do
+  local b=buttons[n]
+  if b then
+   local active=(n==current)
+
+   local bs=b:FindFirstChild("RGBStroke")
+   if bs then
+    bs.Color=active and accentColor or borderColor
+    bs.Thickness=active and 2 or 1.35
+   end
+
+   local ac=b:FindFirstChild("RGBAccent")
+   if ac then
+    ac.BackgroundColor3=active and darkC or darkB
+
+    local glow=ac:FindFirstChild("RGBGlow")
+    if glow then
+     glow.Color=active and accentColor or borderColor
+    end
+   end
+  end
+ end
+end)
+
 sections[current].Visible=true
-buttons[current].BackgroundColor3=Color3.fromRGB(27,60,101)
-buttons[current].TextColor3=Color3.fromRGB(235,248,255)
-local currentStroke=buttons[current]:FindFirstChildOfClass("UIStroke")
+buttons[current].BackgroundColor3=Color3.fromRGB(18,42,72)
+buttons[current].TextColor3=Color3.fromRGB(255,255,255)
+
+local currentStroke=buttons[current]:FindFirstChild("RGBStroke")
 if currentStroke then
- currentStroke.Color=Color3.fromRGB(70,205,255)
- currentStroke.Transparency=.30
+ currentStroke.Transparency=.08
+ currentStroke.Thickness=2
+end
+
+local currentAccent=buttons[current]:FindFirstChild("RGBAccent")
+if currentAccent then
+ currentAccent.BackgroundTransparency=.02
+ local currentGlow=currentAccent:FindFirstChild("RGBGlow")
+ if currentGlow then
+  currentGlow.Transparency=.14
+ end
 end
 
 -- ============================================================
@@ -896,6 +996,7 @@ local function classify(name)
  if n:find("speed") or n:find("invisible") then return "MOVILIDAD" end
  if n:find("server") or n:find("rendimiento") or n:find("inventario") or n:find("kick boton") or n:find("reset") or n:find("comprar") or n:find("ap spammer") or n:find("ap circle") then return "UTILIDADES" end
  if n:find("autograb") or n:find("ragdoll") or n:find("freeze") or n:find("defender") or n:find("bee") or n:find("torreta") or n:find("steal") or n:find("best") or n:find("clone") or n:find("clon") or n:find("potion") or n:find("brainrot") or n:find("drop") or n:find("line to base") or n:find("auto kick") or n:find("rayo") then return "STEAL" end
+ if n=="toki musica reproductor" then return "MUSICA" end
  return "GENERAL"
 end
 local function addHover(b)
@@ -1627,6 +1728,12 @@ UI.mini=mini
 UI.setMini=setMini
 UI.cleanup=function()
  pcall(function() toggleNotificationSound:Destroy() end)
+ pcall(function()
+  if sectionRgbConnection then
+   sectionRgbConnection:Disconnect()
+   sectionRgbConnection=nil
+  end
+ end)
 end
 __TOKITO_ENV.__TokitoHubOpenVisual = openVisual
 return UI
@@ -6459,6 +6566,25 @@ do
     -- Toggle en la interfaz del hub
     createToggle("Steal Floor", function(state)
         SetStealFloor(state)
+    end)
+end
+
+-- ============================================================
+-- TOKI MUSICA REPRODUCTOR
+-- ============================================================
+do
+    local function SetTokiMusic(state)
+        if not state then
+            return
+        end
+
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/mariandrespat18-cpu/Vrg/refs/heads/main/M"))()
+        end)
+    end
+
+    createToggle("Toki musica reproductor", function(state)
+        SetTokiMusic(state)
     end)
 end
 
