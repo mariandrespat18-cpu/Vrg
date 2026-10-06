@@ -6725,6 +6725,18 @@ do
         ["Laser Cape"] = true
     }
 
+    -- Jugador que este sistema nunca debe seleccionar como objetivo.
+    -- Esto afecta Aimbot, Web Slinger, Laser Cape y Auto Paintball,
+    -- porque todos usan StealCleanGetBestEnemy().
+    local StealCleanExcludedPlayerNames = {
+        ["Tokito_2025Muichiro"] = true
+    }
+
+    local function StealCleanIsExcludedPlayer(targetPlayer)
+        return targetPlayer ~= nil
+            and StealCleanExcludedPlayerNames[targetPlayer.Name] == true
+    end
+
     local StealCleanHookedTools = {}
     local StealCleanPlayerMouse
     local StealCleanLastAimCheck = 0
@@ -6931,7 +6943,9 @@ do
         local cameraDirection = camera.CFrame.LookVector
 
         for _, player in ipairs(StealCleanPlayers:GetPlayers()) do
-            if player ~= StealCleanLP and player.Character then
+            if player ~= StealCleanLP
+                and not StealCleanIsExcludedPlayer(player)
+                and player.Character then
                 local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
 
@@ -6975,6 +6989,11 @@ do
 
         local target = StealCleanGetBestEnemy()
         if not target or not target.Parent then
+            return
+        end
+
+        local targetPlayer = StealCleanPlayers:GetPlayerFromCharacter(target.Parent)
+        if StealCleanIsExcludedPlayer(targetPlayer) then
             return
         end
 
@@ -7060,6 +7079,11 @@ do
 
         local target = StealCleanGetBestEnemy()
         if not target or not target.Parent then
+            return
+        end
+
+        local targetPlayer = StealCleanPlayers:GetPlayerFromCharacter(target.Parent)
+        if StealCleanIsExcludedPlayer(targetPlayer) then
             return
         end
 
